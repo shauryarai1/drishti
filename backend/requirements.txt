@@ -1,7 +1,7 @@
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
-swisseph>=2.10.0
+pyswisseph
 geopy>=2.4.0
 timezonefinder>=6.0.0
 tzdata>=2023.3
