@@ -1,7 +1,7 @@
 import type { ChartResponse } from '../types/chart'
 import type { InterpretationResponse, BirthPayload } from '../types/interpretation'
 
-const API_BASE = '/api'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 export async function fetchChart(payload: {
   date: string
