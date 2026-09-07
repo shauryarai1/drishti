@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { API_BASE } from '../services/api'
 
 interface PlaceResult {
   display: string
@@ -49,7 +50,7 @@ export default function LocationInput({
 
     try {
       const res = await fetch(
-        `/api/places/search?q=${encodeURIComponent(q.trim())}`,
+        `${API_BASE}/places/search?q=${encodeURIComponent(q.trim())}`,
         { signal: controller.signal }
       )
       if (!res.ok) return

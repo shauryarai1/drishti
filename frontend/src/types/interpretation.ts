@@ -31,9 +31,13 @@ export interface ChartData {
 export interface InterpretationResponse {
   status: 'success' | 'error'
   message?: string
-  primary: InterpretationArea
-  secondary: InterpretationArea
-  sudden?: InterpretationArea
+  attention: InterpretationArea
+  protect: InterpretationArea
+  danger: InterpretationArea
+  transit: {
+    heading: string
+    description: string
+  }
   chart?: ChartData
 }
 

@@ -52,20 +52,40 @@ function DangerSection({ area, delay }: { area: InterpretationArea; delay: numbe
 
       <div className="reading-section__body">
         <p className="reading-section__desc">{area.description}</p>
-        <p className="reading-section__impact">{area.potential_impact}</p>
+        {area.potential_impact && (
+          <p className="reading-section__impact">{area.potential_impact}</p>
+        )}
       </div>
 
-      <div className="reading-section__careful">
-        <div className="reading-section__careful-label">Be careful with:</div>
-        <ul className="reading-section__list">
-          {area.mindful_of.map((item, i) => (
-            <li key={i} className="reading-section__list-item">{item}</li>
-          ))}
-        </ul>
-      </div>
+      {area.mindful_of.length > 0 && (
+        <div className="reading-section__careful">
+          <div className="reading-section__careful-label">Be careful with:</div>
+          <ul className="reading-section__list">
+            {area.mindful_of.map((item, i) => (
+              <li key={i} className="reading-section__list-item">{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      <div className="reading-section__takeaway">
-        <p className="reading-section__takeaway-text">{area.takeaway}</p>
+      {area.takeaway && (
+        <div className="reading-section__takeaway">
+          <p className="reading-section__takeaway-text">{area.takeaway}</p>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+function AttentionSection({ area, delay }: { area: InterpretationArea; delay: number }) {
+  return (
+    <motion.div className="reading-section protect-section" {...fadeUp(delay)}>
+      <div className="section-badge section-badge--protect">
+        <span className="section-badge__text">ATTENTION AREA</span>
+      </div>
+      <h2 className="reading-section__area">{area.area}</h2>
+      <div className="reading-section__body">
+        <p className="reading-section__desc">{area.description}</p>
       </div>
     </motion.div>
   )
@@ -88,53 +108,43 @@ function ProtectSection({ area, delay }: { area: InterpretationArea; delay: numb
 
       <div className="reading-section__body">
         <p className="reading-section__desc">{area.description}</p>
-        <p className="reading-section__impact">{area.potential_impact}</p>
+        {area.potential_impact && (
+          <p className="reading-section__impact">{area.potential_impact}</p>
+        )}
       </div>
 
-      <div className="reading-section__careful">
-        <div className="reading-section__careful-label">Pay attention to:</div>
-        <ul className="reading-section__list">
-          {area.mindful_of.map((item, i) => (
-            <li key={i} className="reading-section__list-item">{item}</li>
-          ))}
-        </ul>
-      </div>
+      {area.mindful_of.length > 0 && (
+        <div className="reading-section__careful">
+          <div className="reading-section__careful-label">Pay attention to:</div>
+          <ul className="reading-section__list">
+            {area.mindful_of.map((item, i) => (
+              <li key={i} className="reading-section__list-item">{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      <div className="reading-section__takeaway">
-        <p className="reading-section__takeaway-text">{area.takeaway}</p>
-      </div>
+      {area.takeaway && (
+        <div className="reading-section__takeaway">
+          <p className="reading-section__takeaway-text">{area.takeaway}</p>
+        </div>
+      )}
     </motion.div>
   )
 }
 
-// ── Sudden Changes Section ──
-function SuddenSection({ area, delay }: { area: InterpretationArea; delay: number }) {
+// ── Transit Caution Section ──
+function TransitSection({ heading, description, delay }: { heading: string; description: string; delay: number }) {
   return (
     <motion.div className="reading-section sudden-section" {...fadeUp(delay)}>
       <div className="section-badge section-badge--sudden">
         <span className="section-badge__icon">⚡</span>
-        <span className="section-badge__text">SUDDEN CHANGES</span>
+        <span className="section-badge__text">{heading}</span>
       </div>
-
-      <h2 className="reading-section__area">{area.area}</h2>
-
-      {area.hook && (
-        <p className="reading-section__hook">{area.hook}</p>
-      )}
 
       <div className="reading-section__body">
-        <p className="reading-section__desc">{area.description}</p>
-        <p className="reading-section__impact">{area.potential_impact}</p>
+        <p className="reading-section__desc">{description}</p>
       </div>
-    </motion.div>
-  )
-}
-
-// ── Curiosity Bridge ──
-function CuriosityBridge({ text, delay }: { text: string; delay: number }) {
-  return (
-    <motion.div className="curiosity-bridge" {...fadeUp(delay)}>
-      <p className="curiosity-bridge__text">{text}</p>
     </motion.div>
   )
 }
@@ -189,8 +199,6 @@ export default function Results() {
   if (!result) return null
 
   const chart: ChartData | undefined = result.chart
-  const sudden = result.sudden
-
   return (
     <div className="results-page">
       <Navbar />
@@ -242,32 +250,27 @@ export default function Results() {
           <motion.div className="results-divider" {...dividerAnim(0.7)} />
 
           {/* ════════════════════════════════════════════
-              3. DANGER AREA
+              3. ATTENTION, PROTECT, AND DANGER
               ════════════════════════════════════════════ */}
-          <DangerSection area={result.primary} delay={0.8} />
-
-          <CuriosityBridge text="But there's another part of the picture you shouldn't overlook." delay={1.0} />
+          <AttentionSection area={result.attention} delay={0.8} />
 
           <motion.div className="results-divider" {...dividerAnim(1.1)} />
 
-          {/* ════════════════════════════════════════════
-              4. PROTECT THIS AREA
-              ════════════════════════════════════════════ */}
-          <ProtectSection area={result.secondary} delay={1.2} />
+          <ProtectSection area={result.protect} delay={1.2} />
 
-          {sudden && (
-            <>
-              <CuriosityBridge text="And this is where things get interesting..." delay={1.4} />
-              <motion.div className="results-divider" {...dividerAnim(1.5)} />
+          <motion.div className="results-divider" {...dividerAnim(1.5)} />
 
-              {/* ════════════════════════════════════════════
-                  5. SUDDEN CHANGES
-                  ════════════════════════════════════════════ */}
-              <SuddenSection area={sudden} delay={1.6} />
-            </>
-          )}
+          <DangerSection area={result.danger} delay={1.6} />
 
-          <motion.div className="results-divider" {...dividerAnim(1.8)} />
+          <motion.div className="results-divider" {...dividerAnim(1.9)} />
+
+          <TransitSection
+            heading={result.transit.heading}
+            description={result.transit.description}
+            delay={2.0}
+          />
+
+          <motion.div className="results-divider" {...dividerAnim(2.3)} />
 
           {/* ════════════════════════════════════════════
               6. YOUR TAKEAWAY

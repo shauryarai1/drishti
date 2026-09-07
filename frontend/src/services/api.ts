@@ -1,7 +1,8 @@
 import type { ChartResponse } from '../types/chart'
 import type { InterpretationResponse, BirthPayload } from '../types/interpretation'
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+const API_HOST = import.meta.env.VITE_API_URL?.replace(/\/$/, '')
+export const API_BASE = API_HOST ? `${API_HOST}/api` : '/api'
 
 export async function fetchChart(payload: {
   date: string
