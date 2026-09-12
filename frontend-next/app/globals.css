@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-serif: 'Cinzel', Georgia, serif;
+}
+
+body {
+  background-color: #090909;
+  color: #eee9df;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom architectural grid line backgrounds */
+.architectural-grid {
+  background-size: 48px 48px;
+  background-image:
+    linear-gradient(to right, rgba(166, 42, 52, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(166, 42, 52, 0.05) 1px, transparent 1px);
+}
+
+.architectural-grid-light {
+  background-size: 48px 48px;
+  background-image:
+    linear-gradient(to right, rgba(23, 23, 23, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 23, 23, 0.04) 1px, transparent 1px);
+}
+
+.kundli-archive-svg polygon { fill: #F7F5F0 !important; stroke: rgba(120, 25, 35, 0.45) !important; }
+.kundli-archive-svg line { stroke: rgba(120, 25, 35, 0.45) !important; }
+.kundli-archive-svg .kundli-house-label { fill: #5E554D !important; opacity: 0.75; }
+.kundli-archive-svg .kundli-rashi-label { fill: #6F1D1B !important; }
+.kundli-archive-svg .kundli-lagna-label { fill: #151719 !important; }
+.kundli-archive-svg .kundli-planet-text { fill: #151719 !important; }
+.kundli-archive-svg .kundli-degree-text { fill: #6B625A !important; }

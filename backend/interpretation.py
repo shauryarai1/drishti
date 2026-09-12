@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from calculator import generate_chart
 from models import BirthData
+from timing import calculate_caution_windows
 
 
 # These meanings are the source of truth for all three interpretation layers.
@@ -116,6 +117,7 @@ def compute_interpretation(payload: BirthData) -> Dict[str, Any]:
         }
 
     mars_index = RASHI_NAMES.index(mars.sign)
+    mars_sign = mars.sign
     fourth_aspect_sign = RASHI_NAMES[(mars_index + 3) % 12]
     eighth_aspect_sign = RASHI_NAMES[(mars_index + 7) % 12]
 
@@ -150,9 +152,9 @@ def compute_interpretation(payload: BirthData) -> Dict[str, Any]:
         "attention": _reading_area(mars.sign, "attention"),
         "protect": _reading_area(fourth_aspect_sign, "protect"),
         "danger": _reading_area(eighth_aspect_sign, "danger"),
-        "transit": {
-            "heading": "WHEN SHOULD YOU BE EXTRA CAREFUL?",
-            "description": "When Saturn, Rahu, or Ketu moves through one of the highlighted Rashis, treat that period as a reminder to be more careful. Slow down, avoid unnecessary risks, and pay closer attention to the areas mentioned in your reading.",
-        },
+        "timing": calculate_caution_windows(
+            [mars_sign, fourth_aspect_sign, eighth_aspect_sign],
+            RASHI_GUIDANCE,
+        ),
         "chart": chart_data,
     }

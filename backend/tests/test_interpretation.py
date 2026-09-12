@@ -36,7 +36,8 @@ def test_interpretation_layers_use_the_correct_rashis(
     assert protect_phrase in result["protect"]["description"]
     assert danger_phrase in result["danger"]["description"]
     assert attention_phrase.lower() in result["attention"]["description"].lower()
-    assert result["transit"]["heading"] == "WHEN SHOULD YOU BE EXTRA CAREFUL?"
+    assert "current" in result["timing"]
+    assert "upcoming" in result["timing"]
 
 
 def test_danger_copy_does_not_make_guaranteed_harm_predictions():
