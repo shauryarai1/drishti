@@ -1,9 +1,11 @@
 import { BirthDetails, DrishtiReading, KundliData, PlaceSuggestion } from './types';
 
-const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
-  .replace(/\/api\/?$/, '')
-  .replace(/\/$/, '');
-export const API_BASE = `${apiOrigin}/api`;
+const API_ORIGIN =
+  process.env.NODE_ENV === 'production'
+    ? 'https://drishti-5j3u.onrender.com'
+    : 'http://localhost:8000';
+
+export const API_BASE = `${API_ORIGIN}/api`;
 
 interface RawChart {
   status: string;
