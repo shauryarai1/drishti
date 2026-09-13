@@ -42,6 +42,11 @@ app.add_middleware(
 )
 
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/api/places/search")
 async def places_search(q: str = Query(..., min_length=2, max_length=100)):
     """

@@ -56,6 +56,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export function wakeBackend(): void {
+  try {
+    fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+  } catch {
+    // Silent wake-up only — never block navigation.
+  }
+}
+
 function adaptKundli(chart: RawChart): KundliData {
   const planets = [...(chart.planets || []), ...(chart.extra_planets || [])];
   return {

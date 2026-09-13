@@ -7,11 +7,13 @@ import { LightEditorialSection } from '../components/LightEditorialSection';
 import { ImmersiveStorySection } from '../components/ImmersiveStorySection';
 import { ReadingPreviewSection } from '../components/ReadingPreviewSection';
 import { Footer } from '../components/Footer';
+import { wakeBackend } from '../lib/api';
 
 export default function HomePage() {
   const router = useRouter();
 
   const handleStartReading = () => {
+    wakeBackend();
     router.push('/reading');
   };
 
