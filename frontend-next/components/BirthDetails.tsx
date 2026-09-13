@@ -23,6 +23,8 @@ export function BirthDetailsFlow({
   const [date, setDate] = useState(initialDetails?.date || '');
   const [time, setTime] = useState(initialDetails?.time || '');
   const [place, setPlace] = useState(initialDetails?.place || '');
+  const [latitude, setLatitude] = useState(initialDetails?.latitude);
+  const [longitude, setLongitude] = useState(initialDetails?.longitude);
 
   // Place autocomplete state
   const [placeQuery, setPlaceQuery] = useState(place);
@@ -89,6 +91,8 @@ export function BirthDetailsFlow({
         date,
         time,
         place,
+        latitude,
+        longitude,
       });
     }
   };
@@ -324,6 +328,8 @@ export function BirthDetailsFlow({
                               setPlace(full);
                               setPlaceQuery(full);
                               setShowSuggestions(false);
+                              setLatitude(s.coordinates.lat);
+                              setLongitude(s.coordinates.lng);
                             }}
                             className="p-3.5 hover:bg-[#2B0C11] cursor-pointer border-b border-[#A62A34]/15 flex items-center justify-between text-sm text-[#EEE9DF]"
                           >

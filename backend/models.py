@@ -15,6 +15,8 @@ class BirthData(BaseModel):
     date: str = Field(..., description="Birth date in YYYY-MM-DD format")
     time: str = Field(..., description="Birth time in HH:MM format (24-hour)")
     place: str = Field(..., description="Birthplace name")
+    latitude: Optional[float] = Field(default=None, description="Latitude in decimal degrees")
+    longitude: Optional[float] = Field(default=None, description="Longitude in decimal degrees")
     ayanamsa: Optional[str] = Field(default="lahiri", description="Ayanamsa to use")
 
 

@@ -77,7 +77,12 @@ def _sign_from_longitude(lon: float) -> tuple[str, int, float]:
     return RASHI_NAMES[idx], idx, lon - idx * 30.0
 
 
-def resolve_place(place: str) -> dict:
+def resolve_place(place: str, latitude: float | None = None, longitude: float | None = None) -> dict:
+    if latitude is not None and longitude is not None:
+        tz = _TZ_FINDER.timezone_at(lat=latitude, lng=longitude)
+        if tz is None:
+            raise ValueError(f"Timezone could not be resolved for the supplied coordinates")
+        return {"latitude": latitude, "longitude": longitude, "timezone": tz}
     try:
         location = _GEO.geocode(place, language="en", timeout=10)
     except Exception as exc:
@@ -135,9 +140,11 @@ def generate_chart(payload: BirthData) -> ChartResponse:
     date_str = payload.date.strip()
     time_str = payload.time.strip()
     place_str = payload.place.strip()
+    latitude = payload.latitude
+    longitude = payload.longitude
 
     # --- place ---
-    place_info = resolve_place(place_str)
+    place_info = resolve_place(place_str, latitude=latitude, longitude=longitude)
     local_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M").replace(
         tzinfo=ZoneInfo(place_info["timezone"])
     )
