@@ -29,7 +29,7 @@ export function LoadingExperience({ onFinished, isReady = true, error }: Loading
       id: 3,
       text: 'Building your reading',
       subtext: 'Synthesizing attention, protection, and caution indicators...',
-      code: 'DRISHTI.SYNTH',
+      code: 'KAVACH.SYNTH',
     },
   ];
 

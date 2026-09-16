@@ -120,7 +120,7 @@ export function BirthDetailsFlow({
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rotate-45 border border-[#B39250] bg-[#7B1D26]" />
           <span className="text-base sm:text-lg font-bold tracking-[0.25em] text-[#F7F5F0]">
-            DRISHTI
+            KAVACH
           </span>
           <span className="text-[10px] font-mono tracking-widest text-[#EEE9DF]/40 pl-2 border-l border-[#A62A34]/30 hidden sm:inline">
             ASTRONOMICAL CALIBRATION

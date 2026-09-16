@@ -14,28 +14,28 @@ export function ResultChapter({ area }: ResultChapterProps) {
   const isDanger = area.id === 'danger';
 
   // =========================================================================
-  // CHAPTER 01: ATTENTION AREA (Warm Light Editorial Canvas #F7F5F0)
+  // CHAPTER 01: ATTENTION AREA (Near-black calibration field)
   // =========================================================================
   if (isAttention) {
     return (
-      <section className="relative w-full bg-[#F7F5F0] text-[#171717] py-24 sm:py-32 border-t border-[#171717]/10 architectural-grid-light">
+      <section className="relative w-full bg-[#090909] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/20 architectural-grid">
         <Container size="lg">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
 
             {/* Left Column: Number, Category Label, Anchor Title */}
             <div className="lg:col-span-4 space-y-6">
-              <SectionLabel label={area.label} number={area.stepNumber} tone="dark" />
+              <SectionLabel label={area.label} number={area.stepNumber} tone="crimson" />
 
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#171717] leading-tight">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
                 {area.title}
               </h2>
 
-              <p className="text-sm uppercase font-mono tracking-widest text-[#7B1D26]">
+              <p className="text-sm uppercase font-mono tracking-widest text-[#E53E3E]">
                 {area.subtitle}
               </p>
 
               {/* Editorial thematic coordinate stamp */}
-              <div className="pt-6 border-t border-[#171717]/10 font-mono text-xs text-[#171717]/60 space-y-1">
+              <div className="pt-6 border-t border-[#A62A34]/25 font-mono text-xs text-[#EEE9DF]/55 space-y-1">
                 <div>DIMENSION // RELATIONSHIP & PACING</div>
                 <div>STATE: ACTIVE CALIBRATION</div>
               </div>
@@ -45,35 +45,35 @@ export function ResultChapter({ area }: ResultChapterProps) {
             <div className="lg:col-span-8 space-y-8">
 
               {/* Standout Quote (Not inside a card) */}
-              <blockquote className="border-l-2 border-[#7B1D26] pl-6 py-2 text-xl sm:text-2xl font-serif italic text-[#171717] leading-relaxed">
+              <blockquote className="border-l-2 border-[#A62A34] pl-6 py-2 text-xl sm:text-2xl font-serif italic text-[#F7F5F0] leading-relaxed">
                 &ldquo;{area.quote}&rdquo;
               </blockquote>
 
               {/* Explanatory Body */}
-              <div className="space-y-4 text-base sm:text-lg text-[#171717]/85 leading-relaxed font-normal">
-                <p className="font-medium text-[#171717]">{area.summary}</p>
+              <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
+                <p className="font-medium text-[#F7F5F0]">{area.summary}</p>
                 {area.body.map((paragraph, idx) => (
                   <p key={idx}>{paragraph}</p>
                 ))}
               </div>
 
               {/* WATCH FOR: Practical Takeaway (Minimalist editorial list) */}
-              <div className="pt-8 border-t border-[#171717]/15 space-y-4">
+              <div className="pt-8 border-t border-[#A62A34]/25 space-y-4">
                 <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-[#7B1D26]" />
-                  <h4 className="text-xs uppercase font-mono tracking-[0.2em] font-semibold text-[#171717]">
+                  <span className="w-2 h-2 rounded-full bg-[#E53E3E]" />
+                  <h4 className="text-xs uppercase font-mono tracking-[0.2em] font-semibold text-[#E53E3E]">
                     WATCH FOR
                   </h4>
                 </div>
 
-                <div className="p-5 bg-[#FFFFFF] border border-[#171717]/10 rounded-sm space-y-3">
-                  <p className="text-sm font-semibold text-[#7B1D26]">
+                <div className="p-5 bg-[#160A0C]/80 border border-[#A62A34]/30 rounded-sm space-y-3">
+                  <p className="text-sm font-semibold text-[#E53E3E]">
                     {area.watchFor.primary}
                   </p>
-                  <ul className="space-y-2 text-sm text-[#171717]/80">
+                  <ul className="space-y-2 text-sm text-[#EEE9DF]/75">
                     {area.watchFor.points.map((pt, i) => (
                       <li key={i} className="flex items-start gap-2.5">
-                        <span className="font-mono text-[#7B1D26] text-xs mt-0.5">&bull;</span>
+                        <span className="font-mono text-[#E53E3E] text-xs mt-0.5">&bull;</span>
                         <span>{pt}</span>
                       </li>
                     ))}

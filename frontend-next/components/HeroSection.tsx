@@ -62,7 +62,7 @@ export function HeroSection({
               transition={{ duration: 0.6, ease: [0.215, 0.61, 0.355, 1] }}
               className="space-y-4"
             >
-              <SectionLabel label="PERSONAL GUIDANCE" tone="crimson" />
+              <SectionLabel label="ASTROLOGICAL EARLY-WARNING SYSTEM" tone="crimson" />
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
                 Know what deserves
@@ -229,7 +229,7 @@ export function HeroSection({
       <div className="relative z-10 w-full border-t border-[#A62A34]/15 py-3 px-6 flex items-center justify-between text-[11px] font-mono text-[#EEE9DF]/40">
         <div className="flex items-center gap-3">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#A62A34] animate-pulse" />
-          <span>DRISHTI ENGINE // READY</span>
+          <span>KAVACH ENGINE // READY</span>
         </div>
         <button
           onClick={onExploreHowItWorks}

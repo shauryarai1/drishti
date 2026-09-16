@@ -152,7 +152,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
       </div>
 
       {/* SVG Canvas Container with distinct framing */}
-      <div className="relative w-full max-w-[520px] aspect-square rounded-2xl p-2 bg-[#F7F5F0] border-2 border-[#B99145]/50 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+      <div className="relative w-full max-w-[520px] aspect-square rounded-2xl p-2 bg-[#160A0C]/90 border-2 border-[#B99145]/50 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
         <svg
           id="north-indian-kundli-svg"
           viewBox="0 0 500 500"
@@ -188,7 +188,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
           </defs>
 
           {/* Deep Base Canvas */}
-          <rect width="500" height="500" fill="#F7F5F0" />
+          <rect width="500" height="500" fill="#090909" />
 
           {/* 12 House Polygons */}
           {housePolygons.map((poly) => {
@@ -239,7 +239,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                 <g transform={`translate(${poly.rashiPos.x}, ${poly.rashiPos.y})`} className="pointer-events-none">
                   <circle
                     r="11"
-                    fill={isSelected ? '#B99145' : '#F7F5F0'}
+                    fill={isSelected ? '#B99145' : '#160A0C'}
                     stroke={isSelected ? '#6F1D1B' : '#6F1D1B'}
                     strokeWidth="1.2"
                   />
@@ -380,8 +380,8 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
 
           {/* Auspicious Center Bindu (Yantra Central Point) */}
           <g transform="translate(250, 250)" className="pointer-events-none">
-            <circle r="18" fill="#F7F5F0" stroke="rgba(120,25,35,0.45)" strokeWidth="1.5" />
-            <circle r="10" fill="#EDE2D1" stroke="#B99145" strokeWidth="1" />
+            <circle r="18" fill="#160A0C" stroke="rgba(120,25,35,0.45)" strokeWidth="1.5" />
+            <circle r="10" fill="#541219" stroke="#B99145" strokeWidth="1" />
             <circle r="4" fill="#6F1D1B" />
             <circle r="1.5" fill="#151719" />
           </g>

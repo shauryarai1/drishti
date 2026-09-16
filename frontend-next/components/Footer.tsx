@@ -25,7 +25,7 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
             <div className="flex items-center gap-3">
               <div className="w-2.5 h-2.5 rotate-45 border border-[#B39250] bg-[#7B1D26]" />
               <span className="text-xl font-bold tracking-[0.25em] text-[#F7F5F0]">
-                DRISHTI
+                KAVACH
               </span>
             </div>
             <p className="text-sm text-[#EEE9DF]/70 max-w-sm leading-relaxed">
@@ -34,7 +34,7 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
             </p>
             <div className="pt-2">
               <span className="inline-block text-[11px] font-mono tracking-wider text-[#B39250] border border-[#B39250]/30 px-2.5 py-1 rounded-[2px] bg-[#B39250]/5">
-                Vedic Astrological Intelligence
+                Astrological Early-Warning System
               </span>
             </div>
           </div>
@@ -93,7 +93,7 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-[#A62A34]/15 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-[#EEE9DF]/40">
-          <div>© {new Date().getFullYear()} DRISHTI. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} KAVACH. All rights reserved.</div>
           <div className="flex items-center gap-6">
             <span>Non-Fatalistic Guidance</span>
             <span>•</span>

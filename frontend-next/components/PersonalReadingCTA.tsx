@@ -25,7 +25,7 @@ export function PersonalReadingCTA({
     const message = [
       'Hello,',
       '',
-      'I came from DRISHTI and would like to book a personal reading.',
+      'I came from KAVACH and would like to book a personal reading.',
       '',
       'My birth details are:',
       '',
@@ -33,7 +33,7 @@ export function PersonalReadingCTA({
       `Time of Birth: ${reading.birthDetails.time}`,
       `Place of Birth: ${reading.birthDetails.place}`,
       '',
-      'DRISHTI Summary:',
+      'KAVACH Summary:',
       '',
       `🔴 Attention: ${shortSummary(reading.attentionArea)}`,
       '',

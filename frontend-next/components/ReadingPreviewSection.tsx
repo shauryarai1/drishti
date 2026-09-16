@@ -71,7 +71,7 @@ export function ReadingPreviewSection({ onStartReading }: ReadingPreviewSectionP
             The Three Focus Dimensions
           </h2>
           <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
-            Every DRISHTI reading structures your chart’s astrological tensions into three actionable categories.
+            Every KAVACH reading structures your chart’s astrological tensions into three actionable categories.
           </p>
         </div>
 

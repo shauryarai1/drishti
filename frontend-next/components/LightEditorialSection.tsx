@@ -21,7 +21,7 @@ export function LightEditorialSection({ onStartReading }: LightEditorialSectionP
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[46px] font-bold text-[#171717] tracking-tight leading-[1.18]">
             Your birth chart contains thousands of details.{' '}
             <span className="text-[#7B1D26] font-normal block sm:inline">
-              DRISHTI helps you focus on what deserves attention.
+              KAVACH helps you focus on what deserves attention.
             </span>
           </h2>
 

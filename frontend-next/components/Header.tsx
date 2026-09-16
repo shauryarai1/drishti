@@ -42,10 +42,10 @@ export function Header({
               isLight ? 'text-[#171717]' : 'text-[#F7F5F0]'
             }`}
           >
-            DRISHTI
+            KAVACH
           </span>
           <span className="hidden sm:inline-block text-[10px] uppercase font-mono tracking-widest px-2 py-0.5 border border-[#A62A34]/30 text-[#A62A34] rounded-[2px]">
-            GUIDANCE
+            EARLY-WARNING SYSTEM
           </span>
         </div>
 

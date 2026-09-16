@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from interpretation import compute_interpretation
+from interpretation import HOUSE_LIFE_AREAS, compute_interpretation
 
 
 def fake_chart(mars_sign):
@@ -12,6 +12,23 @@ def fake_chart(mars_sign):
         extra_planets=[],
         ascendant=SimpleNamespace(sign="Aries"),
         houses=[],
+    )
+
+
+def chart_with_ascendant(ascendant_sign):
+    signs = [
+        "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+        "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+    ]
+    ascendant_index = signs.index(ascendant_sign)
+    return SimpleNamespace(
+        planets=[SimpleNamespace(name="Mars", sign="Aries", house=1, degree=12.3)],
+        extra_planets=[],
+        ascendant=SimpleNamespace(sign=ascendant_sign),
+        houses=[
+            SimpleNamespace(number=index + 1, sign=signs[(ascendant_index + index) % 12])
+            for index in range(12)
+        ],
     )
 
 
@@ -48,3 +65,72 @@ def test_danger_copy_does_not_make_guaranteed_harm_predictions():
     assert "serious" in danger_text or "bigger problems" in danger_text
     assert "guaranteed" not in danger_text
     assert "will happen" not in danger_text
+
+
+def test_mars_rashi_aspect_selection_and_response_shape_remain_unchanged():
+    with patch("interpretation.generate_chart", return_value=fake_chart("Aries")):
+        result = compute_interpretation(None)
+
+    # Mars Aries, plus 3 signs Cancer, plus 7 signs Scorpio.
+    assert result["attention"]["rashi"] == "Aries"
+    assert result["protect"]["rashi"] == "Cancer"
+    assert result["danger"]["rashi"] == "Scorpio"
+    assert {"status", "attention", "protect", "danger", "timing", "chart"} <= result.keys()
+
+
+def test_highlighted_rashi_uses_the_actual_d1_house():
+    with patch("interpretation.generate_chart", return_value=chart_with_ascendant("Aries")):
+        aries_ascendant = compute_interpretation(None)
+    with patch("interpretation.generate_chart", return_value=chart_with_ascendant("Cancer")):
+        cancer_ascendant = compute_interpretation(None)
+
+    assert aries_ascendant["attention"]["rashi"] == "Aries"
+    assert cancer_ascendant["attention"]["rashi"] == "Aries"
+    assert aries_ascendant["attention"]["house"] == 1
+    assert cancer_ascendant["attention"]["house"] == 10
+    assert aries_ascendant["attention"]["life_area"] == HOUSE_LIFE_AREAS[1]
+    assert cancer_ascendant["attention"]["life_area"] == HOUSE_LIFE_AREAS[10]
+
+
+@pytest.mark.parametrize(
+    ("house_number", "life_area", "unexpected_phrase"),
+    [
+        (5, "creativity, education, children, romance, and judgment", "organisation"),
+        (6, "work, service, health, discipline, obstacles, and debts", ""),
+        (10, "profession, authority, reputation, and public responsibilities", ""),
+    ],
+)
+def test_virgo_danger_integrates_the_house_domain(house_number, life_area, unexpected_phrase):
+    chart = SimpleNamespace(
+        planets=[SimpleNamespace(name="Mars", sign="Aquarius", house=1, degree=12.3)],
+        extra_planets=[],
+        ascendant=SimpleNamespace(sign="Aries"),
+        houses=[SimpleNamespace(number=house_number, sign="Virgo")],
+    )
+    with patch("interpretation.generate_chart", return_value=chart):
+        result = compute_interpretation(None)
+
+    danger = result["danger"]
+    assert danger["rashi"] == "Virgo"
+    assert danger["house"] == house_number
+    assert danger["life_area"] == life_area
+    assert "many skills and significant potential" in danger["description"]
+    assert "lack of discipline and other unresolved weaknesses" in danger["description"]
+    assert "Develop discipline and consistent work" in danger["description"]
+    assert "may face setbacks" in danger["description"]
+    if unexpected_phrase:
+        assert unexpected_phrase not in danger["description"]
+
+
+def test_virgo_danger_house_10_applies_potential_to_profession_and_reputation():
+    chart = SimpleNamespace(
+        planets=[SimpleNamespace(name="Mars", sign="Aquarius", house=1, degree=12.3)],
+        extra_planets=[],
+        ascendant=SimpleNamespace(sign="Aries"),
+        houses=[SimpleNamespace(number=10, sign="Virgo")],
+    )
+    with patch("interpretation.generate_chart", return_value=chart):
+        danger = compute_interpretation(None)["danger"]["description"]
+
+    assert "profession, authority, reputation, and public responsibilities" in danger
+    assert "highly capable and valuable in this area" in danger

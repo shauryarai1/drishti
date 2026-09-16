@@ -3,13 +3,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'DRISHTI — Personal Guidance & Astrological Insight',
+  title: 'KAVACH — Astrological Early-Warning System',
   description:
-    'A personalized reading built from your birth details, revealing the areas of life that may deserve greater awareness and care.',
+    'KAVACH is an Astrological Early-Warning System that reveals the areas of life that may deserve greater awareness and care.',
   openGraph: {
-    title: 'DRISHTI — Personal Guidance & Astrological Insight',
+    title: 'KAVACH — Astrological Early-Warning System',
     description:
-      'A personalized reading built from your birth details, revealing the areas of life that may deserve greater awareness and care.',
+      'KAVACH is an Astrological Early-Warning System that reveals the areas of life that may deserve greater awareness and care.',
     type: 'website',
   },
 };

@@ -45,7 +45,7 @@ RASHI_GUIDANCE: Dict[str, Dict[str, str]] = {
         "area": "Arguments, criticism, and correcting others",
         "attention": "Avoid unnecessary arguments and disputes. Do not constantly try to correct other people or point out every small mistake. This can create conflict and enemies. Pay attention to your own habits as well.",
         "protect": "Create boundaries around arguments, criticism, and the urge to correct others. Know when to stop. Taking these matters too far can create unnecessary conflict.",
-        "danger": "Be especially careful with arguments, criticism, and disputes. Constantly correcting people or pointing out every small mistake can create serious conflict and enemies. Ignoring the boundaries highlighted above can make this area harder to handle.",
+        "danger": "You have many skills and significant potential. You can be an excellent worker and a valuable asset to an organisation, but lack of discipline and other unresolved weaknesses can prevent you from using that potential fully. If these weaknesses are repeatedly ignored, your plans, work and finances may face setbacks. Develop discipline, work consistently, correct weak areas, and understand the details of your work.",
     },
     "Libra": {
         "area": "Attraction, attachment, and relationships",
@@ -90,15 +90,95 @@ RASHI_NAMES = [
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
 ]
 
+AREA_TYPE_PRINCIPLES: Dict[str, str] = {
+    "attention": "Mars concentrates energy here. This is a sensitive area requiring balance.",
+    "protect": "Mars creates a strong protective and defensive instinct here. Conflict may arise when this area feels threatened.",
+    "danger": "Mars demands transformation and correction here. Weaknesses left unresolved may produce setbacks in this area.",
+}
 
-def _reading_area(sign: str, layer: str) -> Dict[str, Any]:
+HOUSE_LIFE_AREAS: Dict[int, str] = {
+    1: "self, vitality, identity, and personal direction",
+    2: "wealth, speech, family, and values",
+    3: "courage, communication, skills, siblings, and short journeys",
+    4: "home, emotional foundations, property, and inner security",
+    5: "creativity, education, children, romance, and judgment",
+    6: "work, service, health, discipline, obstacles, and debts",
+    7: "marriage, partnerships, agreements, and public dealings",
+    8: "transformation, shared resources, vulnerability, and sudden change",
+    9: "beliefs, higher learning, teachers, long journeys, and fortune",
+    10: "profession, authority, reputation, and public responsibilities",
+    11: "gains, networks, friendships, aspirations, and community",
+    12: "expenses, sleep, isolation, foreign places, and release",
+}
+
+RASHI_STRUCTURED_GUIDANCE: Dict[str, Dict[str, Dict[str, str]]] = {
+    "Virgo": {
+        "attention": {
+            "strength": "many skills and significant potential",
+            "weakness": "undisciplined criticism, correction, or attention to detail",
+            "correction": "apply discipline and correct weak areas",
+            "risk_pattern": "too much focus on flaws can consume useful energy",
+            "development": "consistent, balanced attention to detail",
+            "manifestation_template": "Mars concentrates energy in {life_area}. Your Virgo pattern gives you {strength}, but {weakness} can make this sensitive area consume too much of your effort. {correction}; balance this attention so it supports rather than overwhelms {life_area}.",
+        },
+        "protect": {
+            "strength": "skill, usefulness, and careful attention to detail",
+            "weakness": "a defensive urge to correct flaws or control details",
+            "correction": "protect this area without turning correction into conflict",
+            "risk_pattern": "feeling that imperfections threaten the area",
+            "development": "measured protection and constructive communication",
+            "manifestation_template": "Mars makes you instinctively protective of {life_area}. Your Virgo pattern values {strength}, but {weakness} may become defensive when {risk_pattern}. {correction}; develop {development}.",
+        },
+        "danger": {
+            "strength": "many skills and significant potential",
+            "weakness": "lack of discipline and other unresolved weaknesses",
+            "correction": "correct weak areas and understand the details of what you are doing",
+            "risk_pattern": "repeatedly ignoring these weaknesses",
+            "development": "discipline and consistent work",
+            "manifestation_template": "Mars highlights {life_area} for transformation and correction. You have {strength} and can become highly capable and valuable in this area, but {weakness} can prevent you from using that potential fully. Details matter here: {correction}. If you repeatedly ignore these weaknesses, this area may face setbacks. Develop {development} to unlock your potential.",
+        },
+    },
+}
+
+
+def _house_for_sign(chart: Any, sign: str) -> int:
+    """Find a highlighted Rashi's house in the already-calculated D1 chart."""
+    for house in chart.houses or []:
+        if house.sign == sign:
+            return house.number
+
+    # Keep the lookup usable with lightweight chart fixtures lacking house rows.
+    ascendant = chart.ascendant.sign if chart.ascendant else None
+    if ascendant in RASHI_NAMES:
+        return ((RASHI_NAMES.index(sign) - RASHI_NAMES.index(ascendant)) % 12) + 1
+    raise ValueError(f"Unable to locate {sign} in the D1 chart")
+
+
+def _reading_area(sign: str, layer: str, house_number: int) -> Dict[str, Any]:
     guidance = RASHI_GUIDANCE[sign]
+    life_area = HOUSE_LIFE_AREAS[house_number]
+    structured = RASHI_STRUCTURED_GUIDANCE.get(sign, {}).get(layer)
+    if structured:
+        description = structured["manifestation_template"].format(
+            life_area=life_area,
+            strength=structured["strength"],
+            weakness=structured["weakness"],
+            correction=structured["correction"],
+            risk_pattern=structured["risk_pattern"],
+            development=structured["development"],
+        )
+    else:
+        description = f"{AREA_TYPE_PRINCIPLES[layer]} {guidance[layer]}"
+
     return {
-        "area": guidance["area"],
+        "area": f"House {house_number}: {life_area} — {guidance['area']}",
+        "rashi": sign,
+        "house": house_number,
+        "life_area": life_area,
         "severity": "Requires Care" if layer == "danger" else "Deserves Attention",
         "severity_level": "high" if layer == "danger" else "moderate",
         "hook": "",
-        "description": guidance[layer],
+        "description": description,
         "potential_impact": "",
         "mindful_of": [],
         "takeaway": "",
@@ -120,6 +200,9 @@ def compute_interpretation(payload: BirthData) -> Dict[str, Any]:
     mars_sign = mars.sign
     fourth_aspect_sign = RASHI_NAMES[(mars_index + 3) % 12]
     eighth_aspect_sign = RASHI_NAMES[(mars_index + 7) % 12]
+    attention_house = _house_for_sign(chart, mars_sign)
+    protect_house = _house_for_sign(chart, fourth_aspect_sign)
+    danger_house = _house_for_sign(chart, eighth_aspect_sign)
 
     chart_data = {
         "ascendant_sign": chart.ascendant.sign if chart.ascendant else None,
@@ -149,9 +232,9 @@ def compute_interpretation(payload: BirthData) -> Dict[str, Any]:
 
     return {
         "status": "success",
-        "attention": _reading_area(mars.sign, "attention"),
-        "protect": _reading_area(fourth_aspect_sign, "protect"),
-        "danger": _reading_area(eighth_aspect_sign, "danger"),
+        "attention": _reading_area(mars.sign, "attention", attention_house),
+        "protect": _reading_area(fourth_aspect_sign, "protect", protect_house),
+        "danger": _reading_area(eighth_aspect_sign, "danger", danger_house),
         "timing": calculate_caution_windows(
             [mars_sign, fourth_aspect_sign, eighth_aspect_sign],
             RASHI_GUIDANCE,

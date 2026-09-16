@@ -26,7 +26,7 @@ export function ImmersiveStorySection({ onStartReading }: ImmersiveStorySectionP
             <span className="text-[#A62A34]">disciplined direction.</span>
           </h2>
           <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
-            The sky at your birth is an undulating terrain of planetary intersections. Rather than overwhelming you with endless astrological jargon, DRISHTI extracts the exact pressure points requiring conscious pacing.
+            The sky at your birth is an undulating terrain of planetary intersections. Rather than overwhelming you with endless astrological jargon, KAVACH extracts the exact pressure points requiring conscious pacing.
           </p>
         </div>
 

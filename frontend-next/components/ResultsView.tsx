@@ -51,7 +51,7 @@ export function ResultsView({
           </button>
           <span className="hidden sm:inline-block w-[1px] h-4 bg-[#A62A34]/30" />
           <span className="hidden sm:inline-block font-mono text-xs text-[#F7F5F0] font-semibold tracking-wide">
-            DRISHTI // {reading.birthDetails.place.split(',')[0]}
+            KAVACH // {reading.birthDetails.place.split(',')[0]}
           </span>
         </div>
 
@@ -88,7 +88,7 @@ export function ResultsView({
 
           {/* Results Intro Header */}
           <div className="max-w-3xl space-y-6">
-            <SectionLabel label="YOUR DRISHTI" number="CHART.SYNTHESIS" tone="crimson" />
+            <SectionLabel label="YOUR KAVACH" number="CHART.SYNTHESIS" tone="crimson" />
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
               {reading.headline}
