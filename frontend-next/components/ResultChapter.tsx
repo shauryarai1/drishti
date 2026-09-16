@@ -44,21 +44,17 @@ export function ResultChapter({ area }: ResultChapterProps) {
             {/* Right Column: Detailed Narrative + WATCH FOR takeaway */}
             <div className="lg:col-span-8 space-y-8">
 
-              {/* Standout Quote (Not inside a card) */}
-              <blockquote className="border-l-2 border-[#A62A34] pl-6 py-2 text-xl sm:text-2xl font-serif italic text-[#F7F5F0] leading-relaxed">
-                &ldquo;{area.quote}&rdquo;
-              </blockquote>
-
-              {/* Explanatory Body */}
+              {/* Primary interpretation, rendered once */}
               <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
                 <p className="font-medium text-[#F7F5F0]">{area.summary}</p>
-                {area.body.map((paragraph, idx) => (
-                  <p key={idx}>{paragraph}</p>
+                {area.body.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
                 ))}
               </div>
 
-              {/* WATCH FOR: Practical Takeaway (Minimalist editorial list) */}
-              <div className="pt-8 border-t border-[#A62A34]/25 space-y-4">
+              {/* WATCH FOR: only render when supplied by the backend */}
+              {(area.watchFor.primary || area.watchFor.points.length > 0) && (
+                <div className="pt-8 border-t border-[#A62A34]/25 space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="w-2 h-2 rounded-full bg-[#E53E3E]" />
                   <h4 className="text-xs uppercase font-mono tracking-[0.2em] font-semibold text-[#E53E3E]">
@@ -66,10 +62,8 @@ export function ResultChapter({ area }: ResultChapterProps) {
                   </h4>
                 </div>
 
-                <div className="p-5 bg-[#160A0C]/80 border border-[#A62A34]/30 rounded-sm space-y-3">
-                  <p className="text-sm font-semibold text-[#E53E3E]">
-                    {area.watchFor.primary}
-                  </p>
+                 <div className="p-5 bg-[#160A0C]/80 border border-[#A62A34]/30 rounded-sm space-y-3">
+                  {area.watchFor.primary && <p className="text-sm font-semibold text-[#E53E3E]">{area.watchFor.primary}</p>}
                   <ul className="space-y-2 text-sm text-[#EEE9DF]/75">
                     {area.watchFor.points.map((pt, i) => (
                       <li key={i} className="flex items-start gap-2.5">
@@ -77,9 +71,10 @@ export function ResultChapter({ area }: ResultChapterProps) {
                         <span>{pt}</span>
                       </li>
                     ))}
-                  </ul>
+                 </ul>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
           </div>
@@ -113,38 +108,10 @@ export function ResultChapter({ area }: ResultChapterProps) {
                 {area.subtitle}
               </div>
 
-              {/* Boundary layers visualization motif */}
-              <div className="p-6 rounded-lg bg-[#090909]/70 border border-[#A62A34]/30 space-y-3 font-mono text-xs">
-                <div className="text-[10px] text-[#B39250] uppercase tracking-widest">
-                  CONTAINMENT RATIO // 72% LEAKAGE RISK
-                </div>
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex justify-between text-[#EEE9DF]/70 text-[11px]">
-                    <span>Sovereign Morning Hours</span>
-                    <span className="text-[#D6BE85]">Protected</span>
-                  </div>
-                  <div className="h-1 w-full bg-[#2B0C11] rounded">
-                    <div className="h-full w-3/4 bg-[#B39250]" />
-                  </div>
-                </div>
-                <div className="space-y-1.5 pt-2">
-                  <div className="flex justify-between text-[#EEE9DF]/70 text-[11px]">
-                    <span>Peripheral Delegations</span>
-                    <span className="text-[#A62A34]">Uncontained</span>
-                  </div>
-                  <div className="h-1 w-full bg-[#2B0C11] rounded">
-                    <div className="h-full w-2/5 bg-[#A62A34]" />
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Right Column: Narrative & Boundary Takeaway */}
             <div className="lg:col-span-7 space-y-8">
-              <blockquote className="border-l-2 border-[#B39250] pl-6 py-2 text-xl sm:text-2xl font-serif italic text-[#F7F5F0] leading-relaxed">
-                &ldquo;{area.quote}&rdquo;
-              </blockquote>
-
               <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed">
                 <p className="text-[#F7F5F0] font-medium">{area.summary}</p>
                 {area.body.map((p, i) => (
@@ -152,8 +119,9 @@ export function ResultChapter({ area }: ResultChapterProps) {
                 ))}
               </div>
 
-              {/* WATCH FOR: Practical Takeaway */}
-              <div className="pt-8 border-t border-[#A62A34]/25 space-y-4">
+              {/* WATCH FOR: only render when supplied by the backend */}
+              {(area.watchFor.primary || area.watchFor.points.length > 0) && (
+                <div className="pt-8 border-t border-[#A62A34]/25 space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="w-2 h-2 rounded-full bg-[#B39250]" />
                   <h4 className="text-xs uppercase font-mono tracking-[0.2em] font-semibold text-[#D6BE85]">
@@ -161,10 +129,8 @@ export function ResultChapter({ area }: ResultChapterProps) {
                   </h4>
                 </div>
 
-                <div className="p-5 bg-[#090909]/90 border border-[#B39250]/30 rounded-sm space-y-3">
-                  <p className="text-sm font-semibold text-[#D6BE85]">
-                    {area.watchFor.primary}
-                  </p>
+                 <div className="p-5 bg-[#090909]/90 border border-[#B39250]/30 rounded-sm space-y-3">
+                  {area.watchFor.primary && <p className="text-sm font-semibold text-[#D6BE85]">{area.watchFor.primary}</p>}
                   <ul className="space-y-2 text-sm text-[#EEE9DF]/75">
                     {area.watchFor.points.map((pt, i) => (
                       <li key={i} className="flex items-start gap-2.5">
@@ -173,8 +139,9 @@ export function ResultChapter({ area }: ResultChapterProps) {
                       </li>
                     ))}
                   </ul>
-                </div>
-              </div>
+                 </div>
+                 </div>
+               )}
 
             </div>
           </div>
@@ -206,31 +173,20 @@ export function ResultChapter({ area }: ResultChapterProps) {
               {area.subtitle}
             </p>
 
-            <div className="p-5 rounded-lg bg-[#090909]/80 border border-[#E53E3E]/40 space-y-3">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#E53E3E] font-semibold">
-                IRREVERSIBILITY PROTOCOL
-              </span>
-              <p className="text-xs text-[#EEE9DF]/80 leading-relaxed">
-                Actions taken in this domain carry compounding structural consequences over the next 14 months. Require unanimous third-party verification before execution.
-              </p>
-            </div>
           </div>
 
           {/* Right Column: Serious Editorial Analysis */}
           <div className="lg:col-span-7 space-y-8">
-            <blockquote className="border-l-2 border-[#E53E3E] pl-6 py-2 text-xl sm:text-2xl font-serif italic text-[#F7F5F0] leading-relaxed">
-              &ldquo;{area.quote}&rdquo;
-            </blockquote>
+              <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/85 leading-relaxed">
+                <p className="text-[#F7F5F0] font-medium">{area.summary}</p>
+                {area.body.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
 
-            <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/85 leading-relaxed">
-              <p className="text-[#F7F5F0] font-medium">{area.summary}</p>
-              {area.body.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
-            </div>
-
-            {/* WATCH FOR: Practical Takeaway */}
-            <div className="pt-8 border-t border-[#A62A34]/30 space-y-4">
+              {/* WATCH FOR: only render when supplied by the backend */}
+              {(area.watchFor.primary || area.watchFor.points.length > 0) && (
+                <div className="pt-8 border-t border-[#A62A34]/30 space-y-4">
               <div className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-[#E53E3E]" />
                 <h4 className="text-xs uppercase font-mono tracking-[0.2em] font-semibold text-[#E53E3E]">
@@ -238,10 +194,8 @@ export function ResultChapter({ area }: ResultChapterProps) {
                 </h4>
               </div>
 
-              <div className="p-5 bg-[#090909]/90 border border-[#E53E3E]/30 rounded-sm space-y-3">
-                <p className="text-sm font-semibold text-[#E53E3E]">
-                  {area.watchFor.primary}
-                </p>
+               <div className="p-5 bg-[#090909]/90 border border-[#E53E3E]/30 rounded-sm space-y-3">
+                  {area.watchFor.primary && <p className="text-sm font-semibold text-[#E53E3E]">{area.watchFor.primary}</p>}
                 <ul className="space-y-2 text-sm text-[#EEE9DF]/80">
                   {area.watchFor.points.map((pt, i) => (
                     <li key={i} className="flex items-start gap-2.5">
@@ -250,11 +204,12 @@ export function ResultChapter({ area }: ResultChapterProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+                 </div>
+                 </div>
+               )}
             </div>
 
           </div>
-        </div>
       </Container>
     </section>
   );

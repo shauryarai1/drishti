@@ -79,15 +79,21 @@ function adaptKundli(chart: RawChart): KundliData {
 }
 
 function adaptArea(raw: RawArea, id: 'attention' | 'protect' | 'danger', stepNumber: string, environmentalTheme: 'light' | 'mixed' | 'deep-crimson') {
+  const title = raw.area.split(' — ').pop() || raw.area;
+  const description = raw.description
+    .replace(/^This concentrates Mars energy in the area of [^.]+\. Balance is the key recommendation\.\s*/i, 'This is a sensitive area where balance matters. ')
+    .replace(/^Mars instinctively protects the area of [^;]+; conflict can arise when it feels threatened\.\s*/i, 'This is an area you may protect strongly; conflict can arise when it feels threatened. ')
+    .replace(/^Mars highlights [^.]+ for transformation and correction\.\s*/i, 'This area deserves transformation and correction. ');
+
   return {
     id, stepNumber,
     label: id === 'attention' ? 'ATTENTION AREA' : id === 'protect' ? 'PROTECT THIS AREA' : 'DANGER AREA',
-    title: raw.area,
+    title,
     subtitle: id === 'attention' ? 'Where natural instinct needs conscious calibration' : id === 'protect' ? 'Know where to stop' : 'What should not be ignored',
-    quote: raw.hook || raw.takeaway || raw.description,
-    summary: raw.description,
-    body: raw.potential_impact ? [raw.description, raw.potential_impact] : [raw.description],
-    watchFor: { primary: raw.mindful_of?.[0] || 'Repeatedly ignoring the warning signs in this area.', points: raw.mindful_of?.slice(1) || [] },
+    quote: '',
+    summary: description,
+    body: raw.potential_impact ? [raw.potential_impact] : [],
+    watchFor: { primary: raw.mindful_of?.[0] || '', points: raw.mindful_of?.slice(1) || [] },
     environmentalTheme,
   };
 }
