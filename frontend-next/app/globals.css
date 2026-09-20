@@ -13,13 +13,17 @@ html {
   /* Keep the browser canvas, native controls and overscroll dark so no white
      surface can flash while entering/revealing the reading experience. */
   color-scheme: dark;
+  /* Hard guarantee: oversized decorative/orbital layers can never widen the
+     layout viewport on mobile. `clip` (not `hidden`) avoids creating a scroll
+     container, so `position: sticky` keeps working. */
+  overflow-x: clip;
 }
 
 body {
   background-color: #090909;
   color: #eee9df;
   font-family: var(--font-sans);
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 

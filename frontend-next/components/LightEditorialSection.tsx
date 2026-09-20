@@ -12,7 +12,7 @@ export function LightEditorialSection({ onStartReading }: LightEditorialSectionP
   return (
     <section
       id="how-it-works"
-      className="relative w-full bg-[#090909] text-[#EEE9DF] py-24 sm:py-32 lg:py-36 architectural-grid border-t border-[#A62A34]/20 transition-colors duration-500"
+      className="relative w-full overflow-hidden bg-[#090909] text-[#EEE9DF] py-24 sm:py-32 lg:py-36 architectural-grid border-t border-[#A62A34]/20 transition-colors duration-500"
     >
       {/* Ambient burgundy environment — continuous with the hero above */}
       <div className="absolute inset-0 pointer-events-none">

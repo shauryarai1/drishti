@@ -10,7 +10,11 @@ import { Footer } from '../components/Footer';
 import { KavachIntro } from '../components/KavachIntro';
 import { wakeBackend } from '../lib/api';
 
-const INTRO_SESSION_KEY = 'kavach_intro_played';
+// Module-scoped, deliberately NOT persisted anywhere.
+// It lives only as long as this JS runtime, so:
+//   - a fresh load / refresh / new tab re-runs the intro
+//   - client-side navigation back to "/" does not replay it
+let introPlayedThisRuntime = false;
 
 // Runs before paint on the client, degrades to useEffect on the server.
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -20,16 +24,16 @@ export default function HomePage() {
   const [introActive, setIntroActive] = useState(false);
 
   useIsoLayoutEffect(() => {
+    if (introPlayedThisRuntime) return;
+    introPlayedThisRuntime = true;
+
     try {
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const alreadyPlayed = sessionStorage.getItem(INTRO_SESSION_KEY);
-      if (!alreadyPlayed && !reduce) {
+      if (!reduce) {
         setIntroActive(true);
       }
-      // Mark as played so internal navigation never replays the full cinematic.
-      sessionStorage.setItem(INTRO_SESSION_KEY, '1');
     } catch {
-      // Private mode / storage unavailable — skip the intro rather than block.
+      // Motion preference unavailable — skip the intro rather than risk a stuck overlay.
     }
   }, []);
 

@@ -26,7 +26,9 @@ export function KavachIntro({ onComplete }: KavachIntroProps) {
       onComplete();
       return;
     }
-    const timer = setTimeout(onComplete, TIMELINE_SECONDS * 1000 + 120);
+    // Safety net only: the primary completion signal is the overlay's own
+    // animation finishing (see onAnimationComplete below).
+    const timer = setTimeout(onComplete, TIMELINE_SECONDS * 1000 + 600);
     return () => clearTimeout(timer);
   }, [onComplete, reduce]);
 
@@ -34,10 +36,11 @@ export function KavachIntro({ onComplete }: KavachIntroProps) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[90] flex items-center justify-center overflow-hidden bg-[#090909]"
+      className="pointer-events-none fixed inset-0 z-[90] flex items-center justify-center overflow-hidden bg-[#090909]"
       initial={{ opacity: 1 }}
       animate={{ opacity: [1, 1, 1, 0] }}
       transition={{ duration: TIMELINE_SECONDS, times: [0, 0.62, 0.74, 1], ease: 'easeInOut' }}
+      onAnimationComplete={onComplete}
       aria-hidden="true"
     >
       {/* Ambient environment + grid */}

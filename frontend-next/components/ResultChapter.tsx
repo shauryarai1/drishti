@@ -19,7 +19,7 @@ export function ResultChapter({ area }: ResultChapterProps) {
   // =========================================================================
   if (isAttention) {
     return (
-      <section className="relative w-full bg-[#090909] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/20 architectural-grid">
+      <section className="relative w-full overflow-hidden bg-[#090909] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/20 architectural-grid">
         <Container size="lg">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
 
@@ -95,7 +95,7 @@ export function ResultChapter({ area }: ResultChapterProps) {
   // =========================================================================
   if (isProtect) {
     return (
-      <section className="relative w-full bg-[#160A0C] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/20 architectural-grid">
+      <section className="relative w-full overflow-hidden bg-[#160A0C] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/20 architectural-grid">
         {/* Subtle radial glow */}
         <div className="absolute top-1/2 left-10 w-[500px] h-[500px] rounded-full bg-[#B39250]/10 blur-[120px] pointer-events-none" />
 
@@ -167,7 +167,7 @@ export function ResultChapter({ area }: ResultChapterProps) {
   // CHAPTER 03: DANGER AREA (Deep Crimson & Highest Contrast)
   // =========================================================================
   return (
-    <section className="relative w-full bg-gradient-to-b from-[#2B0C11] via-[#541219]/90 to-[#160A0C] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/30 architectural-grid">
+    <section className="relative w-full overflow-hidden bg-gradient-to-b from-[#2B0C11] via-[#541219]/90 to-[#160A0C] text-[#EEE9DF] py-24 sm:py-32 border-t border-[#A62A34]/30 architectural-grid">
       {/* Deep environmental light */}
       <div className="absolute top-1/3 right-10 w-[550px] h-[550px] rounded-full bg-[#7B1D26]/30 blur-[140px] pointer-events-none" />
 

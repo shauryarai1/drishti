@@ -18,16 +18,6 @@ interface HeroSectionProps {
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const copyContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
-};
-
-const copyItem = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.75, ease: EASE } },
-};
-
 export function HeroSection({
   onStartReading,
   onExploreHowItWorks,
@@ -117,13 +107,13 @@ export function HeroSection({
           {/* ========================================== */}
           {/* LEFT / FOREGROUND: Restrained Copy & CTAs */}
           {/* ========================================== */}
-          <motion.div
-            variants={copyContainer}
-            initial="hidden"
-            animate={introActive ? 'hidden' : 'show'}
-            className="lg:col-span-5 xl:col-span-5 space-y-6 sm:space-y-8"
-          >
-            <motion.div variants={copyItem} className="space-y-4">
+          <div className="lg:col-span-5 xl:col-span-5 space-y-6 sm:space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
+              transition={{ duration: 0.75, ease: EASE }}
+              className="space-y-4"
+            >
               <SectionLabel label="ASTROLOGICAL EARLY-WARNING SYSTEM" tone="crimson" />
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
@@ -134,7 +124,9 @@ export function HeroSection({
             </motion.div>
 
             <motion.p
-              variants={copyItem}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
+              transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.12 }}
               className="text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed max-w-xl font-normal"
             >
               A personalized reading built from your birth details, revealing the areas of life
@@ -142,7 +134,9 @@ export function HeroSection({
             </motion.p>
 
             <motion.div
-              variants={copyItem}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
+              transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.24 }}
               className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6"
             >
               <Button
@@ -166,7 +160,9 @@ export function HeroSection({
 
             {/* Micro credibility indicator */}
             <motion.div
-              variants={copyItem}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
+              transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.36 }}
               className="pt-4 flex items-center gap-6 border-t border-[#A62A34]/20 text-xs font-mono text-[#EEE9DF]/50"
             >
               <div className="flex items-center gap-2">
@@ -178,7 +174,7 @@ export function HeroSection({
                 <span>3 DIMENSIONS OF CARE</span>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
 
           {/* ========================================================================= */}
           {/* RIGHT / MIDGROUND: Large Organic Dimensional Centerpiece + Micro UI Units */}

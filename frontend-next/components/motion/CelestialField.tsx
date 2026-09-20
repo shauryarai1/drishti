@@ -144,7 +144,7 @@ export function CelestialField({ className = '', variant = 'full' }: CelestialFi
 
   return (
     <div
-      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${className}`}
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden ${className}`}
       aria-hidden="true"
     >
       <div className="relative aspect-square w-[min(165vmin,1750px)]">
