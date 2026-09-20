@@ -50,15 +50,73 @@ interface PublicCaution {
 
 const signNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, init);
-  if (!response.ok) throw new Error((await response.text().catch(() => '')) || `Request failed: ${response.status}`);
-  return response.json() as Promise<T>;
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const DEFAULT_TIMEOUT_MS = 45000;
+const DEFAULT_RETRY_DELAYS_MS = [2000, 4000];
+
+interface RequestOptions {
+  timeoutMs?: number;
+  retryDelaysMs?: number[];
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchOnce(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isTransientError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'AbortError') return true;
+  if (error instanceof TypeError) return true;
+  if (error instanceof Error && error.message === 'NETWORK_ERROR') return true;
+  return false;
+}
+
+async function request<T>(path: string, init?: RequestInit, options: RequestOptions = {}): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+  const maxAttempts = retryDelaysMs.length + 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const response = await fetchOnce(`${API_BASE}${path}`, init ?? {}, timeoutMs);
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        const retryable = RETRYABLE_STATUS.has(response.status);
+        if (retryable && attempt < maxAttempts - 1) {
+          lastError = new Error(text || `Request failed: ${response.status}`);
+          await delay(retryDelaysMs[Math.min(attempt, retryDelaysMs.length - 1)]);
+          continue;
+        }
+        throw new Error(text || `Request failed: ${response.status}`);
+      }
+      return (await response.json()) as T;
+    } catch (error) {
+      const retryable = isTransientError(error);
+      if (retryable && attempt < maxAttempts - 1) {
+        lastError = error;
+        await delay(retryDelaysMs[Math.min(attempt, retryDelaysMs.length - 1)]);
+        continue;
+      }
+      throw error instanceof Error ? error : new Error('Request failed');
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
 }
 
 export function wakeBackend(): void {
   try {
-    fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+    fetch(`${API_BASE}/health`, { method: 'GET', cache: 'no-store' }).catch(() => {});
   } catch {
     // Silent wake-up only — never block navigation.
   }
@@ -79,19 +137,13 @@ function adaptKundli(chart: RawChart): KundliData {
 }
 
 function adaptArea(raw: RawArea, id: 'attention' | 'protect' | 'danger', stepNumber: string, environmentalTheme: 'light' | 'mixed' | 'deep-crimson') {
-  const title = raw.area.split(' — ').pop() || raw.area;
-  const description = raw.description
-    .replace(/^This concentrates Mars energy in the area of [^.]+\. Balance is the key recommendation\.\s*/i, 'This is a sensitive area where balance matters. ')
-    .replace(/^Mars instinctively protects the area of [^;]+; conflict can arise when it feels threatened\.\s*/i, 'This is an area you may protect strongly; conflict can arise when it feels threatened. ')
-    .replace(/^Mars highlights [^.]+ for transformation and correction\.\s*/i, 'This area deserves transformation and correction. ');
-
   return {
     id, stepNumber,
     label: id === 'attention' ? 'ATTENTION AREA' : id === 'protect' ? 'PROTECT THIS AREA' : 'DANGER AREA',
-    title,
+    title: raw.area,
     subtitle: id === 'attention' ? 'Where natural instinct needs conscious calibration' : id === 'protect' ? 'Know where to stop' : 'What should not be ignored',
     quote: '',
-    summary: description,
+    summary: raw.description,
     body: raw.potential_impact ? [raw.potential_impact] : [],
     watchFor: { primary: raw.mindful_of?.[0] || '', points: raw.mindful_of?.slice(1) || [] },
     environmentalTheme,
@@ -100,12 +152,22 @@ function adaptArea(raw: RawArea, id: 'attention' | 'protect' | 'danger', stepNum
 
 export const api = {
   async searchPlaces(query: string): Promise<PlaceSuggestion[]> {
-    if (!query.trim()) return [];
-    const response = await request<{ results: Array<{ display: string; lat: number; lon: number }> }>(`/places/search?q=${encodeURIComponent(query.trim())}`);
-    return (response.results || []).map((place, index) => {
-      const parts = place.display.split(',').map((part) => part.trim());
-      return { id: `${place.lat}-${place.lon}-${index}`, name: parts[0] || place.display, region: parts[1] || '', country: parts.slice(2).join(', ') || '', coordinates: { lat: place.lat, lng: place.lon } };
-    });
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return [];
+    try {
+      const response = await request<{ results: Array<{ display: string; lat: number; lon: number }> }>(
+        `/places/search?q=${encodeURIComponent(trimmed)}`,
+        undefined,
+        { timeoutMs: 8000, retryDelaysMs: [] },
+      );
+      return (response.results || []).map((place, index) => {
+        const parts = place.display.split(',').map((part) => part.trim());
+        return { id: `${place.lat}-${place.lon}-${index}`, name: parts[0] || place.display, region: parts[1] || '', country: parts.slice(2).join(', ') || '', coordinates: { lat: place.lat, lng: place.lon } };
+      });
+    } catch {
+      // Autocomplete is optional: a cold/unavailable backend must not block manual entry.
+      return [];
+    }
   },
 
   async calculateChart(birthDetails: BirthDetails) {

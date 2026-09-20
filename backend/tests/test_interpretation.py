@@ -122,7 +122,7 @@ def test_virgo_danger_integrates_the_house_domain(house_number, life_area, unexp
         assert unexpected_phrase not in danger["description"]
 
 
-def test_virgo_danger_house_10_applies_potential_to_profession_and_reputation():
+def test_virgo_danger_house_10_keeps_internal_mapping_out_of_public_copy():
     chart = SimpleNamespace(
         planets=[SimpleNamespace(name="Mars", sign="Aquarius", house=1, degree=12.3)],
         extra_planets=[],
@@ -130,7 +130,29 @@ def test_virgo_danger_house_10_applies_potential_to_profession_and_reputation():
         houses=[SimpleNamespace(number=10, sign="Virgo")],
     )
     with patch("interpretation.generate_chart", return_value=chart):
-        danger = compute_interpretation(None)["danger"]["description"]
+        danger = compute_interpretation(None)["danger"]
 
-    assert "profession, authority, reputation, and public responsibilities" in danger
-    assert "highly capable and valuable in this area" in danger
+    # The engine still resolves the real house and life area internally.
+    assert danger["house"] == 10
+    assert danger["life_area"] == "profession, authority, reputation, and public responsibilities"
+    assert "highly capable and valuable in this area" in danger["description"]
+
+    # Public copy must not reveal the house mapping or the planetary method.
+    public_text = danger["description"].lower() + " " + danger["area"].lower()
+    for forbidden in ("mars", "mangal", "rashi", "aspect", "house", "d1"):
+        assert forbidden not in public_text
+
+
+def test_public_reading_areas_do_not_reveal_the_internal_method():
+    with patch("interpretation.generate_chart", return_value=fake_chart("Cancer")):
+        result = compute_interpretation(None)
+
+    public_text = " ".join(
+        result[layer][field]
+        for layer in ("attention", "protect", "danger")
+        for field in ("area", "description")
+    ).lower()
+
+    for forbidden in ("mars", "mangal", "saturn", "shani", "rahu", "ketu", "rashi", "aspect", "transit", "house", "d1"):
+        assert forbidden not in public_text
+

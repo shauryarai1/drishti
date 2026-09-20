@@ -6,24 +6,34 @@ interface LoadingExperienceProps {
   onFinished: () => void;
   isReady?: boolean;
   error?: string;
+  statusMessage?: string;
+  onRetry?: () => void;
+  onEditDetails?: () => void;
 }
 
-export function LoadingExperience({ onFinished, isReady = true, error }: LoadingExperienceProps) {
+export function LoadingExperience({
+  onFinished,
+  isReady = true,
+  error,
+  statusMessage,
+  onRetry,
+  onEditDetails,
+}: LoadingExperienceProps) {
   const [stage, setStage] = useState<1 | 2 | 3>(1);
   const [minimumTimeElapsed, setMinimumTimeElapsed] = useState(false);
 
   const stages = [
     {
       id: 1,
-      text: 'Preparing your chart',
-      subtext: 'Calculating planetary coordinates and horizon angles...',
+      text: 'Preparing your reading',
+      subtext: 'Preparing the foundation of your reading...',
       code: 'HORIZON.FIX',
     },
     {
       id: 2,
       text: 'Identifying your key areas',
-      subtext: 'Analyzing house placements and planetary relationships...',
-      code: 'HOUSE.MAP',
+      subtext: 'Analyzing the patterns behind your reading...',
+      code: 'PATTERN.MAP',
     },
     {
       id: 3,
@@ -140,7 +150,33 @@ export function LoadingExperience({ onFinished, isReady = true, error }: Loading
           </div>
         </div>
 
-        {error && <div className="mx-auto max-w-md border border-[#A62A34]/50 bg-[#541219]/30 p-4 text-sm text-[#F7F5F0]">{error}</div>}
+        {error && (
+          <div className="mx-auto max-w-md space-y-4 border border-[#A62A34]/50 bg-[#541219]/30 p-4 text-sm text-[#F7F5F0]">
+            <p>{error}</p>
+            {(onRetry || onEditDetails) && (
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="rounded border border-[#A62A34]/60 bg-[#7B1D26] px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[#F7F5F0] transition-colors hover:bg-[#A62A34] cursor-pointer"
+                  >
+                    Try Again
+                  </button>
+                )}
+                {onEditDetails && (
+                  <button
+                    type="button"
+                    onClick={onEditDetails}
+                    className="rounded border border-[#A62A34]/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[#EEE9DF]/80 transition-colors hover:text-[#F7F5F0] cursor-pointer"
+                  >
+                    Edit Details
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Text Sequence (No fake percentages) */}
         <div className="space-y-3 min-h-[90px]">
@@ -161,7 +197,7 @@ export function LoadingExperience({ onFinished, isReady = true, error }: Loading
                 {currentStage.text}
               </h3>
               <p className="text-xs sm:text-sm font-mono text-[#EEE9DF]/60">
-                {currentStage.subtext}
+                {error ? 'Waiting for your confirmation.' : statusMessage || currentStage.subtext}
               </p>
             </motion.div>
           </AnimatePresence>

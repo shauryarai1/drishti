@@ -91,9 +91,9 @@ RASHI_NAMES = [
 ]
 
 AREA_TYPE_PRINCIPLES: Dict[str, str] = {
-    "attention": "Mars concentrates energy here. This is a sensitive area requiring balance.",
-    "protect": "Mars creates a strong protective and defensive instinct here. Conflict may arise when this area feels threatened.",
-    "danger": "Mars demands transformation and correction here. Weaknesses left unresolved may produce setbacks in this area.",
+    "attention": "This is a sensitive area requiring balance.",
+    "protect": "You may feel strongly protective and defensive about this area. Conflict may arise when it feels threatened.",
+    "danger": "This area requires transformation and correction. Weaknesses left unresolved may produce setbacks.",
 }
 
 HOUSE_LIFE_AREAS: Dict[int, str] = {
@@ -119,7 +119,7 @@ RASHI_STRUCTURED_GUIDANCE: Dict[str, Dict[str, Dict[str, str]]] = {
             "correction": "apply discipline and correct weak areas",
             "risk_pattern": "too much focus on flaws can consume useful energy",
             "development": "consistent, balanced attention to detail",
-            "manifestation_template": "Mars concentrates energy in {life_area}. Your Virgo pattern gives you {strength}, but {weakness} can make this sensitive area consume too much of your effort. {correction}; balance this attention so it supports rather than overwhelms {life_area}.",
+            "manifestation_template": "This is a sensitive area requiring balance. You have {strength}, but {weakness} can make this area consume too much of your effort. {correction}; balance this attention so it supports rather than overwhelms {life_area}.",
         },
         "protect": {
             "strength": "skill, usefulness, and careful attention to detail",
@@ -127,7 +127,7 @@ RASHI_STRUCTURED_GUIDANCE: Dict[str, Dict[str, Dict[str, str]]] = {
             "correction": "protect this area without turning correction into conflict",
             "risk_pattern": "feeling that imperfections threaten the area",
             "development": "measured protection and constructive communication",
-            "manifestation_template": "Mars makes you instinctively protective of {life_area}. Your Virgo pattern values {strength}, but {weakness} may become defensive when {risk_pattern}. {correction}; develop {development}.",
+            "manifestation_template": "You may feel strongly protective and defensive about this area. You value {strength}, but {weakness} can make you defensive when {risk_pattern}. {correction}; develop {development}.",
         },
         "danger": {
             "strength": "many skills and significant potential",
@@ -135,7 +135,7 @@ RASHI_STRUCTURED_GUIDANCE: Dict[str, Dict[str, Dict[str, str]]] = {
             "correction": "correct weak areas and understand the details of what you are doing",
             "risk_pattern": "repeatedly ignoring these weaknesses",
             "development": "discipline and consistent work",
-            "manifestation_template": "Mars highlights {life_area} for transformation and correction. You have {strength} and can become highly capable and valuable in this area, but {weakness} can prevent you from using that potential fully. Details matter here: {correction}. If you repeatedly ignore these weaknesses, this area may face setbacks. Develop {development} to unlock your potential.",
+            "manifestation_template": "This area requires transformation and correction. You have {strength} and can become highly capable and valuable in this area, but {weakness} can prevent you from using that potential fully. Details matter here: {correction}. If you repeatedly ignore these weaknesses, this area may face setbacks. Develop {development} to unlock your potential.",
         },
     },
 }
@@ -171,7 +171,7 @@ def _reading_area(sign: str, layer: str, house_number: int) -> Dict[str, Any]:
         description = f"{AREA_TYPE_PRINCIPLES[layer]} {guidance[layer]}"
 
     return {
-        "area": f"House {house_number}: {life_area} — {guidance['area']}",
+        "area": guidance["area"],
         "rashi": sign,
         "house": house_number,
         "life_area": life_area,

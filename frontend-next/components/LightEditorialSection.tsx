@@ -85,7 +85,7 @@ export function LightEditorialSection({ onStartReading }: LightEditorialSectionP
                   Your personalized reading is prepared.
                 </h3>
                 <p className="text-sm text-[#171717]/75 leading-relaxed">
-                  Instead of generic horoscopes or endless lists of planetary aspects, our engine isolates the specific house frictions and planetary alignments influencing your current trajectory.
+                  Instead of generic horoscopes or endless lists of general predictions, our engine isolates the specific pressure points influencing your current trajectory.
                 </p>
               </div>
 
@@ -100,7 +100,7 @@ export function LightEditorialSection({ onStartReading }: LightEditorialSectionP
                     <div className="h-full w-4/5 bg-[#7B1D26]" />
                   </div>
                   <div className="flex justify-between text-[10px] font-mono text-[#171717]/50">
-                    <span>ASPECT DISTILLATION</span>
+                    <span>PATTERN DISTILLATION</span>
                     <span>100% COMPLETE</span>
                   </div>
                 </div>

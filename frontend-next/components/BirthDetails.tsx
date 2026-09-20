@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, Clock, MapPin, ArrowLeft, ArrowRight, Search, CheckCircle2 } from 'lucide-react';
 import { BirthDetails as BirthDetailsType, PlaceSuggestion } from '../lib/types';
-import { api } from '../lib/api';
+import { api, wakeBackend } from '../lib/api';
 import { Button } from './Button';
 import { BirthInput } from './BirthInput';
 import { ReadingProgress } from './ReadingProgress';
@@ -34,21 +34,40 @@ export function BirthDetailsFlow({
 
   // Errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Search places when query changes in Step 3
+  // Kick the backend awake as soon as the visitor starts the birth-details flow.
   useEffect(() => {
-    if (step === 3 && placeQuery.trim().length > 1) {
-      setIsSearchingPlaces(true);
-      const timer = setTimeout(async () => {
-        const results = await api.searchPlaces(placeQuery);
-        setSuggestions(results);
-        setIsSearchingPlaces(false);
-      }, 150);
-      return () => clearTimeout(timer);
-    } else {
+    wakeBackend();
+  }, []);
+
+  // Search places when query changes in Step 3. Autocomplete is optional and
+  // must never block manual entry or throw when the backend is cold.
+  useEffect(() => {
+    const trimmed = placeQuery.trim();
+    if (step !== 3 || trimmed.length < 3) {
       setSuggestions([]);
       setIsSearchingPlaces(false);
+      return;
     }
+
+    let cancelled = false;
+    setIsSearchingPlaces(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.searchPlaces(trimmed);
+        if (!cancelled) setSuggestions(results);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setIsSearchingPlaces(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [placeQuery, step]);
 
   const validateStep = (currentStep: number): boolean => {
@@ -82,11 +101,14 @@ export function BirthDetailsFlow({
   };
 
   const handleContinue = () => {
-    if (!validateStep(step)) return;
-
-    if (step < 3) {
-      setStep((prev) => (prev + 1) as 1 | 2 | 3);
-    } else {
+    if (isSubmitting) return;
+    if (validateStep(step)) {
+      if (step < 3) {
+        setStep((prev) => (prev + 1) as 1 | 2 | 3);
+        return;
+      }
+      // Final step: lock the button so repeated clicks cannot start parallel flows.
+      setIsSubmitting(true);
       onComplete({
         date,
         time,
@@ -361,8 +383,9 @@ export function BirthDetailsFlow({
                 variant="primary"
                 onClick={handleContinue}
                 showArrow
+                disabled={isSubmitting}
               >
-                {step === 3 ? 'Generate My Reading' : 'Continue'}
+                {step === 3 ? (isSubmitting ? 'Preparing...' : 'Generate My Reading') : 'Continue'}
               </Button>
             </div>
 
