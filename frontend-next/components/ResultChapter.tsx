@@ -2,6 +2,7 @@ import React from 'react';
 import { InsightArea } from '../lib/types';
 import { Container } from './Container';
 import { SectionLabel } from './SectionLabel';
+import { MaskedReveal } from './motion/MaskedReveal';
 import { Eye, Shield, AlertOctagon, Check, ArrowRight } from 'lucide-react';
 
 interface ResultChapterProps {
@@ -24,15 +25,21 @@ export function ResultChapter({ area }: ResultChapterProps) {
 
             {/* Left Column: Number, Category Label, Anchor Title */}
             <div className="lg:col-span-4 space-y-6">
-              <SectionLabel label={area.label} number={area.stepNumber} tone="crimson" />
+              <MaskedReveal>
+                <SectionLabel label={area.label} number={area.stepNumber} tone="crimson" />
+              </MaskedReveal>
 
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
-                {area.title}
-              </h2>
+              <MaskedReveal delay={0.08}>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
+                  {area.title}
+                </h2>
+              </MaskedReveal>
 
-              <p className="text-sm uppercase font-mono tracking-widest text-[#E53E3E]">
-                {area.subtitle}
-              </p>
+              <MaskedReveal delay={0.16}>
+                <p className="text-sm uppercase font-mono tracking-widest text-[#E53E3E]">
+                  {area.subtitle}
+                </p>
+              </MaskedReveal>
 
               {/* Editorial thematic coordinate stamp */}
               <div className="pt-6 border-t border-[#A62A34]/25 font-mono text-xs text-[#EEE9DF]/55 space-y-1">
@@ -45,12 +52,12 @@ export function ResultChapter({ area }: ResultChapterProps) {
             <div className="lg:col-span-8 space-y-8">
 
               {/* Primary interpretation, rendered once */}
-              <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
+              <MaskedReveal delay={0.1} innerClassName="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
                 <p className="font-medium text-[#F7F5F0]">{area.summary}</p>
                 {area.body.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
-              </div>
+              </MaskedReveal>
 
               {/* WATCH FOR: only render when supplied by the backend */}
               {(area.watchFor.primary || area.watchFor.points.length > 0) && (
@@ -97,27 +104,33 @@ export function ResultChapter({ area }: ResultChapterProps) {
 
             {/* Left Column: Bold Boundary Title & Prominent Supporting Phrase */}
             <div className="lg:col-span-5 space-y-6">
-              <SectionLabel label={area.label} number={area.stepNumber} tone="brass" />
+              <MaskedReveal>
+                <SectionLabel label={area.label} number={area.stepNumber} tone="brass" />
+              </MaskedReveal>
 
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
-                {area.title}
-              </h2>
+              <MaskedReveal delay={0.08}>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
+                  {area.title}
+                </h2>
+              </MaskedReveal>
 
               {/* Supporting phrase in prominent typography */}
-              <div className="inline-block p-3 rounded bg-[#B39250]/10 border border-[#B39250]/30 text-[#D6BE85] font-mono text-xs uppercase tracking-[0.25em]">
-                {area.subtitle}
-              </div>
+              <MaskedReveal delay={0.16}>
+                <div className="inline-block p-3 rounded bg-[#B39250]/10 border border-[#B39250]/30 text-[#D6BE85] font-mono text-xs uppercase tracking-[0.25em]">
+                  {area.subtitle}
+                </div>
+              </MaskedReveal>
 
             </div>
 
             {/* Right Column: Narrative & Boundary Takeaway */}
             <div className="lg:col-span-7 space-y-8">
-              <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed">
+              <MaskedReveal delay={0.1} innerClassName="space-y-4 text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed">
                 <p className="text-[#F7F5F0] font-medium">{area.summary}</p>
                 {area.body.map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
-              </div>
+              </MaskedReveal>
 
               {/* WATCH FOR: only render when supplied by the backend */}
               {(area.watchFor.primary || area.watchFor.points.length > 0) && (
@@ -163,26 +176,32 @@ export function ResultChapter({ area }: ResultChapterProps) {
 
           {/* Left Column: High Serious Hierarchy (No warning emojis or horror aesthetic) */}
           <div className="lg:col-span-5 space-y-6">
-            <SectionLabel label={area.label} number={area.stepNumber} tone="crimson" />
+            <MaskedReveal>
+              <SectionLabel label={area.label} number={area.stepNumber} tone="crimson" />
+            </MaskedReveal>
 
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
-              {area.title}
-            </h2>
+            <MaskedReveal delay={0.08}>
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
+                {area.title}
+              </h2>
+            </MaskedReveal>
 
-            <p className="text-sm uppercase font-mono tracking-widest text-[#E53E3E]">
-              {area.subtitle}
-            </p>
+            <MaskedReveal delay={0.16}>
+              <p className="text-sm uppercase font-mono tracking-widest text-[#E53E3E]">
+                {area.subtitle}
+              </p>
+            </MaskedReveal>
 
           </div>
 
           {/* Right Column: Serious Editorial Analysis */}
           <div className="lg:col-span-7 space-y-8">
-              <div className="space-y-4 text-base sm:text-lg text-[#EEE9DF]/85 leading-relaxed">
+              <MaskedReveal delay={0.1} innerClassName="space-y-4 text-base sm:text-lg text-[#EEE9DF]/85 leading-relaxed">
                 <p className="text-[#F7F5F0] font-medium">{area.summary}</p>
                 {area.body.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
-              </div>
+              </MaskedReveal>
 
               {/* WATCH FOR: only render when supplied by the backend */}
               {(area.watchFor.primary || area.watchFor.points.length > 0) && (

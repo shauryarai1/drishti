@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Container } from './Container';
+import { CelestialField } from './motion/CelestialField';
 
 interface LoadingExperienceProps {
   onFinished: () => void;
@@ -66,6 +67,11 @@ export function LoadingExperience({
       {/* Ambient background glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[#541219]/30 blur-[120px]" />
+      </div>
+
+      {/* Shared celestial language with the landing/intro environment */}
+      <div className="pointer-events-none absolute inset-0 opacity-50">
+        <CelestialField variant="full" />
       </div>
 
       <Container size="sm" className="relative z-10 text-center space-y-10">

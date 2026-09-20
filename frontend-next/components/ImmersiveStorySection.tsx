@@ -2,6 +2,7 @@ import React from 'react';
 import { Container } from './Container';
 import { SectionLabel } from './SectionLabel';
 import { Button } from './Button';
+import { MaskedReveal } from './motion/MaskedReveal';
 import { ShieldCheck, Sparkles, Sliders } from 'lucide-react';
 
 interface ImmersiveStorySectionProps {
@@ -20,14 +21,20 @@ export function ImmersiveStorySection({ onStartReading }: ImmersiveStorySectionP
       <Container size="lg" className="relative z-10">
         {/* Section Heading */}
         <div className="max-w-2xl mb-14 space-y-4">
-          <SectionLabel label="THE LANDSCAPE OF YOUR CHART" number="SEC.03" tone="crimson" />
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#F7F5F0] tracking-tight leading-[1.15]">
-            From celestial complexity to{' '}
-            <span className="text-[#A62A34]">disciplined direction.</span>
-          </h2>
-          <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
-            The sky at your birth is an undulating terrain of planetary intersections. Rather than overwhelming you with endless astrological jargon, KAVACH extracts the exact pressure points requiring conscious pacing.
-          </p>
+          <MaskedReveal>
+            <SectionLabel label="THE LANDSCAPE OF YOUR CHART" number="SEC.03" tone="crimson" />
+          </MaskedReveal>
+          <MaskedReveal delay={0.08}>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#F7F5F0] tracking-tight leading-[1.15]">
+              From celestial complexity to{' '}
+              <span className="text-[#A62A34]">disciplined direction.</span>
+            </h2>
+          </MaskedReveal>
+          <MaskedReveal delay={0.16}>
+            <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
+              The sky at your birth is an undulating terrain of planetary intersections. Rather than overwhelming you with endless astrological jargon, KAVACH extracts the exact pressure points requiring conscious pacing.
+            </p>
+          </MaskedReveal>
         </div>
 
         {/* Centerpiece Composition: Topographic Crimson Terrain + ONE Translucent Interface Module */}

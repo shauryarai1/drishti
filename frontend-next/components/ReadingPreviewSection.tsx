@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Container } from './Container';
 import { SectionLabel } from './SectionLabel';
 import { Button } from './Button';
+import { MaskedReveal } from './motion/MaskedReveal';
 import { Eye, Shield, AlertTriangle, ArrowRight } from 'lucide-react';
 
 interface ReadingPreviewSectionProps {
@@ -66,13 +67,19 @@ export function ReadingPreviewSection({ onStartReading }: ReadingPreviewSectionP
       <Container size="lg">
         {/* Section Header */}
         <div className="max-w-3xl mb-16 space-y-4">
-          <SectionLabel label="THE TRIAD OF GUIDANCE" number="SEC.04" tone="crimson" />
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#F7F5F0] tracking-tight leading-[1.15]">
-            The Three Focus Dimensions
-          </h2>
-          <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
-            Every KAVACH reading structures your chart’s astrological tensions into three actionable categories.
-          </p>
+          <MaskedReveal>
+            <SectionLabel label="THE TRIAD OF GUIDANCE" number="SEC.04" tone="crimson" />
+          </MaskedReveal>
+          <MaskedReveal delay={0.08}>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#F7F5F0] tracking-tight leading-[1.15]">
+              The Three Focus Dimensions
+            </h2>
+          </MaskedReveal>
+          <MaskedReveal delay={0.16}>
+            <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
+              Every KAVACH reading structures your chart’s astrological tensions into three actionable categories.
+            </p>
+          </MaskedReveal>
         </div>
 
         {/* Editorial Narrative Grid (Asymmetric visual narrative, not 3 side-by-side cards) */}

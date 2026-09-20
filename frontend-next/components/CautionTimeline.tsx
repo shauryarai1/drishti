@@ -2,6 +2,7 @@ import React from 'react';
 import { CautionPeriod } from '../lib/types';
 import { Container } from './Container';
 import { SectionLabel } from './SectionLabel';
+import { MaskedReveal } from './motion/MaskedReveal';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 
 interface CautionTimelineProps {
@@ -17,15 +18,21 @@ export function CautionTimeline({ periods }: CautionTimelineProps) {
       <Container size="lg">
         {/* Section Header */}
         <div className="max-w-3xl mb-16 space-y-4">
-          <SectionLabel label="CHRONOLOGICAL WINDOWS" number="SEC.05" tone="crimson" />
+          <MaskedReveal>
+            <SectionLabel label="CHRONOLOGICAL WINDOWS" number="SEC.05" tone="crimson" />
+          </MaskedReveal>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
-            When should you be extra careful?
-          </h2>
+          <MaskedReveal delay={0.08}>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[#F7F5F0] leading-tight">
+              When should you be extra careful?
+            </h2>
+          </MaskedReveal>
 
-          <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
-            Some periods deserve a slower pace and closer attention. Use these windows as a practical reminder to avoid unnecessary escalation and give important decisions more time.
-          </p>
+          <MaskedReveal delay={0.16}>
+            <p className="text-base sm:text-lg text-[#EEE9DF]/75 leading-relaxed">
+              Some periods deserve a slower pace and closer attention. Use these windows as a practical reminder to avoid unnecessary escalation and give important decisions more time.
+            </p>
+          </MaskedReveal>
         </div>
 
         <div className="mb-14 rounded-xl border border-[#A62A34]/30 bg-[#160A0C]/70 p-6 sm:p-8">
@@ -35,7 +42,6 @@ export function CautionTimeline({ periods }: CautionTimelineProps) {
           </p>
           {current && <p className="mt-3 text-sm leading-relaxed text-[#EEE9DF]/75">Move more deliberately around {current.focus.toLowerCase()} and avoid unnecessary escalation.</p>}
         </div>
-
         {/* Timeline Layout */}
         <div className="relative border-l border-[#A62A34]/30 ml-4 sm:ml-8 pl-8 sm:pl-12 space-y-12">
           {upcoming.map((item, index) => {
@@ -62,7 +68,7 @@ export function CautionTimeline({ periods }: CautionTimelineProps) {
                 />
 
                 {/* Card representation of the caution period */}
-                <div className="p-6 sm:p-8 rounded-xl bg-[#160A0C]/80 border border-[#A62A34]/30 hover:border-[#A62A34]/60 transition-all duration-300 shadow-xl space-y-4">
+                <MaskedReveal innerClassName="p-6 sm:p-8 rounded-xl bg-[#160A0C]/80 border border-[#A62A34]/30 hover:border-[#A62A34]/60 transition-all duration-300 shadow-xl space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-xs font-mono text-[#F7F5F0]">
                       <Calendar className="w-3.5 h-3.5 text-[#A62A34]" />
@@ -88,7 +94,7 @@ export function CautionTimeline({ periods }: CautionTimelineProps) {
                   <p className="text-sm sm:text-base text-[#EEE9DF]/75 leading-relaxed">
                     {item.description}
                   </p>
-                </div>
+                </MaskedReveal>
               </div>
             );
           })}

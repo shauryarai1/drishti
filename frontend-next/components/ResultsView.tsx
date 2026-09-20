@@ -9,6 +9,7 @@ import { CautionTimeline } from './CautionTimeline';
 import { TakeawaySection } from './TakeawaySection';
 import { PersonalReadingCTA } from './PersonalReadingCTA';
 import { Footer } from './Footer';
+import { MaskedReveal } from './motion/MaskedReveal';
 import { ArrowLeft, Share2, Sparkles, Printer } from 'lucide-react';
 
 interface ResultsViewProps {
@@ -88,42 +89,54 @@ export function ResultsView({
 
           {/* Results Intro Header */}
           <div className="max-w-3xl space-y-6">
-            <SectionLabel label="YOUR KAVACH" number="CHART.SYNTHESIS" tone="crimson" />
+            <MaskedReveal>
+              <SectionLabel label="YOUR KAVACH" number="CHART.SYNTHESIS" tone="crimson" />
+            </MaskedReveal>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
-              {reading.headline}
-            </h1>
+            <MaskedReveal delay={0.08}>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
+                {reading.headline}
+              </h1>
+            </MaskedReveal>
 
-            <p className="text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
-              {reading.overview}
-            </p>
+            <MaskedReveal delay={0.16}>
+              <p className="text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed font-normal">
+                {reading.overview}
+              </p>
+            </MaskedReveal>
 
-            <div className="pt-2 flex flex-wrap items-center gap-3 font-mono text-xs">
-              <span className="px-3 py-1 rounded bg-[#160A0C] border border-[#A62A34]/30 text-[#A62A34]">
-                {reading.ascendant}
-              </span>
-              <span className="px-3 py-1 rounded bg-[#160A0C] border border-[#B39250]/30 text-[#B39250]">
-                NATAL HORIZON FIX
-              </span>
-            </div>
+            <MaskedReveal delay={0.24}>
+              <div className="pt-2 flex flex-wrap items-center gap-3 font-mono text-xs">
+                <span className="px-3 py-1 rounded bg-[#160A0C] border border-[#A62A34]/30 text-[#A62A34]">
+                  {reading.ascendant}
+                </span>
+                <span className="px-3 py-1 rounded bg-[#160A0C] border border-[#B39250]/30 text-[#B39250]">
+                  NATAL HORIZON FIX
+                </span>
+              </div>
+            </MaskedReveal>
           </div>
 
           {/* 20. THE KUNDLI AS THE STAR ARTIFACT */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs uppercase tracking-widest text-[#B39250]">
-                ARTIFACT // TRADITIONAL NORTH INDIAN KUNDLI
-              </span>
-              <span className="text-[11px] font-mono text-[#EEE9DF]/50 hidden sm:inline">
-                INTERACTIVE INSPECTION ACTIVE
-              </span>
-            </div>
+            <MaskedReveal>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs uppercase tracking-widest text-[#B39250]">
+                  ARTIFACT // TRADITIONAL NORTH INDIAN KUNDLI
+                </span>
+                <span className="text-[11px] font-mono text-[#EEE9DF]/50 hidden sm:inline">
+                  INTERACTIVE INSPECTION ACTIVE
+                </span>
+              </div>
+            </MaskedReveal>
 
-            <Kundli
-              kundli={reading.kundli}
-              birthDetails={reading.birthDetails}
-              ascendant={reading.ascendant}
-            />
+            <MaskedReveal delay={0.1} duration={1.1}>
+              <Kundli
+                kundli={reading.kundli}
+                birthDetails={reading.birthDetails}
+                ascendant={reading.ascendant}
+              />
+            </MaskedReveal>
           </div>
 
         </Container>
