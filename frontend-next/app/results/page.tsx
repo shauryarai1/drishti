@@ -41,7 +41,7 @@ export default function ResultsPage() {
     router.replace('/reading');
   }, []);
 
-  if (!reading) {
+  if (!reading || !reading.birthDetails) {
     return (
       <div className="min-h-screen bg-[#090909] flex items-center justify-center font-mono text-xs text-[#A62A34]">
         CALIBRATING REPORT...

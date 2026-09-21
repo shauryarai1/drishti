@@ -7,3 +7,4 @@ timezonefinder>=6.0.0
 tzdata>=2023.3
 pytest>=7.4.0
 httpx>=0.25.0
+python-dotenv>=1.0.0

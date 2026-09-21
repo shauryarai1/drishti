@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Navbar from '../components/Navbar'
@@ -36,6 +36,12 @@ const steps = [
   },
 ]
 
+const loadingMessages = [
+  'Preparing your chart',
+  'Identifying your key areas',
+  'Building your reading',
+]
+
 export default function Tool() {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
@@ -43,6 +49,20 @@ export default function Tool() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [direction, setDirection] = useState(1)
+  const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0])
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMessage(loadingMessages[0])
+      return
+    }
+    let index = 0
+    const timer = window.setInterval(() => {
+      index = (index + 1) % loadingMessages.length
+      setLoadingMessage(loadingMessages[index])
+    }, 900)
+    return () => window.clearInterval(timer)
+  }, [loading])
 
   const current = steps[step]
   const isLast = step === steps.length - 1
@@ -86,6 +106,10 @@ export default function Tool() {
       })
       sessionStorage.setItem('drishti_result', JSON.stringify(result))
       sessionStorage.setItem('drishti_name', form.name || '')
+      sessionStorage.setItem(
+        'drishti_birth_details',
+        JSON.stringify({ date: form.date, time: form.time, place: form.place })
+      )
       navigate('/results')
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
@@ -208,7 +232,7 @@ export default function Tool() {
               {loading ? (
                 <span className="btn__loading">
                   <span className="spinner" />
-                  Reading your profile…
+                  {loadingMessage}…
                 </span>
               ) : isLast ? (
                 <>

@@ -1,0 +1,86 @@
+import { API_BASE } from './api';
+
+// Daily Prediction API client. Origin comes from the host-aware API_BASE, so
+// localhost / 127.0.0.1 / LAN / deployed resolve exactly as the rest of KAVACH.
+
+export type DailyStatus = 'GOOD' | 'NEUTRAL' | 'CAUTION';
+
+export interface DailyCategory {
+  status: DailyStatus;
+  reason: string;
+}
+
+export interface DailyCard {
+  sign: string;
+  activeHouse: number;
+  title: string;
+  pattern: string;
+  categories: { love: DailyCategory; health: DailyCategory; career: DailyCategory };
+  bestColour: string | null;
+  earlierTitle?: string;
+  isPersonal: boolean;
+}
+
+export interface DailyMoon {
+  date: string;
+  sunrise: string;
+  sunriseLocal: string;
+  longitude: number;
+  rashi: string;
+}
+
+export interface CurrentMoon {
+  rashi: string;
+  longitude: number;
+  asOf: string;
+}
+
+export interface DailyResponse {
+  status: string;
+  asOf: { timestamp: string; timezone: string };
+  dailyMoon: DailyMoon;
+  currentMoon: CurrentMoon;
+  natalMoon: string | null;
+  signs: DailyCard[];
+  basis: string;
+}
+
+export interface DailyRequest {
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  natal_moon?: string;
+}
+
+export async function fetchDaily(payload: DailyRequest): Promise<DailyResponse> {
+  const response = await fetch(`${API_BASE}/daily`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || (body as { status?: string }).status === 'error') {
+    throw new Error('Daily prediction unavailable');
+  }
+  return body as DailyResponse;
+}
+
+export const MOON_SIGNS = [
+  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+] as const;
+
+/** Reuses the city already chosen elsewhere in KAVACH (Panchang storage key). */
+export const DAILY_CITIES = [
+  { label: 'New Delhi, India', latitude: 28.6139, longitude: 77.209 },
+  { label: 'Mumbai, India', latitude: 19.076, longitude: 72.8777 },
+  { label: 'Bengaluru, India', latitude: 12.9716, longitude: 77.5946 },
+  { label: 'Chennai, India', latitude: 13.0827, longitude: 80.2707 },
+  { label: 'Kolkata, India', latitude: 22.5726, longitude: 88.3639 },
+  { label: 'Hyderabad, India', latitude: 17.385, longitude: 78.4867 },
+  { label: 'London, United Kingdom', latitude: 51.5074, longitude: -0.1278 },
+  { label: 'New York, United States', latitude: 40.7128, longitude: -74.006 },
+  { label: 'Dubai, UAE', latitude: 25.2048, longitude: 55.2708 },
+  { label: 'Singapore', latitude: 1.3521, longitude: 103.8198 },
+  { label: 'Sydney, Australia', latitude: -33.8688, longitude: 151.2093 },
+];

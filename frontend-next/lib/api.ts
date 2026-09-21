@@ -1,9 +1,23 @@
-import { BirthDetails, DrishtiReading, KundliData, PlaceSuggestion } from './types';
+import type { PanchangResult } from './panchang';
+﻿import { BirthDetails, DrishtiReading, KundliData, PlaceSuggestion } from './types';
 
-const API_ORIGIN =
-  process.env.NODE_ENV === 'production'
-    ? 'https://drishti-5j3u.onrender.com'
-    : 'http://localhost:8000';
+const PRODUCTION_ORIGIN = 'https://drishti-5j3u.onrender.com';
+const LOCAL_API_PORT = 8000;
+
+function resolveOrigin(): string {
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname;
+    const isLocal =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      /^[0-9]{1,3}([.][0-9]{1,3}){3}$/.test(host);
+    if (isLocal) return `http://${host}:${LOCAL_API_PORT}`;
+  }
+  return PRODUCTION_ORIGIN;
+}
+
+export const API_ORIGIN = resolveOrigin();
 
 export const API_BASE = `${API_ORIGIN}/api`;
 
@@ -118,21 +132,40 @@ export function wakeBackend(): void {
   try {
     fetch(`${API_BASE}/health`, { method: 'GET', cache: 'no-store' }).catch(() => {});
   } catch {
-    // Silent wake-up only — never block navigation.
+    // Silent wake-up only ΓÇö never block navigation.
   }
+}
+
+export interface PanchangQuery {
+  date: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  label?: string;
+}
+
+export async function getPanchang(query: PanchangQuery): Promise<PanchangResult> {
+  const params = new URLSearchParams({
+    date: query.date,
+    latitude: String(query.latitude),
+    longitude: String(query.longitude),
+    timezone: query.timezone,
+    label: query.label ?? '',
+  });
+  return request<PanchangResult>(`/panchang?${params.toString()}`);
 }
 
 function adaptKundli(chart: RawChart): KundliData {
   const planets = [...(chart.planets || []), ...(chart.extra_planets || [])];
   return {
-    ascendantSign: chart.ascendant?.sign || chart.ascendant_sign || '—',
-    ascendantDegree: chart.ascendant?.degree === undefined ? undefined : `${chart.ascendant.degree.toFixed(2)}°`,
+    ascendantSign: chart.ascendant?.sign || chart.ascendant_sign || 'ΓÇö',
+    ascendantDegree: chart.ascendant?.degree === undefined ? undefined : `${chart.ascendant.degree.toFixed(2)}┬░`,
     houses: Array.from({ length: 12 }, (_, index) => {
       const houseNumber = index + 1;
       const house = chart.houses?.find((item) => item.number === houseNumber);
-      return { houseNumber, sign: house?.sign || '—', signNumber: Math.max(1, signNames.indexOf(house?.sign || '') + 1), planets: planets.filter((planet) => planet.house === houseNumber).map((planet) => planet.name) };
+      return { houseNumber, sign: house?.sign || 'ΓÇö', signNumber: Math.max(1, signNames.indexOf(house?.sign || '') + 1), planets: planets.filter((planet) => planet.house === houseNumber).map((planet) => planet.name) };
     }),
-    planetaryPositions: planets.map((planet) => ({ planet: planet.name as never, house: planet.house, sign: planet.sign, degree: planet.degree === undefined ? undefined : `${planet.degree.toFixed(2)}°` })),
+    planetaryPositions: planets.map((planet) => ({ planet: planet.name as never, house: planet.house, sign: planet.sign, degree: planet.degree === undefined ? undefined : `${planet.degree.toFixed(2)}┬░` })),
   };
 }
 
@@ -173,7 +206,7 @@ export const api = {
   async calculateChart(birthDetails: BirthDetails) {
     const raw = await request<RawChart>('/chart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(birthDetails) });
     if (raw.status === 'ERROR') throw new Error(raw.reason || 'Chart calculation failed.');
-    return { kundli: adaptKundli(raw), ascendant: raw.ascendant?.sign || raw.ascendant_sign || '—' };
+    return { kundli: adaptKundli(raw), ascendant: raw.ascendant?.sign || raw.ascendant_sign || 'ΓÇö' };
   },
 
   async getInterpretation(birthDetails: BirthDetails): Promise<DrishtiReading> {
@@ -182,7 +215,7 @@ export const api = {
     const chart = raw.chart || await request<RawChart>('/chart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(birthDetails) });
     return {
       id: `reading-${Date.now()}`, createdAt: new Date().toISOString(), birthDetails,
-      ascendant: chart.ascendant?.sign || chart.ascendant_sign || '—',
+      ascendant: chart.ascendant?.sign || chart.ascendant_sign || 'ΓÇö',
       headline: 'Know what deserves your attention.',
       overview: 'A clear view of the areas where awareness, boundaries, and care can make the greatest difference.',
       kundli: adaptKundli(chart),
@@ -201,7 +234,7 @@ export const api = {
 function mapCaution(item: PublicCaution) {
   return {
     id: `${item.start_date}-${item.end_date}-${item.area}`,
-    period: `${item.start_date} — ${item.end_date}`,
+    period: `${item.start_date} ΓÇö ${item.end_date}`,
     intensity: item.level === 'high' ? 'critical' as const : 'heightened' as const,
     title: item.title,
     description: item.guidance,

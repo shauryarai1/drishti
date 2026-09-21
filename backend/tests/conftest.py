@@ -1,9 +1,29 @@
+"""Test-wide guard: no test may ever contact Google's Gemini API."""
+
+from __future__ import annotations
+
+import json
+
 import pytest
 
-# Ensure backend root is importable when tests are run from the tests/ dir
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+class _StubResponse:
+    status_code = 200
+    text = ""
 
-pytest_plugins = []
+    def json(self):
+        return {
+            "status": "completed",
+            "steps": [{"type": "model_output", "content": [{"type": "text", "text": "Stubbed reply."}]}],
+        }
+
+
+@pytest.fixture(autouse=True)
+def block_real_gemini(monkeypatch):
+    import chat.gemini as gemini
+
+    def _stub_post(*args, **kwargs):
+        return _StubResponse()
+
+    monkeypatch.setattr(gemini.httpx, "post", _stub_post)
+    yield

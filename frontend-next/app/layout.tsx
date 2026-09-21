@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'KAVACH — Astrological Early-Warning System',
@@ -30,7 +31,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[#090909] text-[#EEE9DF] antialiased selection:bg-[#7B1D26] selection:text-[#F7F5F0]">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

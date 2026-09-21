@@ -1,9 +1,10 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeroSection } from '../components/HeroSection';
 import { LightEditorialSection } from '../components/LightEditorialSection';
+import { ExploreSection } from '../components/ExploreSection';
 import { ImmersiveStorySection } from '../components/ImmersiveStorySection';
 import { ReadingPreviewSection } from '../components/ReadingPreviewSection';
 import { Footer } from '../components/Footer';
@@ -33,7 +34,7 @@ export default function HomePage() {
         setIntroActive(true);
       }
     } catch {
-      // Motion preference unavailable — skip the intro rather than risk a stuck overlay.
+      // Motion preference unavailable â€” skip the intro rather than risk a stuck overlay.
     }
   }, []);
 
@@ -57,6 +58,9 @@ export default function HomePage() {
         onExploreHowItWorks={handleExploreHowItWorks}
         introActive={introActive}
       />
+
+      {/* Explore hub: the two primary features + Panchang */}
+      <ExploreSection />
 
       {/* 02: Dark Editorial Section */}
       <LightEditorialSection onStartReading={handleStartReading} />

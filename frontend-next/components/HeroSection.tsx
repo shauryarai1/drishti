@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useRef } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -48,7 +48,7 @@ export function HeroSection({
       {/* LAYER 1: BACKGROUND (Celestial environment + architectural grid lines)     */}
       {/* ========================================================================= */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        {/* Revolving planetary environment — the shared visual system with the intro. */}
+        {/* Revolving planetary environment â€” the shared visual system with the intro. */}
         {/* Deep layer: large faint structures that drift slower than the near layer. */}
         <motion.div
           className="absolute inset-0"
@@ -149,6 +149,19 @@ export function HeroSection({
                 Begin your reading
               </Button>
 
+              <a
+                href="/life-summary"
+                className="inline-flex items-center justify-center rounded border border-[#A62A34]/40 px-6 py-4 text-base tracking-wide text-[#F7F5F0] transition-colors hover:border-[#A62A34] hover:bg-[#2B0C11]/60"
+              >
+                Explore My Life
+              </a>
+
+              <a
+                href="/ask"
+                className="inline-flex items-center justify-center rounded border border-[#B39250]/40 px-6 py-4 text-base tracking-wide text-[#F7F5F0] transition-colors hover:border-[#B39250] hover:bg-[#2B0C11]/60"
+              >
+                Ask Kavach
+              </a>
               <button
                 onClick={onExploreHowItWorks}
                 className="group inline-flex items-center justify-center gap-2 text-sm uppercase tracking-widest text-[#EEE9DF]/80 hover:text-[#F7F5F0] transition-colors py-3 px-2 cursor-pointer"
@@ -233,7 +246,7 @@ export function HeroSection({
               <MicroPanel
                 category="ATTENTION AREA"
                 label="Relationships"
-                actionText="A closer look →"
+                actionText="A closer look â†’"
                 accent="crimson"
                 onAction={onInspectMicroAttention || onStartReading}
               />
@@ -288,7 +301,7 @@ export function HeroSection({
           className="flex items-center gap-2 hover:text-[#EEE9DF] transition-colors cursor-pointer"
         >
           <span>EXPLORE THE ARCHITECTURE</span>
-          <span>↓</span>
+          <span>â†“</span>
         </button>
       </div>
     </section>

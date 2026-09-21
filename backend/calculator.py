@@ -119,6 +119,33 @@ def calc_planet_longitudes(jd: float) -> dict[str, float]:
     return out
 
 
+def calc_planet_longitudes_and_speed(jd: float) -> dict[str, tuple[float, float]]:
+    """Identical sidereal calculation to calc_planet_longitudes, plus speed.
+
+    Adding swe.FLG_SPEED does not alter the returned longitude; it only adds the
+    longitudinal speed so retrograde status can be derived properly.
+    """
+    out: dict[str, tuple[float, float]] = {}
+    for name in ALL_PLANETS:
+        if name == "Ketu":
+            rahu = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+            values = rahu[0]
+            rahu_lon, rahu_speed = float(values[0]), float(values[3])
+            out[name] = ((rahu_lon + 180.0) % 360.0, rahu_speed)
+        else:
+            res = swe.calc_ut(jd, _PLANET_IDX[name], swe.FLG_SIDEREAL | swe.FLG_SPEED)
+            values = res[0]
+            out[name] = (float(values[0]), float(values[3]))
+    return out
+
+
+def calc_planet_retrograde(jd: float) -> dict[str, bool]:
+    """Retrograde from longitudinal speed. Nodes are excluded by design."""
+    return {name: (speed < 0)
+            for name, (_longitude, speed) in calc_planet_longitudes_and_speed(jd).items()
+            if name not in ("Rahu", "Ketu")}
+
+
 def calc_ascendant(jd: float, lat: float, lng: float) -> float:
     cusps, ascmc = swe.houses(jd, lat, lng, b"P")
     asc = ascmc[0]
