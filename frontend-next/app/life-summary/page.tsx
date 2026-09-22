@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { API_BASE } from '../../lib/api';
+import { API_BASE, api } from '../../lib/api';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import { Header } from '../../components/Header';
 import { CurrentDashaSection } from '../../components/CurrentDashaSection';
@@ -31,16 +31,31 @@ export default function LifeSummaryPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const search = async () => {
-    if (query.trim().length < 3) return;
-    try {
-      const res = await fetch(`${API_BASE}/places/search?q=${encodeURIComponent(query.trim())}`);
-      const body = await res.json();
-      setHits(body.results || []);
-    } catch {
-      setHits([]);
-    }
-  };
+    const [searching, setSearching] = useState(false);
+    const [searchUnavailable, setSearchUnavailable] = useState(false);
+
+    const search = async () => {
+      const trimmed = query.trim();
+      if (trimmed.length < 3) return;
+      setSearching(true);
+      setSearchUnavailable(false);
+      try {
+        // Shared hardened search: cached, deduped, and it tells us when the
+        // location service is temporarily down (instead of "no cities").
+        const outcome = await api.searchPlacesDetailed(trimmed);
+        setHits(outcome.results.map((place) => ({
+          display: `${place.name}${place.region ? `, ${place.region}` : ''}${place.country ? `, ${place.country}` : ''}`,
+          lat: place.coordinates.lat,
+          lon: place.coordinates.lng,
+        })));
+        setSearchUnavailable(outcome.unavailable);
+      } catch {
+        setHits([]);
+        setSearchUnavailable(true);
+      } finally {
+        setSearching(false);
+      }
+    };
 
   const submit = async () => {
     if (!date || !time || !place.trim()) return;
@@ -102,10 +117,19 @@ export default function LifeSummaryPage() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && search()}
                 />
-                <button onClick={search} className="rounded border border-[#A62A34]/35 px-4 py-3 text-xs uppercase tracking-wide text-[#EEE9DF]/80 hover:text-[#F7F5F0]">
-                  Search
+                <button
+                  onClick={search}
+                  disabled={searching}
+                  className="rounded border border-[#A62A34]/35 px-4 py-3 text-xs uppercase tracking-wide text-[#EEE9DF]/80 hover:text-[#F7F5F0] disabled:opacity-50"
+                >
+                  {searching ? 'Searching…' : 'Search'}
                 </button>
               </div>
+              {searchUnavailable && hits.length === 0 && (
+                <p className="text-[11px] text-[#E5B567]">
+                  Location search is temporarily unavailable. Please try again shortly.
+                </p>
+              )}
               {hits.length > 0 && (
                 <div className="rounded border border-[#A62A34]/25">
                   {hits.map((h, i) => (

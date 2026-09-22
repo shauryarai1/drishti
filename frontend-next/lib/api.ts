@@ -183,24 +183,71 @@ function adaptArea(raw: RawArea, id: 'attention' | 'protect' | 'danger', stepNum
   };
 }
 
+export interface PlaceSearchOutcome {
+  results: PlaceSuggestion[];
+  /** True when the location service is temporarily unavailable (not "no matches"). */
+  unavailable: boolean;
+}
+
+// Shared autocomplete guard: identical normalized queries are answered from a
+// short-lived memo and concurrent identical lookups share one request, so fast
+// typing cannot fire duplicate upstream work or race stale results.
+const PLACE_LOOKUP_TTL_MS = 20_000;
+const placeLookups = new Map<string, { at: number; outcome: PlaceSearchOutcome }>();
+const placeInFlight = new Map<string, Promise<PlaceSearchOutcome>>();
+
 export const api = {
-  async searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+  /**
+   * Place autocomplete. Distinguishes "no matches" from "service unavailable" so
+   * the dropdown never looks empty as though a city did not exist.
+   */
+  async searchPlacesDetailed(query: string): Promise<PlaceSearchOutcome> {
     const trimmed = query.trim();
-    if (trimmed.length < 3) return [];
-    try {
-      const response = await request<{ results: Array<{ display: string; lat: number; lon: number }> }>(
-        `/places/search?q=${encodeURIComponent(trimmed)}`,
-        undefined,
-        { timeoutMs: 8000, retryDelaysMs: [] },
-      );
-      return (response.results || []).map((place, index) => {
-        const parts = place.display.split(',').map((part) => part.trim());
-        return { id: `${place.lat}-${place.lon}-${index}`, name: parts[0] || place.display, region: parts[1] || '', country: parts.slice(2).join(', ') || '', coordinates: { lat: place.lat, lng: place.lon } };
-      });
-    } catch {
-      // Autocomplete is optional: a cold/unavailable backend must not block manual entry.
-      return [];
-    }
+    if (trimmed.length < 3) return { results: [], unavailable: false };
+    const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+
+    const memo = placeLookups.get(key);
+    if (memo && Date.now() - memo.at < PLACE_LOOKUP_TTL_MS) return memo.outcome;
+    const inFlight = placeInFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const task = (async (): Promise<PlaceSearchOutcome> => {
+      try {
+        const response = await request<{ results?: Array<{ display: string; lat: number; lon: number }> }>(
+          `/places/search?q=${encodeURIComponent(trimmed)}`,
+          undefined,
+          { timeoutMs: 8000, retryDelaysMs: [] },
+        );
+        const results = (response.results || []).map((place, index) => {
+          const parts = place.display.split(',').map((part) => part.trim());
+          return {
+            id: `${place.lat}-${place.lon}-${index}`,
+            name: parts[0] || place.display,
+            region: parts[1] || '',
+            country: parts.slice(2).join(', ') || '',
+            coordinates: { lat: place.lat, lng: place.lon },
+          };
+        });
+        const outcome: PlaceSearchOutcome = { results, unavailable: false };
+        placeLookups.set(key, { at: Date.now(), outcome });
+        return outcome;
+      } catch {
+        // 503 (upstream geocoder unavailable) or a network failure: report it as
+        // temporarily unavailable instead of pretending there are no cities.
+        const outcome: PlaceSearchOutcome = { results: [], unavailable: true };
+        placeLookups.set(key, { at: Date.now(), outcome });
+        return outcome;
+      } finally {
+        placeInFlight.delete(key);
+      }
+    })();
+
+    placeInFlight.set(key, task);
+    return task;
+  },
+
+  async searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+    return (await api.searchPlacesDetailed(query)).results;
   },
 
   async calculateChart(birthDetails: BirthDetails) {

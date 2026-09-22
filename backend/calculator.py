@@ -83,14 +83,20 @@ def resolve_place(place: str, latitude: float | None = None, longitude: float | 
         if tz is None:
             raise ValueError(f"Timezone could not be resolved for the supplied coordinates")
         return {"latitude": latitude, "longitude": longitude, "timezone": tz}
+    # Shared, hardened geocoder (cached, single-flight, circuit-broken). Only
+    # consulted when the caller supplied no coordinates - a selected place
+    # therefore never triggers a second geocoding call.
+    from geocoding import GeocoderRateLimited, resolve_coordinates
+
     try:
-        location = _GEO.geocode(place, language="en", timeout=10)
-    except Exception as exc:
-        raise ValueError(f"Geocoding service unavailable for '{place}': {exc}") from exc
-    if location is None:
+        coordinates = resolve_coordinates(place)
+    except GeocoderRateLimited as exc:
+        raise ValueError(
+            "Location search is temporarily unavailable. Please try again shortly."
+        ) from exc
+    if coordinates is None:
         raise ValueError(f"Place could not be resolved: {place}")
-    lat = float(location.latitude)
-    lng = float(location.longitude)
+    lat, lng = coordinates
     tz = _TZ_FINDER.timezone_at(lat=lat, lng=lng)
     if tz is None:
         raise ValueError(f"Timezone could not be resolved for: {place}")

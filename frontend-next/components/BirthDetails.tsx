@@ -31,6 +31,8 @@ export function BirthDetailsFlow({
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // Distinguishes "no matches" from "location service temporarily unavailable".
+  const [placeSearchUnavailable, setPlaceSearchUnavailable] = useState(false);
 
   // Errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -41,13 +43,15 @@ export function BirthDetailsFlow({
     wakeBackend();
   }, []);
 
-  // Search places when query changes in Step 3. Autocomplete is optional and
-  // must never block manual entry or throw when the backend is cold.
+  // Search places when query changes in Step 3. Debounced (one lookup per pause),
+  // stale responses are ignored, duplicates are suppressed in lib/api, and a
+  // temporary outage is surfaced instead of showing an empty dropdown.
   useEffect(() => {
     const trimmed = placeQuery.trim();
     if (step !== 3 || trimmed.length < 3) {
       setSuggestions([]);
       setIsSearchingPlaces(false);
+      setPlaceSearchUnavailable(false);
       return;
     }
 
@@ -55,14 +59,19 @@ export function BirthDetailsFlow({
     setIsSearchingPlaces(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await api.searchPlaces(trimmed);
-        if (!cancelled) setSuggestions(results);
+        const outcome = await api.searchPlacesDetailed(trimmed);
+        if (cancelled) return;
+        setSuggestions(outcome.results);
+        setPlaceSearchUnavailable(outcome.unavailable);
       } catch {
-        if (!cancelled) setSuggestions([]);
+        if (!cancelled) {
+          setSuggestions([]);
+          setPlaceSearchUnavailable(true);
+        }
       } finally {
         if (!cancelled) setIsSearchingPlaces(false);
       }
-    }, 250);
+    }, 450);
 
     return () => {
       cancelled = true;
@@ -339,7 +348,13 @@ export function BirthDetailsFlow({
                       autoFocus
                     />
 
-                    {/* Suggestions dropdown */}
+                      {showSuggestions && !isSearchingPlaces && suggestions.length === 0 && placeSearchUnavailable && (
+                        <p className="mt-1.5 text-[11px] text-[#E5B567]">
+                          Location search is temporarily unavailable. Please try again shortly.
+                        </p>
+                      )}
+
+                      {/* Suggestions dropdown */}
                     {showSuggestions && suggestions.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-2 bg-[#160A0C] border border-[#A62A34]/40 rounded-lg shadow-2xl z-30 max-h-60 overflow-y-auto">
                         {suggestions.map((s) => (
