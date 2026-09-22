@@ -19,7 +19,7 @@ const NAV_LINKS = [
   { label: 'Your Week', href: '/your-week' },
   { label: 'Life Summary', href: '/life-summary' },
   { label: 'Ask Kavach', href: '/ask' },
-  { label: 'YES / NO', href: '/yes-no' },
+  { label: 'SANKET', href: '/yes-no' },
   { label: 'Panchang', href: '/panchang' },
   { label: 'Services', href: '/services' },
 ];
