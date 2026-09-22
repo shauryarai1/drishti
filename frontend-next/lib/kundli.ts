@@ -1,4 +1,5 @@
 import { API_BASE } from './api';
+import { authHeaders } from './authHeaders';
 import type { BirthDetails, KundliData } from './types';
 
 // Kundli Generator API client.
@@ -137,9 +138,11 @@ const RASHI_ORDER = [
 ];
 
 async function post<T>(path: string, payload: KundliRequest): Promise<T> {
+  // Verified identity for the archive: present only when signed in.
+  const identity = await authHeaders();
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...identity },
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));

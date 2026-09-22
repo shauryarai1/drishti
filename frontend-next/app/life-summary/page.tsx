@@ -9,6 +9,7 @@ import { ResultGate } from '../../components/ResultGate';
 import { useAuth } from '../../lib/auth';
 import { loginHref } from '../../lib/authPaths';
 import { savePendingForm, takePendingForm } from '../../lib/pendingForms';
+import { authHeaders } from '../../lib/authHeaders';
 
 interface Section {
   key: string;
@@ -93,9 +94,11 @@ export default function LifeSummaryPage() {
     setBusy(true);
     setError('');
     try {
+      // Verified identity for the archive: present only when signed in.
+      const identity = await authHeaders();
       const res = await fetch(`${API_BASE}/life-summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...identity },
         body: JSON.stringify(payload),
       });
       const body = await res.json();

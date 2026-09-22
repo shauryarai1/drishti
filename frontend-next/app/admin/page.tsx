@@ -54,7 +54,10 @@ function shortTime(iso: string): string {
 
 function visitorLabel(row: AdminSubmissionRow): string {
   if (!row.user_id) return 'Guest';
-  return row.account_email ? `Account · ${row.account_email}` : 'Account';
+  if (row.account_name && row.account_email) return `${row.account_name} · ${row.account_email}`;
+  if (row.account_email) return `Account · ${row.account_email}`;
+  if (row.account_name) return row.account_name;
+  return 'Account';
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -350,9 +353,16 @@ export default function AdminPage() {
 
                       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                         <Field label="User">{detail.user_id ? 'Account' : 'Guest'}</Field>
+                        <Field label="Account name">{detail.account_name ?? '—'}</Field>
                         <Field label="Account email">{detail.account_email ?? '—'}</Field>
                         <Field label="Status">{detail.status}</Field>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <Field label="Product">{PRODUCT_LABELS[detail.product] ?? detail.product}</Field>
+                        <Field label="Reading for">{detail.person_name ?? '—'}</Field>
                         <Field label="Error category">{detail.error_category ?? '—'}</Field>
+                        <Field label="Account user id">{detail.user_id ?? 'Guest'}</Field>
                       </div>
 
                       <div className="mt-6 border-t border-[#A62A34]/20 pt-5">
@@ -441,6 +451,11 @@ export default function AdminPage() {
                             {PRODUCT_LABELS[row.product] ?? row.product}
                           </span>
                           <span className="truncate text-[12.5px] text-[#EEE9DF]/70">{visitorLabel(row)}</span>
+                          {row.person_name && (
+                            <span className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[#B39250]">
+                              Reading for {row.person_name}
+                            </span>
+                          )}
                           {row.status !== 'SUCCEEDED' && (
                             <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#A62A34]">{row.status}</span>
                           )}

@@ -1,5 +1,6 @@
 import type { PanchangResult } from './panchang';
-﻿import { BirthDetails, DrishtiReading, KundliData, PlaceSuggestion } from './types';
+import { BirthDetails, DrishtiReading, KundliData, PlaceSuggestion } from './types';
+import { authHeaders } from './authHeaders';
 
 const PRODUCTION_ORIGIN = 'https://drishti-5j3u.onrender.com';
 const LOCAL_API_PORT = 8000;
@@ -100,9 +101,14 @@ async function request<T>(path: string, init?: RequestInit, options: RequestOpti
   const maxAttempts = retryDelaysMs.length + 1;
   let lastError: unknown;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      const response = await fetchOnce(`${API_BASE}${path}`, init ?? {}, timeoutMs);
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        // Verified identity for the archive: present only when signed in.
+        const identity = await authHeaders();
+        const response = await fetchOnce(`${API_BASE}${path}`, {
+          ...(init ?? {}),
+          headers: { ...((init?.headers as Record<string, string>) ?? {}), ...identity },
+        }, timeoutMs);
       if (!response.ok) {
         const text = await response.text().catch(() => '');
         const retryable = RETRYABLE_STATUS.has(response.status);

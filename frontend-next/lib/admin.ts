@@ -16,6 +16,10 @@ export interface AdminSubmissionRow {
   input_data: Record<string, unknown>;
   schema_version?: number;
   account_email?: string | null;
+  /** Safe display name from verified Supabase metadata, when one exists. */
+  account_name?: string | null;
+  /** The chart person's name (Kundli Person Name), separate from the account. */
+  person_name?: string | null;
 }
 
 export interface AdminSubmissionDetail extends AdminSubmissionRow {

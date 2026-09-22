@@ -385,6 +385,15 @@ class SupabaseStore:
         return allowed
 
     def email_for(self, user_id: str) -> Optional[str]:
+        profile = self.profile_for(user_id)
+        return profile.get("email") if profile else None
+
+    def profile_for(self, user_id: str) -> Optional[dict]:
+        """Minimum safe identity for an admin view: email + a display name.
+
+        Resolved server-side from the verified user id only. The raw auth
+        metadata blob is never returned, stored or archived.
+        """
         response = self._request(
             "GET",
             f"/auth/v1/admin/users/{user_id}",
@@ -393,10 +402,25 @@ class SupabaseStore:
         if response is None or response.status_code >= 300:
             return None
         try:
-            email = response.json().get("email")
-            return email if isinstance(email, str) else None
+            payload = response.json()
         except Exception:
             return None
+        if not isinstance(payload, dict):
+            return None
+
+        email = payload.get("email")
+        metadata = payload.get("user_metadata")
+        name = None
+        if isinstance(metadata, dict):
+            for key in ("name", "full_name", "display_name"):
+                candidate = metadata.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    name = candidate.strip()[:80]
+                    break
+        return {
+            "email": email if isinstance(email, str) else None,
+            "name": name,
+        }
 
     def verify_token(self, token: str) -> Optional[str]:
         """Resolve a Supabase access token to its user id (verified server-side)."""
@@ -497,6 +521,48 @@ _LIST_SELECT = "id,created_at,completed_at,user_id,visitor_session_id,product,st
 _RANGES = {"today": 1, "7d": 7, "30d": 30}
 
 
+def _identity_for(user_id: Optional[str]) -> dict:
+    """Verified account identity for the admin view.
+
+    Resolved from the verified Supabase user id through the trusted server path.
+    Never from a browser-supplied name, email or user_id.
+    """
+    if not user_id:
+        return {"account_email": None, "account_name": None}
+    profile = None
+    reader = getattr(store, "profile_for", None)
+    if callable(reader):
+        try:
+            profile = reader(user_id)
+        except Exception:
+            profile = None
+    if isinstance(profile, dict):
+        return {"account_email": profile.get("email"), "account_name": profile.get("name")}
+    try:
+        email = store.email_for(user_id)
+    except Exception:
+        email = None
+    return {"account_email": email, "account_name": None}
+
+
+def _person_name(row: dict) -> Optional[str]:
+    """The chart person's name for a Kundli, from the archived customer input.
+
+    Only the legitimate Person Name field is used; arbitrary question text or
+    unrelated input fields are never treated as a name.
+    """
+    if row.get("product") != "kundli":
+        return None
+    data = row.get("input_data")
+    if not isinstance(data, dict):
+        return None
+    name = data.get("name")
+    if not isinstance(name, str):
+        return None
+    clean = " ".join(name.split())[:80]
+    return clean or None
+
+
 def _bearer(authorization: str) -> Optional[str]:
     value = (authorization or "").strip()
     if value.lower().startswith("bearer "):
@@ -576,9 +642,10 @@ async def admin_list(
     rows, total = store.query(filters, select=_LIST_SELECT, limit=page_size, offset=offset, count=True)
 
     account_ids = sorted({row["user_id"] for row in rows if row.get("user_id")})
-    emails = {uid: store.email_for(uid) for uid in account_ids[:50]}
+    identities = {uid: _identity_for(uid) for uid in account_ids[:50]}
     for row in rows:
-        row["account_email"] = emails.get(row.get("user_id")) if row.get("user_id") else None
+        row.update(identities.get(row.get("user_id"), {"account_email": None, "account_name": None}))
+        row["person_name"] = _person_name(row)
 
     return {
         "status": "ok",
@@ -597,7 +664,8 @@ async def admin_detail(submission_id: str, authorization: str = Header(default="
     row = store.get(submission_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Submission not found.")
-    row["account_email"] = store.email_for(row["user_id"]) if row.get("user_id") else None
+    row.update(_identity_for(row.get("user_id")))
+    row["person_name"] = _person_name(row)
     return {"status": "ok", "submission": row}
 
 

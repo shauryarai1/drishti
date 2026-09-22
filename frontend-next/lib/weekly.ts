@@ -1,4 +1,5 @@
 import { API_BASE, api } from './api';
+import { authHeaders } from './authHeaders';
 import type { PlaceSuggestion } from './types';
 
 // "Your Week" public API client. Types mirror ONLY the customer-safe payload:
@@ -50,9 +51,11 @@ export interface WeeklyRequest {
 }
 
 export async function fetchWeekly(payload: WeeklyRequest): Promise<WeeklyForecast> {
+  // Verified identity for the archive: present only when signed in.
+  const identity = await authHeaders();
   const response = await fetch(`${API_BASE}/weekly`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...identity },
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));
