@@ -11,7 +11,6 @@ import pathlib
 
 import pytest
 from fastapi.testclient import TestClient
-from geopy.exc import GeocoderRateLimited, GeocoderTimedOut
 
 import geocoding
 import main
@@ -34,30 +33,30 @@ class FakeLocation:
         self.longitude = longitude
 
 
-class FakeGeocoder:
-    """Scriptable stand-in for the real provider client."""
+class FakeProvider:
+    """Scriptable stand-in for the upstream provider (one call per lookup)."""
 
     def __init__(self):
         self.calls = 0
         self.mode = "ok"
 
-    def geocode(self, query, **kwargs):
+    def __call__(self, query, limit):
         self.calls += 1
         if self.mode == "rate_limited":
-            raise GeocoderRateLimited("HTTP Error 429: Too many requests")
+            raise geocoding.ProviderRateLimited("rate limited")
         if self.mode == "timeout":
-            raise GeocoderTimedOut("timed out")
+            raise geocoding.ProviderTimeout("timed out")
         if self.mode == "empty":
             return []
         if self.mode == "boom":
             raise RuntimeError("upstream exploded")
-        return [FakeLocation(item["display"], item["lat"], item["lon"]) for item in DELHI_RESULTS]
+        return [dict(item) for item in DELHI_RESULTS]
 
 
 @pytest.fixture()
 def fake_geocoder(monkeypatch):
-    fake = FakeGeocoder()
-    monkeypatch.setattr(geocoding, "_GEOCODER", fake)
+    fake = FakeProvider()
+    monkeypatch.setattr(geocoding, "active_providers", lambda: [("fake", fake)])
     geocoding.reset_state()
     yield fake
     geocoding.reset_state()
@@ -208,10 +207,13 @@ def test_coordinate_bypass_holds_while_the_breaker_is_open(fake_geocoder, client
 
 
 # --- provider policy + frontend behaviour -----------------------------------
-def test_geocoder_identifies_itself_per_provider_policy():
-    assert geocoding.USER_AGENT.startswith("drishti-")
-    assert "http" in geocoding.USER_AGENT or "contact" in geocoding.USER_AGENT.lower()
-    assert geocoding.USER_AGENT.lower() not in ("geopy", "python-requests", "mozilla/5.0")
+def test_fallback_provider_identifies_itself_per_provider_policy():
+    # The optional Nominatim fallback must identify itself per its usage policy;
+    # the primary provider authenticates with a server-side API key instead.
+    user_agent = geocoding.NOMINATIM_USER_AGENT
+    assert user_agent.startswith("drishti-")
+    assert "http" in user_agent
+    assert user_agent.lower() not in ("geopy", "python-requests", "mozilla/5.0")
 
 
 def test_frontend_autocomplete_is_debounced_and_guards_stale_results():

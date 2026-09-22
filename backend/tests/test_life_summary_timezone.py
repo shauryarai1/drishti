@@ -113,10 +113,10 @@ def test_coordinates_are_forwarded_unchanged(client, captured):
 def test_places_search_results_include_the_derived_timezone(monkeypatch, client):
     import geocoding
 
-    monkeypatch.setattr(geocoding, "_GEOCODER", type("G", (), {
-        "geocode": lambda self, q, **k: [type("L", (), {"address": "London, UK",
-                                                        "latitude": 51.5074, "longitude": -0.1278})()],
-    })())
+    def fake_provider(_query, _limit):
+        return [{"display": "London, UK", "lat": 51.5074, "lon": -0.1278}]
+
+    monkeypatch.setattr(geocoding, "active_providers", lambda: [("fake", fake_provider)])
     geocoding.reset_state()
 
     body = client.get("/api/places/search", params={"q": "London"}).json()

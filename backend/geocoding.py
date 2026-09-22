@@ -1,22 +1,25 @@
-"""Shared, hardened place geocoding for KAVACH.
+"""Location autocomplete for KAVACH, with a pluggable production provider.
 
-Provider: **Nominatim / OpenStreetMap** through geopy, with a descriptive
-user-agent so KAVACH identifies itself as the provider's usage policy requires.
-We do not attempt to bypass the provider's rate limits, rotate identities or
-proxy around restrictions - if the public endpoint is unsuitable for production
-autocomplete traffic, that is reported rather than evaded.
+Primary provider: **Geoapify** (`/v1/geocode/autocomplete`), a commercial
+geocoding service whose free plan fits a small production app. The API key is
+server-side only (Render env var `GEOAPIFY_API_KEY`); it is never logged, never
+returned to a client and never exposed to the browser.
 
-Hardening (one shared implementation for every caller):
+Provider history: KAVACH originally called **Nominatim / OpenStreetMap**
+directly, which returned HTTP 429 for this workload from Render. Nominatim's
+public endpoint is not intended for production autocomplete, so it has been
+removed from the production request path. It remains available as an optional
+emergency fallback (`GEOCODER_NOMINATIM_FALLBACK=1`) or automatically when no
+Geoapify key is configured, which keeps local development working. We never
+rotate identities, proxy around restrictions or retry aggressively.
 
-* normalized cache keys (casefold, collapsed whitespace)
-* 24h TTL for successful lookups, a short TTL for empty/not-found results
-* **stale-while-error**: a previously successful result keeps working during an
-  upstream outage instead of breaking the product
-* **single-flight**: concurrent identical lookups share one upstream call
-* **circuit breaker**: on HTTP 429 / rate-limit responses the provider is not
-  called again until the cooldown expires, so there is no retry storm
-* upstream detail never reaches a client: callers get a clean "unavailable"
-  state, and logs carry a category only (no queries, keys or stack traces)
+Preserved architecture (unchanged in behaviour):
+* normalized cache keys, 24h TTL for hits, short TTL for empty results
+* stale-while-error: previously successful places keep working during an outage
+* single-flight: concurrent identical lookups share one upstream call
+* circuit breaker: on rate-limit/timeout the provider is not called again until
+  the cooldown expires, so there is no retry storm
+* provider internals and stack traces never reach a client
 """
 
 from __future__ import annotations
@@ -25,39 +28,183 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from geopy.exc import GeocoderRateLimited, GeocoderTimedOut, GeocoderUnavailable
-from geopy.geocoders import Nominatim
+import httpx
 
 logger = logging.getLogger("kavach.geocoding")
 
-USER_AGENT = "drishti-reading-platform-v1.0.0 (+https://drishti-5j3u.onrender.com)"
-CONTACT_EMAIL = os.environ.get("NOMINATIM_CONTACT_EMAIL") or ""
+# --- configuration ----------------------------------------------------------
+GEOAPIFY_API_KEY = (os.environ.get("GEOAPIFY_API_KEY") or "").strip()
+GEOAPIFY_ENDPOINT = "https://api.geoapify.com/v1/geocode/autocomplete"
+GEOAPIFY_ATTRIBUTION = "Powered by Geoapify"
+
+NOMINATIM_USER_AGENT = "drishti-reading-platform-v1.0.0 (+https://drishti-5j3u.onrender.com)"
+NOMINATIM_CONTACT_EMAIL = (os.environ.get("NOMINATIM_CONTACT_EMAIL") or "").strip()
+NOMINATIM_FALLBACK_ENABLED = (os.environ.get("GEOCODER_NOMINATIM_FALLBACK") or "").strip() == "1"
 
 POSITIVE_TTL_SECONDS = 24 * 3600.0
 NEGATIVE_TTL_SECONDS = 300.0
-
-# Circuit breaker windows.
 RATE_LIMIT_COOLDOWN_SECONDS = 60.0
 ERROR_COOLDOWN_SECONDS = 15.0
-
 UPSTREAM_TIMEOUT_SECONDS = 8.0
 UNRESOLVED_TIMEOUT_SECONDS = 2.0
 
 UNAVAILABLE_MESSAGE = "Location search is temporarily unavailable. Please try again shortly."
 
 
-def _make_geocoder() -> Nominatim:
-    kwargs: Dict[str, Any] = {"user_agent": USER_AGENT, "timeout": UPSTREAM_TIMEOUT_SECONDS}
-    if CONTACT_EMAIL:
-        kwargs["user_agent"] = f"{USER_AGENT} (contact: {CONTACT_EMAIL})"
-    return Nominatim(**kwargs)
+# --- provider errors (no provider text ever escapes) ------------------------
+class ProviderError(Exception):
+    """Base class: something went wrong talking to a provider."""
 
 
-_GEOCODER = _make_geocoder()
+class ProviderRateLimited(ProviderError):
+    """The provider told us we are over its limit (HTTP 429)."""
 
-# normalized query -> (results, stored_at)
+
+class ProviderTimeout(ProviderError):
+    """The provider did not answer in time."""
+
+
+class ProviderUnavailable(ProviderError):
+    """The provider is reachable but not serving us (5xx / network)."""
+
+
+# Backwards-compatible name: calculator.py imports this to surface a friendly,
+# non-technical message when no coordinates were supplied.
+GeocoderRateLimited = ProviderRateLimited
+
+
+# --- Geoapify (primary) -----------------------------------------------------
+def _geoapify_search(normalized: str, limit: int) -> List[Dict[str, Any]]:
+    """Auto-complete lookup. Returns [] when the provider has no match."""
+    response = httpx.get(
+        GEOAPIFY_ENDPOINT,
+        params={
+            "text": normalized,
+            "format": "json",
+            "limit": limit,
+            "lang": "en",
+            "apiKey": GEOAPIFY_API_KEY,
+        },
+        timeout=UPSTREAM_TIMEOUT_SECONDS,
+    )
+    if response.status_code == 429:
+        raise ProviderRateLimited("rate limited")
+    if response.status_code >= 500:
+        raise ProviderUnavailable(f"http {response.status_code}")
+    if response.status_code >= 400:
+        # 401/403 = key problem, 400 = bad request: never surface the body.
+        raise ProviderError(f"http {response.status_code}")
+
+    payload = response.json()  # ValueError -> malformed
+    if not isinstance(payload, dict):
+        raise ProviderError("malformed payload")
+    rows = payload.get("results")
+    if rows is None:
+        raise ProviderError("malformed payload")
+    if not isinstance(rows, list):
+        raise ProviderError("malformed payload")
+
+    shaped: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        label = row.get("formatted") or row.get("address_line1")
+        lat, lon = row.get("lat"), row.get("lon")
+        if not label or lat is None or lon is None:
+            continue
+        try:
+            shaped.append({"display": str(label), "lat": round(float(lat), 6), "lon": round(float(lon), 6)})
+        except (TypeError, ValueError):
+            continue
+    return shaped
+
+
+# --- Nominatim (optional fallback / local development) ----------------------
+def _nominatim_search(normalized: str, limit: int) -> List[Dict[str, Any]]:
+    from geopy.exc import GeocoderRateLimited as _GeoRateLimited
+    from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+    from geopy.geocoders import Nominatim
+
+    user_agent = NOMINATIM_USER_AGENT
+    if NOMINATIM_CONTACT_EMAIL:
+        user_agent = f"{user_agent} (contact: {NOMINATIM_CONTACT_EMAIL})"
+    geocoder = Nominatim(user_agent=user_agent, timeout=UPSTREAM_TIMEOUT_SECONDS)
+
+    try:
+        results = geocoder.geocode(normalized, language="en", exactly_one=False, limit=limit)
+    except _GeoRateLimited as exc:
+        raise ProviderRateLimited("rate limited") from exc
+    except GeocoderTimedOut as exc:
+        raise ProviderTimeout("timed out") from exc
+    except GeocoderUnavailable as exc:
+        raise ProviderUnavailable("unavailable") from exc
+
+    if results is None:
+        return []
+    if not isinstance(results, list):
+        results = [results]
+    return [
+        {"display": item.address, "lat": round(float(item.latitude), 6), "lon": round(float(item.longitude), 6)}
+        for item in results
+    ]
+
+
+def active_providers() -> List[Tuple[str, Callable[[str, int], List[Dict[str, Any]]]]]:
+    """Provider chain, in order. Production uses Geoapify only."""
+    chain: List[Tuple[str, Callable[[str, int], List[Dict[str, Any]]]]] = []
+    if GEOAPIFY_API_KEY:
+        chain.append(("geoapify", _geoapify_search))
+    # Nominatim is a fallback of last resort (or the only provider locally).
+    if NOMINATIM_FALLBACK_ENABLED or not GEOAPIFY_API_KEY:
+        chain.append(("nominatim", _nominatim_search))
+    return chain
+
+
+def _provider_search(normalized: str, limit: int) -> List[Dict[str, Any]]:
+    """Try each configured provider at most once, in order.
+
+    A provider that answers with "no matches" is a valid result and stops the
+    chain; only failures fall through. Errors are normalized so callers can
+    trip the breaker without ever seeing provider detail.
+    """
+    global _UPSTREAM_CALLS
+    errors: List[Exception] = []
+    for name, provider in active_providers():
+        started = time.monotonic()
+        _UPSTREAM_CALLS += 1
+        try:
+            results = provider(normalized, limit)
+        except ProviderError as exc:
+            errors.append(exc)
+            logger.info("ask_kavach geocoder=%s outcome=%s", name, _classify(exc))
+            continue
+        except (httpx.TimeoutException,) as exc:
+            errors.append(ProviderTimeout("timed out"))
+            logger.info("ask_kavach geocoder=%s outcome=timeout", name)
+            continue
+        except httpx.HTTPError as exc:
+            errors.append(ProviderUnavailable("network"))
+            logger.info("ask_kavach geocoder=%s outcome=unavailable", name)
+            continue
+        except ValueError:
+            # Malformed JSON body.
+            errors.append(ProviderError("malformed"))
+            logger.info("ask_kavach geocoder=%s outcome=malformed", name)
+            continue
+        logger.info(
+            "ask_kavach geocoder=%s outcome=ok results=%d elapsed_ms=%d",
+            name, len(results), int((time.monotonic() - started) * 1000),
+        )
+        return results
+
+    if errors:
+        raise errors[0]
+    return []
+
+
+# --- shared state -----------------------------------------------------------
 _CACHE: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
 _INFLIGHT: Dict[str, threading.Event] = {}
 _LOCK = threading.Lock()
@@ -83,7 +230,7 @@ def _trip_breaker(reason: str, seconds: float) -> None:
     global _COOLDOWN_UNTIL, _COOLDOWN_REASON
     _COOLDOWN_UNTIL = time.monotonic() + seconds
     _COOLDOWN_REASON = reason
-    logger.info("ask_kavach geocoder=upstream outcome=%s cooldown_s=%s", reason, int(seconds))
+    logger.info("ask_kavach geocoder=provider outcome=%s cooldown_s=%s", reason, int(seconds))
 
 
 def _cached(normalized: str) -> Optional[Tuple[List[Dict[str, Any]], float]]:
@@ -119,48 +266,41 @@ def provider_state() -> Dict[str, Any]:
         cached = len(_CACHE)
         inflight = len(_INFLIGHT)
     return {
-        "provider": "nominatim",
-        "user_agent_configured": bool(USER_AGENT),
+        "providers": [name for name, _fn in active_providers()],
+        "primary": (active_providers() or [("none", None)])[0][0],
+        "api_key_configured": bool(GEOAPIFY_API_KEY),
         "cached_queries": cached,
         "in_flight": inflight,
         "upstream_calls": _UPSTREAM_CALLS,
         "cooldown_remaining_s": cooldown_remaining(),
         "cooldown_reason": _COOLDOWN_REASON,
+        "attribution": GEOAPIFY_ATTRIBUTION if GEOAPIFY_API_KEY else "",
     }
 
 
 def _classify(exc: Exception) -> str:
-    if isinstance(exc, GeocoderRateLimited):
+    if isinstance(exc, ProviderRateLimited):
         return "rate_limited"
-    if isinstance(exc, GeocoderTimedOut):
+    if isinstance(exc, ProviderTimeout):
         return "timeout"
-    if isinstance(exc, GeocoderUnavailable):
+    if isinstance(exc, ProviderUnavailable):
         return "unavailable"
+    try:  # geopy fallback exceptions
+        from geopy.exc import GeocoderRateLimited as _GeoRateLimited
+        from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+
+        if isinstance(exc, _GeoRateLimited):
+            return "rate_limited"
+        if isinstance(exc, GeocoderTimedOut):
+            return "timeout"
+        if isinstance(exc, GeocoderUnavailable):
+            return "unavailable"
+    except Exception:  # pragma: no cover - geopy always present
+        pass
     text = str(exc).lower()
     if "429" in text or "too many requests" in text:
         return "rate_limited"
     return "error"
-
-
-def _upstream_search(normalized: str, limit: int) -> List[Dict[str, Any]]:
-    """One upstream call. Returns [] when the provider has no match."""
-    global _UPSTREAM_CALLS
-    started = time.monotonic()
-    _UPSTREAM_CALLS += 1
-    results = _GEOCODER.geocode(normalized, language="en", exactly_one=False, limit=limit)
-    if results is None:
-        results = []
-    if not isinstance(results, list):
-        results = [results]
-    shaped = [
-        {"display": item.address, "lat": round(float(item.latitude), 6), "lon": round(float(item.longitude), 6)}
-        for item in results
-    ]
-    logger.info(
-        "ask_kavach geocoder=upstream outcome=ok results=%d elapsed_ms=%d",
-        len(shaped), int((time.monotonic() - started) * 1000),
-    )
-    return shaped
 
 
 def search(query: str, limit: int = 6) -> Dict[str, Any]:
@@ -198,7 +338,7 @@ def search(query: str, limit: int = 6) -> Dict[str, Any]:
         return {"status": "unavailable", "results": [], "message": UNAVAILABLE_MESSAGE}
 
     try:
-        results = _upstream_search(normalized, limit)
+        results = _provider_search(normalized, limit)
         _store(normalized, results)
         return {"status": "ok", "results": list(results), "stale": False}
     except Exception as exc:  # noqa: BLE001 - classify, never surface detail
@@ -208,7 +348,7 @@ def search(query: str, limit: int = 6) -> Dict[str, Any]:
         elif category in ("timeout", "unavailable"):
             _trip_breaker(category, ERROR_COOLDOWN_SECONDS)
         else:
-            logger.info("ask_kavach geocoder=upstream outcome=error")
+            logger.info("ask_kavach geocoder=provider outcome=error")
 
         if entry:
             # Stale-while-error: a previous successful place keeps working.
@@ -228,7 +368,7 @@ def resolve_coordinates(place: str) -> Optional[Tuple[float, float]]:
     """
     outcome = search(place, limit=1)
     if outcome["status"] == "unavailable":
-        raise GeocoderRateLimited(UNAVAILABLE_MESSAGE)
+        raise ProviderRateLimited(UNAVAILABLE_MESSAGE)
     results = outcome["results"]
     if not results:
         return None
