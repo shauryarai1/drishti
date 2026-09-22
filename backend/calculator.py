@@ -77,6 +77,16 @@ def _sign_from_longitude(lon: float) -> tuple[str, int, float]:
     return RASHI_NAMES[idx], idx, lon - idx * 30.0
 
 
+def timezone_for(latitude: float, longitude: float) -> str | None:
+    """IANA timezone for coordinates (offline lookup, no network).
+
+    The single place every caller asks "what zone is this point in?" - so a
+    selected place is never assumed to be Asia/Kolkata. Returns None when the
+    coordinates cannot be resolved (e.g. open ocean).
+    """
+    return _TZ_FINDER.timezone_at(lat=latitude, lng=longitude)
+
+
 def resolve_place(place: str, latitude: float | None = None, longitude: float | None = None) -> dict:
     if latitude is not None and longitude is not None:
         tz = _TZ_FINDER.timezone_at(lat=latitude, lng=longitude)

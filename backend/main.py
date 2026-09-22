@@ -157,9 +157,17 @@ async def places_search(q: str = Query(..., min_length=3, max_length=100)):
 
     outcome = await run_in_threadpool(geocoding.search, q)
     if outcome["status"] == "ok":
+        # Each suggestion carries the IANA timezone of its own coordinates, so a
+        # selected place never has to assume a zone.
+        from calculator import timezone_for
+
+        results = [
+            {**place, "timezone": timezone_for(float(place["lat"]), float(place["lon"]))}
+            for place in outcome["results"]
+        ]
         return {
             "status": "ok",
-            "results": outcome["results"],
+            "results": results,
             "stale": bool(outcome.get("stale")),
         }
     return JSONResponse(
@@ -302,12 +310,20 @@ async def dev_chat(payload: ChatRequest):
 async def life_summary_endpoint(payload: PanchangEngineRequest):
     """User-facing Life Summary. Only approved interpretations are returned."""
     try:
+        latitude = payload.latitude if payload.latitude is not None else 28.6139
+        longitude = payload.longitude if payload.longitude is not None else 77.2090
+        # The timezone must follow the SELECTED COORDINATES. The submitted value is
+        # only a fallback when the coordinates cannot resolve (e.g. open ocean),
+        # and the app default is the last resort - never a blanket Asia/Kolkata.
+        from calculator import timezone_for
+
+        timezone_name = timezone_for(latitude, longitude) or payload.timezone or "Asia/Kolkata"
         result = build_life_summary(
             birth_date=payload.date,
             birth_time=payload.time,
-            latitude=payload.latitude if payload.latitude is not None else 28.6139,
-            longitude=payload.longitude if payload.longitude is not None else 77.2090,
-            timezone_name=payload.timezone,
+            latitude=latitude,
+            longitude=longitude,
+            timezone_name=timezone_name,
             place=payload.place,
         )
         result.pop("_internal_engine_status", None)

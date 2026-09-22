@@ -148,7 +148,7 @@ def test_places_endpoint_returns_results(fake_geocoder, client):
     body = response.json()
     assert body["status"] == "ok"
     assert len(body["results"]) == 2
-    assert set(body["results"][0]) == {"display", "lat", "lon"}
+    assert set(body["results"][0]) == {"display", "lat", "lon", "timezone"}
 
 
 def test_places_endpoint_returns_a_clean_unavailable_response(fake_geocoder, client):

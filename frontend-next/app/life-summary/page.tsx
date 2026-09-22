@@ -25,37 +25,41 @@ export default function LifeSummaryPage() {
   const [time, setTime] = useState('');
   const [place, setPlace] = useState('');
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<Array<{ display: string; lat: number; lon: number }>>([]);
+  const [hits, setHits] = useState<Array<{ display: string; lat: number; lon: number; timezone: string | null }>>([]);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+  // IANA timezone of the SELECTED place (from the backend). Null means unknown:
+  // the backend then derives it from the coordinates, and we never assume
+  // Asia/Kolkata for an arbitrary location.
+  const [selectedTimezone, setSelectedTimezone] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchUnavailable, setSearchUnavailable] = useState(false);
 
-    const [searching, setSearching] = useState(false);
-    const [searchUnavailable, setSearchUnavailable] = useState(false);
-
-    const search = async () => {
-      const trimmed = query.trim();
-      if (trimmed.length < 3) return;
-      setSearching(true);
-      setSearchUnavailable(false);
-      try {
-        // Shared hardened search: cached, deduped, and it tells us when the
-        // location service is temporarily down (instead of "no cities").
-        const outcome = await api.searchPlacesDetailed(trimmed);
-        setHits(outcome.results.map((place) => ({
-          display: `${place.name}${place.region ? `, ${place.region}` : ''}${place.country ? `, ${place.country}` : ''}`,
-          lat: place.coordinates.lat,
-          lon: place.coordinates.lng,
-        })));
-        setSearchUnavailable(outcome.unavailable);
-      } catch {
-        setHits([]);
-        setSearchUnavailable(true);
-      } finally {
-        setSearching(false);
-      }
-    };
+  const search = async () => {
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return;
+    setSearching(true);
+    setSearchUnavailable(false);
+    try {
+      // Shared hardened search: cached, deduped, and it tells us when the
+      // location service is temporarily down (instead of "no cities").
+      const outcome = await api.searchPlacesDetailed(trimmed);
+      setHits(outcome.results.map((place) => ({
+        display: `${place.name}${place.region ? `, ${place.region}` : ''}${place.country ? `, ${place.country}` : ''}`,
+        lat: place.coordinates.lat,
+        lon: place.coordinates.lng,
+        timezone: place.timezone ?? null,
+      })));
+      setSearchUnavailable(outcome.unavailable);
+    } catch {
+      setHits([]);
+      setSearchUnavailable(true);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const submit = async () => {
     if (!date || !time || !place.trim()) return;
@@ -71,7 +75,9 @@ export default function LifeSummaryPage() {
           place,
           latitude: coords?.lat ?? null,
           longitude: coords?.lon ?? null,
-          timezone: 'Asia/Kolkata',
+          // No hardcoded zone. Send the selected place's timezone when known;
+          // otherwise omit it and the backend derives it from the coordinates.
+          ...(selectedTimezone ? { timezone: selectedTimezone } : {}),
         }),
       });
       const body = await res.json();
@@ -135,7 +141,7 @@ export default function LifeSummaryPage() {
                   {hits.map((h, i) => (
                     <div
                       key={i}
-                      onClick={() => { setPlace(h.display); setCoords({ lat: h.lat, lon: h.lon }); setHits([]); setQuery(h.display); }}
+                      onClick={() => { setPlace(h.display); setCoords({ lat: h.lat, lon: h.lon }); setSelectedTimezone(h.timezone); setHits([]); setQuery(h.display); }}
                       className="cursor-pointer border-b border-[#A62A34]/15 px-3 py-2.5 text-sm last:border-0 hover:bg-[#2B0C11]"
                     >
                       {h.display}

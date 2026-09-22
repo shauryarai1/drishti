@@ -109,4 +109,6 @@ export interface PlaceSuggestion {
     lat: number;
     lng: number;
   };
+  /** IANA timezone of the coordinates (from the backend), when available. */
+  timezone?: string | null;
 }

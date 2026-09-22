@@ -213,7 +213,9 @@ export const api = {
 
     const task = (async (): Promise<PlaceSearchOutcome> => {
       try {
-        const response = await request<{ results?: Array<{ display: string; lat: number; lon: number }> }>(
+        const response = await request<{
+          results?: Array<{ display: string; lat: number; lon: number; timezone?: string | null }>;
+        }>(
           `/places/search?q=${encodeURIComponent(trimmed)}`,
           undefined,
           { timeoutMs: 8000, retryDelaysMs: [] },
@@ -226,6 +228,7 @@ export const api = {
             region: parts[1] || '',
             country: parts.slice(2).join(', ') || '',
             coordinates: { lat: place.lat, lng: place.lon },
+            timezone: place.timezone ?? null,
           };
         });
         const outcome: PlaceSearchOutcome = { results, unavailable: false };
