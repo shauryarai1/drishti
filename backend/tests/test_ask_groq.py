@@ -157,7 +157,7 @@ def test_astrology_follow_up_keeps_context_then_general_returns(env, client):
 
 def test_general_chat_never_touches_astrology_or_the_geocoder(env, client):
     for index, question in enumerate(("hi", "how are you?", "what is gravity?",
-                                      "write an email", "help me study", "will my project work?")):
+                                      "write an email", "help me study", "what is financial success?")):
         ask(client, question, conversation_id=f"general-{index}")
 
     assert env["seen"]["geocoder"] == 0

@@ -26,7 +26,7 @@ ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude
 REPRESENTATIVE_PROMPTS = {
     "hi": "general",
     "What is gravity?": "general",
-    "Will I be successful?": "general",
+    "Will I be successful?": "reading",
     "Explain photosynthesis": "general",
     "Explain Newton's laws in detail": "general",
     "Compare Newton's three laws in a table": "general",
@@ -220,7 +220,7 @@ def mock_env(monkeypatch):
 
 def test_general_questions_get_no_astrology_context_and_no_geocoder(mock_env):
     client = TestClient(main.app)
-    for index, question in enumerate(("hi", "What is gravity?", "Will I be successful?",
+    for index, question in enumerate(("hi", "What is gravity?", "How do I make pasta?",
                                       "Explain photosynthesis", "Explain Newton's laws in detail",
                                       "Compare Newton's three laws in a table")):
         client.post("/api/ask", json={**ASK, "question": question, "conversation_id": f"g-{index}"})

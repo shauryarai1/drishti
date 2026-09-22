@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../../lib/api';
 import { Header } from '../../components/Header';
+import { RichAnswer } from '../../components/RichAnswer';
 
 interface City { label: string; latitude: number; longitude: number; timezone: string }
 
@@ -376,7 +377,7 @@ export default function AskPage() {
               <div className="flex justify-start">
                 <div className="max-w-[90%]">
                   <div className="rounded-2xl rounded-bl-sm border border-[#A62A34]/25 bg-[#160A0C]/80 px-4 py-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">
-                    {turn.answer}
+                    <RichAnswer text={turn.answer} />
                   </div>
                   {DEV_TOOLS_ENABLED && devEnabled && (
                     <button

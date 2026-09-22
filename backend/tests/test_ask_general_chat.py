@@ -21,7 +21,8 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata"}
 GENERAL_QUESTIONS = ["hi", "how are you?", "what is gravity?", "explain photosynthesis",
-                     "write an email to my teacher", "give me study tips", "will my project work?"]
+                     "write an email to my teacher", "give me study tips",
+                     "what is financial success?", "how can a business improve profitability?"]
 ASTROLOGY_QUESTIONS = ["read my kundli", "what does Saturn mean in my chart?",
                        "how is my week astrologically?",
                        "what should I be cautious about according to my chart?"]
