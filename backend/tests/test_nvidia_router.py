@@ -16,7 +16,7 @@ import chat.nvidia as nvidia
 import main
 from chat.gemini import READING_INSTRUCTION, SYSTEM_INSTRUCTION
 
-FAKE_KEY = "nvapi-test-key-should-never-leak"
+FAKE_KEY = "test-sentinel-key-never-a-real-credential"
 REASONING = "HIDDEN CHAIN OF THOUGHT that must never surface"
 
 

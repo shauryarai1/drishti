@@ -99,6 +99,8 @@ _DENY_RESULT_NORMALISED = _DENY_NORMALISED | {
 }
 
 _SESSION_HEADER = "x-kavach-session"
+# Guest session ids are non-identifying random values; only this shape is kept.
+_SESSION_PATTERN = re.compile(r"[A-Za-z0-9_-]{8,64}")
 
 _identity: ContextVar[dict[str, Optional[str]]] = ContextVar("kavach_identity", default={})
 
@@ -620,7 +622,9 @@ class IdentityMiddleware:
                 if value.lower().startswith("bearer "):
                     token = value[7:].strip() or None
             elif key == _SESSION_HEADER:
-                session = raw_value.decode("latin-1").strip() or None
+                candidate = raw_value.decode("latin-1").strip()
+                # Anything outside the expected shape is dropped rather than stored.
+                session = candidate if _SESSION_PATTERN.fullmatch(candidate) else None
 
         set_request_identity(token, session)
         await self.app(scope, receive, send)

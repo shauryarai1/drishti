@@ -203,9 +203,11 @@ async def chart_endpoint(payload: BirthData):
         result = generate_chart(payload)
         return result
     except Exception as exc:
+        logger.warning("Chart calculation failed: %s", type(exc).__name__)
+        # Legacy response shape is preserved, but internal exception text is never echoed.
         return JSONResponse(
             status_code=400,
-            content={"status": "ERROR", "reason": str(exc)},
+            content={"status": "ERROR", "reason": "We could not calculate that chart."},
         )
 
 
@@ -386,10 +388,13 @@ async def ask_endpoint(payload: ChatRequest):
     from chat.router import NEW_READING, READING_FOLLOWUP, route_message
 
     question = (getattr(payload, "question", "") or "").strip()
-    conversation_id = (getattr(payload, "conversation_id", "") or "").strip()
+    conversation_id = (getattr(payload, "conversation_id", "") or "").strip()[:64]
     if not conversation_id:
-        label = getattr(payload, "location_label", "") or f"{getattr(payload, 'latitude', '')},{getattr(payload, 'longitude', '')}"
-        conversation_id = "loc-" + str(label).strip().lower()
+        # Never derive a conversation id from user-supplied labels: that would be
+        # guessable and could share one conversation between unrelated visitors.
+        from chat.session import new_conversation_id
+
+        conversation_id = new_conversation_id()
 
     # Safety first: some questions deserve real-world support, not a reading.
     try:
@@ -794,5 +799,7 @@ async def current_dasha_endpoint(payload: CurrentDashaRequest):
 # Archiving is fail-open and never alters a product response.
 # ---------------------------------------------------------------------------
 from archive import install_archive  # noqa: E402
+from hardening import install_hardening  # noqa: E402
 
 install_archive(app)
+install_hardening(app)
