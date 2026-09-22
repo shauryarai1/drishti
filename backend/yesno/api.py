@@ -16,6 +16,7 @@ No existing endpoint, router or archive behaviour is altered by this module.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -23,7 +24,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from .engine import evaluate_yes_no
-from .timezone import resolve_local_datetime
+from .timezone import resolve_local_time
+
+logger = logging.getLogger("kavach.yesno")
 
 router = APIRouter(prefix="/api/yes-no", tags=["yes-no"])
 
@@ -34,6 +37,9 @@ class YesNoRequest(BaseModel):
     # local zone; a naive value is treated as the user's local wall-clock time.
     timestamp: str = ""
     timezone: str = ""
+    # Browser UTC offset in minutes east of UTC (IST = +330). Optional: older
+    # clients that omit it keep working exactly as before.
+    utc_offset_minutes: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -48,6 +54,25 @@ def _parse_instant(value: str) -> Optional[datetime]:
         return None
 
 
+def _log_resolution(instant: datetime, timezone_name: str, local: datetime,
+                    resolution: Dict[str, object]) -> None:
+    """Privacy-safe diagnostics: time resolution only.
+
+    Never logs the question, identity, tokens, planets, the relationship or the
+    interpretation.
+    """
+    logger.info(
+        "yesno_time_resolution instant=%s timezone=%s submitted_offset=%s "
+        "resolved_local=%s source=%s matched=%s",
+        instant.isoformat(),
+        timezone_name or "-",
+        resolution.get("submitted_offset_minutes"),
+        local.strftime("%H:%M"),
+        resolution.get("source"),
+        resolution.get("matched"),
+    )
+
+
 @router.post("")
 def yes_no(payload: YesNoRequest) -> Dict[str, Any]:
     """Deterministic YES / NO / 50-50 from the exact local time of the question."""
@@ -56,14 +81,17 @@ def yes_no(payload: YesNoRequest) -> Dict[str, Any]:
         return {"status": "invalid", "message": "A valid ISO-8601 timestamp is required."}
 
     try:
-        local = resolve_local_datetime(
+        local, resolution = resolve_local_time(
             instant,
-            latitude=payload.latitude,
-            longitude=payload.longitude,
             timezone_name=payload.timezone,
+            utc_offset_minutes=payload.utc_offset_minutes,
         )
     except ValueError:
         return {"status": "invalid", "message": "A timezone or coordinates are required."}
 
+    _log_resolution(instant, payload.timezone, local, resolution)
+
     result = evaluate_yes_no(payload.question, local, timezone_name=payload.timezone)
-    return {"status": "ok", **result.to_public()}
+    # Public payload: the verdict, the explanation and the resolved wall clock.
+    # No numbers, planets, relationship or other internal mechanics.
+    return {"status": "ok", **result.to_public(), "local_time": local.strftime("%H:%M")}

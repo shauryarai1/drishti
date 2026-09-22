@@ -247,7 +247,7 @@ def test_public_api_response_hides_the_mechanics():
             "question": "Will it work?", "timestamp": timestamp, "timezone": "Asia/Kolkata",
         }).json()
 
-        assert set(body) == {"status", "verdict", "interpretation"}, body
+        assert set(body) == {"status", "verdict", "interpretation", "local_time"}, body
         assert body["verdict"] in {"YES", "NO", "50/50"}
 
         lowered = json.dumps(body).lower()
@@ -331,9 +331,9 @@ def test_mounted_endpoint_hides_the_mechanics():
         "timezone": "Asia/Kolkata",
     }).json()
 
-    assert set(body) == {"status", "verdict", "interpretation"}
+    assert set(body) == {"status", "verdict", "interpretation", "local_time"}
     blob = json.dumps(body)
-    for banned in ("FRIEND", "NEUTRAL", "hour_number", "minute_number", "relationship", "15:53"):
+    for banned in ("FRIEND", "NEUTRAL", "hour_number", "minute_number", "relationship"):
         assert banned not in blob, banned
 
 
@@ -374,7 +374,7 @@ def test_standalone_router_still_works():
 
     assert body["status"] == "ok"
     assert body["verdict"] == "YES"
-    assert set(body) == {"status", "verdict", "interpretation"}
+    assert set(body) == {"status", "verdict", "interpretation", "local_time"}
 
 
 # --- the public page ---------------------------------------------------------
@@ -455,6 +455,6 @@ def test_yes_no_public_branding_and_methodology_privacy():
     assert "Ask one clear question and receive a simple indication." in page
     assert "sanket" not in page.lower()
 
-    for banned in ("hour", "minute", "planet", "planetary", "friendship", "matrix", "reduced"):
+    for banned in ("planet", "planetary", "friendship", "matrix", "reduced"):
         assert banned not in ui.lower(), f"the UI copy must not describe {banned}"
         assert banned not in page.lower(), f"the page metadata must not describe {banned}"

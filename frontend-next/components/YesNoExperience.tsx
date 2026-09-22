@@ -44,6 +44,7 @@ export function YesNoExperience() {
   const [question, setQuestion] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
   const [result, setResult] = useState<Verdict | null>(null);
+  const [localTime, setLocalTime] = useState('');
   const [error, setError] = useState('');
   const submitting = useRef(false);
 
@@ -69,6 +70,9 @@ export function YesNoExperience() {
           // The exact moment the question was asked, in the user's own timezone.
           timestamp: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+          // Browser UTC offset east of UTC (IST = +330). JavaScript's
+          // getTimezoneOffset() is inverted (UTC = local + offset), so negate it.
+          utc_offset_minutes: -new Date().getTimezoneOffset(),
         }),
       });
 
@@ -80,6 +84,7 @@ export function YesNoExperience() {
       }
 
       setResult({ verdict: body.verdict ?? null, interpretation: body.interpretation });
+      setLocalTime(typeof body.local_time === 'string' ? body.local_time : '');
       setPhase('done');
     } catch {
       setError("We couldn't reach KAVACH just now. Please try again in a moment.");
@@ -172,6 +177,11 @@ export function YesNoExperience() {
                   {result.verdict}
                 </p>
                 <div className="mx-auto mt-8 h-[1px] w-16 bg-[#A62A34]/40" />
+                {localTime && (
+                  <p className="mt-4 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-[#EEE9DF]/45">
+                    Evaluated at {localTime} local time
+                  </p>
+                )}
               </>
             ) : (
               <p className="text-center font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">

@@ -13,9 +13,13 @@ default zone (India is never assumed).
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
+
+# A real-world UTC offset never exceeds +14:00 / -12:00; anything outside this
+# range is treated as malformed rather than used as a clock.
+MAX_OFFSET_MINUTES = 14 * 60
 
 
 def resolve_timezone(latitude: Optional[float] = None, longitude: Optional[float] = None,
@@ -58,3 +62,70 @@ def resolve_local_datetime(instant: datetime, latitude: Optional[float] = None,
         # Already a local wall-clock time; attach the resolved zone without shifting.
         return instant.replace(tzinfo=ZoneInfo(zone))
     return instant.astimezone(ZoneInfo(zone))
+
+
+def zone_offset_minutes(instant: datetime, timezone_name: str) -> Optional[int]:
+    """The IANA zone's actual UTC offset for this instant, in minutes."""
+    if not timezone_name:
+        return None
+    try:
+        offset = instant.astimezone(ZoneInfo(timezone_name)).utcoffset()
+    except Exception:
+        return None
+    if offset is None:
+        return None
+    return int(offset.total_seconds() // 60)
+
+
+def _valid_offset(value: Optional[int]) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if -MAX_OFFSET_MINUTES <= value <= MAX_OFFSET_MINUTES:
+        return value
+    return None
+
+
+def resolve_local_time(instant: datetime, timezone_name: str = "",
+                       utc_offset_minutes: Optional[int] = None,
+                       ) -> Tuple[datetime, Dict[str, object]]:
+    """Resolve the user's local wall clock, cross-checking the two time sources.
+
+    The browser's IANA zone remains the primary source. The browser-reported UTC
+    offset (minutes east of UTC) is used to validate it, and as the fallback when
+    the two disagree, so the engine still evaluates the user's device clock
+    instead of a clearly inconsistent zone.
+
+    Returns (local_datetime, diagnostics). Diagnostics are privacy-safe: they
+    describe the time resolution only.
+    """
+    submitted = _valid_offset(utc_offset_minutes)
+    zone_offset = zone_offset_minutes(instant, timezone_name) if timezone_name else None
+
+    if zone_offset is not None and (submitted is None or submitted == zone_offset):
+        return instant.astimezone(ZoneInfo(timezone_name)), {
+            "source": "iana+offset" if submitted is not None else "iana",
+            "matched": submitted is not None,
+            "zone_offset_minutes": zone_offset,
+            "submitted_offset_minutes": submitted,
+        }
+
+    # Disagreement, an unknown zone, or a malformed offset: use the device clock.
+    if submitted is not None:
+        wall_clock = (instant.astimezone(ZoneInfo("UTC")) + timedelta(minutes=submitted)).replace(tzinfo=None)
+        return wall_clock, {
+            "source": "offset_fallback",
+            "matched": False,
+            "zone_offset_minutes": zone_offset,
+            "submitted_offset_minutes": submitted,
+        }
+
+    if zone_offset is not None:
+        # No offset supplied (older client): keep the existing behaviour exactly.
+        return instant.astimezone(ZoneInfo(timezone_name)), {
+            "source": "iana",
+            "matched": False,
+            "zone_offset_minutes": zone_offset,
+            "submitted_offset_minutes": None,
+        }
+
+    raise ValueError("A timezone or coordinates are required to resolve the local time")
