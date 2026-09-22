@@ -73,36 +73,49 @@ def test_people_field_carries_no_chart_information():
     assert [p["name"] for p in body["people"]] == ["Ananya", "Arjun"]
 
 
-def test_final_json_exposes_no_methodology():
-    body = _post(FIXTURE_A).json()
-    tokens = [t.lower() for t in _walk(body)]
-    joined = " ".join(tokens)
+def test_technical_analysis_is_published_as_an_allowlist():
+    """The working is openly shown now - but only the approved astrology fields."""
+    report = _post(FIXTURE_A).json()["report"]
+    working = report["technicalAnalysis"]
+    names = [entry["factor"] for entry in working]
+    assert names == [
+        "Tara / Dina Kuta", "Gana", "Nadi", "Rashi Kuta", "Graha Maitri", "Vasya Kuta",
+        "Yoni Kuta", "Ascendant compatibility", "Partnership foundation (7th house)",
+        "Partnership influences (contextual)", "Deep partnership (8th house)",
+        "Relationship timing (Dasha)", "Communication (Mercury)",
+        "Conflict & energy (Mars)", "Kuja Dosha balance",
+    ]
+    for entry in working:
+        assert set(entry) == {"factor", "values", "result", "meaning"}
+        assert entry["result"] in ("Supportive", "Mixed", "Challenging", "Contextual",
+                                   "Strong alignment", "Needs attention")
+        assert entry["meaning"]
 
-    # Word-boundary matching avoids false positives (ordinary/category).
-    for term in ("tara", "dina", "gana", "nadi", "rashi", "graha", "vasya", "yoni",
-                 "kuja", "nakshatra", "ascendant", "planet", "mars", "mercury",
-                 "venus", "jupiter", "saturn", "rahu", "ketu", "dasha", "bhukti",
-                 "lord", "aspect", "matrix", "points", "score", "percentage",
-                 "evidence", "facts", "reason", "chartfacts", "lagna", "rashi"):
-        assert not re.search(rf"\b{term}\b", joined), term
 
-    for phrase in ("moon sign", "moon nakshatra", "6/8", "2/12", "3/11", "5/9",
-                   "/36", "male row", "female column"):
-        assert phrase not in joined, phrase
+def test_overall_working_separates_voters_from_contextual_evidence():
+    working = _post(FIXTURE_A).json()["report"]["overallWorking"]
+    assert set(working) == {"state", "counts", "eligible", "contextualOnly", "note"}
+    assert working["contextualOnly"] == [
+        {"factor": "Partnership influences (contextual)", "result": "Contextual"}]
+    assert all(row["result"] != "Contextual" for row in working["eligible"])
+    assert working["state"] in (
+        "STRONG POTENTIAL", "GENERALLY SUPPORTIVE", "MIXED COMPATIBILITY", "SIGNIFICANT CHALLENGES")
 
-    for animal in ("horse", "cat", "elephant", "serpent", "deer", "lion", "mongoose",
-                   "monkey", "buffalo", "tiger", "rat", "cow", "dog", "goat", "sheep"):
-        assert not re.search(rf"\b{animal}\b", joined), animal
 
-    # No raw chart placements or technical keys anywhere.
-    assert not re.search(r"\b(house|houses)\b", joined)
-    assert "rashi" not in json.dumps(body).lower()
+def test_public_working_carries_no_private_internals():
+    raw = json.dumps(_post(FIXTURE_A).json())
+    lowered = raw.lower()
+    for banned in ("service_role", "supabase", "token", "password", "secret", "apikey",
+                   "authorization", "bearer", "env", "traceback", "chartfacts",
+                   "factorresult", "deepfactor", "personfacts", "class ", "def ",
+                   "c:\\", "/users/", ".py", "reason_code", "rule_id", "source_code"):
+        assert banned not in lowered, banned
 
 
 def test_internal_analysis_object_is_not_serialized():
     raw = json.dumps(_post(FIXTURE_A).json()).lower()
-    for banned in ("moon_sign", "moon_nakshatra", "moon_ruler", "eligible", "status_counts",
-                   "verdict", "bucket", "chartfacts", "deepfactor", "factorresult"):
+    for banned in ("moon_sign", "moon_nakshatra", "moon_ruler", "status_counts",
+                   "bucket", "chartfacts", "deepfactor", "factorresult"):
         assert banned not in raw, banned
 
 

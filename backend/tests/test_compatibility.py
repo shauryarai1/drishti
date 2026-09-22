@@ -283,21 +283,25 @@ def test_bnn_registry_is_unchanged_and_unused():
 
 
 # --- Yoni is not implemented, and there is no total ------------------------
-def test_yoni_is_not_exposed_publicly_and_has_no_matrix_leak():
-    """Yoni is implemented internally, but no animal/gender/matrix is public."""
-    import re
+def test_yoni_working_is_published_with_the_approved_orientation():
+    """Yoni is now openly shown: mapping, genders, orientation and value."""
+    from compatibility.engine import analyse_factors
+    from compatibility.interpretation import build_interpreted
 
-    assert (PKG / "yoni.py").exists()
-    report = evaluate_compatibility(person("A", "bride", "Aries", "Ashwini"),
-                                    person("B", "groom", "Cancer", "Ashlesha"),
-                                    NAKSHATRAS, RASHIS)
-    blob = str(report).lower()
-    for banned in ("yoni", "matrix", "animal", "brideanimal", "groomanimal"):
-        assert banned not in blob, banned
-    # Animal names as whole words only (avoids substring false positives).
-    for animal in ("horse", "cat", "elephant", "serpent", "deer", "lion", "mongoose",
-                   "monkey", "buffalo", "tiger", "rat", "cow", "dog", "goat", "sheep"):
-        assert not re.search(rf"\b{animal}\b", blob), animal
+    factors = analyse_factors(person("A", "bride", "Aries", "Ashwini"),
+                              person("B", "groom", "Cancer", "Ashlesha"),
+                              NAKSHATRAS, RASHIS)
+    report = build_interpreted(factors, [], {"bride": "A", "groom": "B"})
+    entry = next(e for e in report["technicalAnalysis"] if e["factor"] == "Yoni Kuta")
+    assert entry["values"]["brideAnimal"] == "Horse"
+    assert entry["values"]["groomAnimal"] == "Cat"
+    assert entry["values"]["matrixOrientation"] == "male_row_female_column"
+    assert entry["values"]["score"] == 2
+    # No aggregate score is ever produced: the only score shown is the Yoni
+    # matrix value the owner approved for display.
+    assert "score" not in report["overall"]
+    assert "/36" not in str(report)
+    assert "percentage" not in str(report).lower()
 
 
 def test_no_total_score_or_percentage_exists():
@@ -396,7 +400,7 @@ def test_endpoint_returns_the_interpreted_report():
                            "inDepth", "kavachView"}
     assert len(report["atAGlance"]) == 11
     blob = str(body).lower()
-    for banned in ("yoni", "36", "score", "planet", "nakshatra"):
+    for banned in ("36", "planet", "percentage"):
         assert banned not in blob, banned
 
 

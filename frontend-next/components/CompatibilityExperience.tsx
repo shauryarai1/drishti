@@ -45,6 +45,20 @@ interface Report {
   attentionAreas?: string[];
   inDepth?: Array<{ category: string; interpretation: string }>;
   kavachView?: string;
+  /** Layer 2: the openly displayed astrological working (approved fields only). */
+  technicalAnalysis?: Array<{
+    factor: string;
+    values: Record<string, unknown>;
+    result: string;
+    meaning: string;
+  }>;
+  overallWorking?: {
+    state: string;
+    counts: Record<string, number>;
+    eligible: Array<{ factor: string; result: string }>;
+    contextualOnly: Array<{ factor: string; result: string }>;
+    note: string;
+  };
   /** Legacy V1 shape (older saved reports): rendered safely, never recalculated. */
   factors?: Array<{ label: string; subtitle: string; status: string; summary: string }>;
   label?: string;
@@ -403,6 +417,89 @@ function InterpretedReport({ report }: { report: Report }) {
         <h3 className={SECTION}>Kavach view</h3>
         <p className="mt-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">{report.kavachView}</p>
       </section>
+
+      {report.technicalAnalysis && report.technicalAnalysis.length > 0 && (
+        <details className="rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/50 p-5 sm:p-6">
+          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
+            How Kavach analysed this match
+          </summary>
+          <div className="mt-5 space-y-5">
+            {report.technicalAnalysis.map((entry, index) => (
+              <article key={index} className="border-l border-[#A62A34]/30 pl-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-[13px] font-semibold tracking-[0.06em] text-[#F7F5F0]">
+                    {entry.factor}
+                  </h4>
+                  <span
+                    className={`rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                      STATUS_STYLE[entry.result] ?? STATUS_STYLE.Mixed
+                    }`}
+                  >
+                    {entry.result}
+                  </span>
+                </div>
+                <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                  {Object.entries(entry.values).map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-3 text-[12.5px]">
+                      <dt className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#EEE9DF]/45">
+                        {key.replace(/([A-Z])/g, ' $1')}
+                      </dt>
+                      <dd className="text-[#EEE9DF]/85">{String(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 text-[13px] leading-relaxed text-[#EEE9DF]/70">
+                  <span className="text-[#D6BE85]">What this means: </span>
+                  {entry.meaning}
+                </p>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {report.overallWorking && (
+        <details className="rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/50 p-5 sm:p-6">
+          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
+            Why this overall result?
+          </summary>
+          <p className="mt-4 text-[13px] leading-relaxed text-[#EEE9DF]/70">
+            {report.overallWorking.note}
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <div className={SECTION}>Counted towards the assessment</div>
+              <ul className="mt-2 space-y-1">
+                {report.overallWorking.eligible.map((row, index) => (
+                  <li key={index} className="flex justify-between gap-3 text-[12.5px] text-[#EEE9DF]/80">
+                    <span>{row.factor}</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#D6BE85]">
+                      {row.result}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className={SECTION}>Contextual only</div>
+              {report.overallWorking.contextualOnly.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {report.overallWorking.contextualOnly.map((row, index) => (
+                    <li key={index} className="flex justify-between gap-3 text-[12.5px] text-[#EEE9DF]/60">
+                      <span>{row.factor}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.1em]">
+                        {row.result}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[12.5px] text-[#EEE9DF]/50">None.</p>
+              )}
+            </div>
+          </div>
+        </details>
+      )}
     </div>
   );
 }

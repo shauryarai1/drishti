@@ -169,6 +169,7 @@ def personality_fit(bride: ChartFacts, groom: ChartFacts,
     a = friendship(bride_ruler, groom_ruler) if bride_ruler and groom_ruler else "neutral"
     b = friendship(groom_ruler, bride_ruler) if bride_ruler and groom_ruler else "neutral"
     evidence = {"brideRuler": bride_ruler, "groomRuler": groom_ruler,
+                "brideLagna": bride.lagna, "groomLagna": groom.lagna,
                 "brideViewOfGroom": a, "groomViewOfBride": b}
 
     if a == "friend" and b == "friend":
@@ -228,7 +229,7 @@ def communication(bride: ChartFacts, groom: ChartFacts, signs: Sequence[str]) ->
                           "Communication styles are not clearly indicated here.", {"mercury": None})
     d = sign_distance(a, b, signs)
     status = _classify_pair(d, COMM_SUPPORTIVE)
-    evidence = {"distance": d, "pair": sorted(_pair(d))}
+    evidence = {"brideSign": a, "groomSign": b, "distance": d, "pair": sorted(_pair(d))}
 
     prose = {
         SUPPORTIVE: "You tend to understand each other's meaning fairly naturally, which "
@@ -257,7 +258,7 @@ def energy_style(bride: ChartFacts, groom: ChartFacts, signs: Sequence[str]) -> 
     pair = frozenset(_pair(d))
     supportive = any(pair == frozenset(allowed) for allowed in ENERGY_SUPPORTIVE)
     status = SUPPORTIVE if supportive else MIXED
-    evidence = {"distance": d, "pair": sorted(_pair(d))}
+    evidence = {"brideSign": a, "groomSign": b, "distance": d, "pair": sorted(_pair(d))}
 
     prose = (
         "Your natural action styles sit comfortably together, so conflict is likely to be "

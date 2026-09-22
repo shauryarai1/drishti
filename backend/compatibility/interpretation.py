@@ -149,6 +149,117 @@ def build_interpreted(
         "inDepth": in_depth,
         "kavachView": kavach_view,
         "people": {"bride": names.get("bride", ""), "groom": names.get("groom", "")},
+        # Layer 2: the astrological working, openly shown. Built ONLY from the
+        # results the engine already produced - never recalculated here.
+        "technicalAnalysis": build_technical_analysis(kuta_results, deep_results),
+        "overallWorking": build_overall_working(kuta_results, deep_results, overall),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Layer 2: the deliberate public working model.
+# ---------------------------------------------------------------------------
+# Only these astrology fields are ever published, and each is read from the
+# result the engine already computed (one source of truth).
+WORKING_DISPLAY: Dict[str, Any] = {
+    "tara": ("Tara / Dina Kuta", "facts",
+             ("brideMoonNakshatra", "groomMoonNakshatra", "remainder")),
+    "gana": ("Gana", "facts",
+             ("brideNakshatra", "brideGana", "groomNakshatra", "groomGana")),
+    "nadi": ("Nadi", "facts",
+             ("brideNakshatra", "brideNadi", "groomNakshatra", "groomNadi")),
+    "rashi": ("Rashi Kuta", "facts",
+              ("brideMoonSign", "groomMoonSign", "positionFromGroom", "mitigationApplied",
+               "sameRuler", "rulersAreFriends")),
+    "graha_maitri": ("Graha Maitri", "facts",
+                     ("brideMoonRuler", "groomMoonRuler", "brideViewOfGroom", "groomViewOfBride")),
+    "vasya": ("Vasya Kuta", "facts",
+              ("brideMoonSign", "groomMoonSign", "brideInfluencesGroom", "groomInfluencesBride")),
+    "yoni": ("Yoni Kuta", "facts",
+             ("brideAnimal", "brideYoniGender", "groomAnimal", "groomYoniGender",
+              "matrixOrientation", "score")),
+    "personality_fit": ("Ascendant compatibility", "evidence",
+                        ("brideLagna", "groomLagna", "brideRuler", "groomRuler",
+                         "brideViewOfGroom", "groomViewOfBride")),
+    "foundation": ("Partnership foundation (7th house)", "evidence",
+                   ("brideRuler", "brideRulerHouse", "groomRuler", "groomRulerHouse", "flags")),
+    "foundation_context": ("Partnership influences (contextual)", "evidence",
+                           ("brideSeventh", "groomSeventh")),
+    "deep_partnership": ("Deep partnership (8th house)", "evidence",
+                         ("brideEighth", "brideEighthOccupants", "groomEighth",
+                          "groomEighthOccupants")),
+    "timing": ("Relationship timing (Dasha)", "evidence",
+               ("currentLords", "friendlyCount")),
+    "communication": ("Communication (Mercury)", "evidence",
+                      ("brideSign", "groomSign", "distance", "pair")),
+    "energy_style": ("Conflict & energy (Mars)", "evidence",
+                     ("brideSign", "groomSign", "distance", "pair")),
+    "conflict_balance": ("Kuja Dosha balance", "evidence",
+                         ("brideHouse", "groomHouse", "brideCondition", "groomCondition")),
+}
+
+
+def _meaning(result: Any) -> str:
+    return getattr(result, "summary", "") or getattr(result, "prose", "")
+
+
+def build_technical_analysis(
+    kuta_results: Sequence[Any],
+    deep_results: Sequence[Any],
+) -> List[Dict[str, Any]]:
+    """The openly displayed working, in a fixed order.
+
+    Values are read from the engine's own results; nothing is recomputed.
+    """
+    by_key: Dict[str, Any] = {}
+    for result in list(kuta_results) + list(deep_results):
+        by_key[result.key] = result
+
+    ordered = [key for key, _ in WORKING_DISPLAY.items()]
+    working: List[Dict[str, Any]] = []
+    for key in ordered:
+        result = by_key.get(key)
+        if result is None:
+            continue
+        name, source, fields = WORKING_DISPLAY[key]
+        raw = getattr(result, source, {}) or {}
+        working.append({
+            "factor": name,
+            "values": {field: raw.get(field) for field in fields if field in raw},
+            "result": result.status,
+            "meaning": _meaning(result),
+        })
+    return working
+
+
+def build_overall_working(
+    kuta_results: Sequence[Any],
+    deep_results: Sequence[Any],
+    overall: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Which factors voted, and which are contextual only."""
+    from .deep import CONTEXTUAL_FACTORS, ELIGIBLE_FACTORS
+
+    by_key: Dict[str, Any] = {}
+    for result in list(kuta_results) + list(deep_results):
+        by_key[result.key] = result
+
+    def rows(keys: Sequence[str]) -> List[Dict[str, str]]:
+        return [
+            {"factor": WORKING_DISPLAY[key][0], "result": by_key[key].status}
+            for key in keys if key in by_key
+        ]
+
+    return {
+        "state": overall["state"],
+        "counts": overall["counts"],
+        "eligible": rows(ELIGIBLE_FACTORS),
+        "contextualOnly": rows(CONTEXTUAL_FACTORS),
+        "note": (
+            "The overall assessment counts only the factors whose source rules give "
+            "enough direction to classify them. Factors marked contextual only are "
+            "shown for completeness and do not affect the assessment."
+        ),
     }
 
 

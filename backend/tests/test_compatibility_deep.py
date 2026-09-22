@@ -238,8 +238,8 @@ def _interpreted():
 
 def test_public_report_has_the_required_sections():
     report = _interpreted()
-    assert set(report) == {"overall", "atAGlance", "strengths", "attentionAreas",
-                           "inDepth", "kavachView", "people"}
+    assert set(report) >= {"overall", "atAGlance", "strengths", "attentionAreas",
+                           "inDepth", "kavachView", "technicalAnalysis", "overallWorking"}
     assert set(report["overall"]) == {"state", "summary"}
     assert report["overall"]["state"] in (
         "STRONG POTENTIAL", "GENERALLY SUPPORTIVE", "MIXED COMPATIBILITY", "SIGNIFICANT CHALLENGES")
@@ -252,23 +252,16 @@ def test_public_report_is_deterministic():
     assert json.dumps(_interpreted(), sort_keys=True) == json.dumps(_interpreted(), sort_keys=True)
 
 
-def test_public_report_leaks_no_methodology():
-    import re
-
-    blob = json.dumps(_interpreted()).lower()
-    banned = ("tara", "dina", "gana", "nadi", "rashi", "graha", "vasya", "yoni",
-              "kuja", "nakshatra", "ascendant", "planet", "mars", "mercury",
-              "venus", "jupiter", "saturn", "rahu", "ketu", "dasha", "bhukti",
-              "lord", "aspect", "matrix", "points", "score", "percentage",
-              "evidence", "facts", "reason")
-    for term in banned:
-        assert not re.search(rf"\b{term}\b", blob), term
-    for token in ("moon sign", "6/8", "2/12", "3/11", "5/9", "/36", "house number"):
-        assert token not in blob, token
-    for animal in ("horse", "cat", "elephant", "serpent", "deer", "lion", "mongoose",
-                   "monkey", "buffalo", "tiger", "rat", "cow", "dog", "goat", "sheep",
-                   "male", "female"):
-        assert not re.search(rf"\b{animal}\b", blob), animal
+def test_public_report_publishes_the_approved_working_only():
+    """Methodology is now openly shown; only approved astrology fields appear."""
+    report = _interpreted()
+    assert "technicalAnalysis" in report and "overallWorking" in report
+    names = [entry["factor"] for entry in report["technicalAnalysis"]]
+    assert "Tara / Dina Kuta" in names and "Yoni Kuta" in names
+    blob = json.dumps(report).lower()
+    for banned in ("service_role", "supabase", "token", "password", "traceback",
+                   "chartfacts", "factorresult", "deepfactor", ".py", "c:\\"):
+        assert banned not in blob, banned
 
 
 def test_public_report_never_serializes_internal_evidence():
