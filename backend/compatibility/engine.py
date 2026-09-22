@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Sequence
 
-from . import gana, graha_maitri, nadi, rashi, tara, vasya
+from . import gana, graha_maitri, nadi, rashi, tara, vasya, yoni
 from .models import STATUSES, FactorResult, PersonFacts
 
-FACTOR_ORDER = ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya")
+FACTOR_ORDER = ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya", "yoni")
 
 DISCLAIMER = (
     "Traditional compatibility guidance, not a decision. No outcome is guaranteed, "
@@ -32,6 +32,7 @@ def evaluate_compatibility(
         rashi.evaluate(bride, groom, signs),
         graha_maitri.evaluate(bride, groom),
         vasya.evaluate(bride, groom),
+        yoni.evaluate(bride, groom),
     ]
 
     return {

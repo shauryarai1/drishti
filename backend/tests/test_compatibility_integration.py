@@ -223,11 +223,11 @@ def test_pending_key_is_dedicated_and_complete():
     assert "MAX_AGE_MS" in source and "takePendingForm" in source
 
 
-def test_ui_renders_exactly_six_factors_and_no_score_or_yoni():
-    # The six factors come from the backend engine, and the UI renders them all.
+def test_ui_renders_the_factor_set_and_no_score_or_yoni():
+    # The factors come from the backend engine, and the UI renders them all.
     from compatibility.engine import FACTOR_ORDER
 
-    assert FACTOR_ORDER == ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya")
+    assert FACTOR_ORDER == ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya", "yoni")
 
     ui = _read(EXPERIENCE)
     lowered = ui.lower()
@@ -280,8 +280,8 @@ def test_safety_language_absent_from_the_public_frontend():
         assert banned not in ui, banned
 
 
-def test_yoni_and_deeper_factors_remain_unimplemented():
-    assert not (REPO / "backend" / "compatibility" / "yoni.py").exists()
+def test_yoni_is_implemented_and_deeper_factors_remain_unimplemented():
+    assert (REPO / "backend" / "compatibility" / "yoni.py").exists()
     for name in ("mercury", "kuja", "dosha", "seventh_house", "eighth_house"):
         assert not (REPO / "backend" / "compatibility" / f"{name}.py").exists()
 

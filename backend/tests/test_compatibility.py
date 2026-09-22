@@ -283,12 +283,21 @@ def test_bnn_registry_is_unchanged_and_unused():
 
 
 # --- Yoni is not implemented, and there is no total ------------------------
-def test_yoni_is_not_calculated():
-    assert not (PKG / "yoni.py").exists(), "Yoni must not be implemented in V1"
-    for path in PKG.glob("*.py"):
-        source = path.read_text(encoding="utf-8")
-        for banned in ("YONI_", "yoni_of", "YoniKuta", "YONI_MATRIX"):
-            assert banned not in source, f"{path.name} encodes {banned}"
+def test_yoni_is_not_exposed_publicly_and_has_no_matrix_leak():
+    """Yoni is implemented internally, but no animal/gender/matrix is public."""
+    import re
+
+    assert (PKG / "yoni.py").exists()
+    report = evaluate_compatibility(person("A", "bride", "Aries", "Ashwini"),
+                                    person("B", "groom", "Cancer", "Ashlesha"),
+                                    NAKSHATRAS, RASHIS)
+    blob = str(report).lower()
+    for banned in ("yoni", "matrix", "animal", "brideanimal", "groomanimal"):
+        assert banned not in blob, banned
+    # Animal names as whole words only (avoids substring false positives).
+    for animal in ("horse", "cat", "elephant", "serpent", "deer", "lion", "mongoose",
+                   "monkey", "buffalo", "tiger", "rat", "cow", "dog", "goat", "sheep"):
+        assert not re.search(rf"\b{animal}\b", blob), animal
 
 
 def test_no_total_score_or_percentage_exists():
@@ -302,8 +311,11 @@ def test_no_total_score_or_percentage_exists():
                                     NAKSHATRAS, RASHIS)
     assert report["label"] == "COMPATIBILITY FACTORS ANALYZED"
     assert set(report) == {"label", "factors", "summary", "disclaimer"}
-    assert [f["key"] for f in report["factors"]] == list(
-        ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya"))
+    assert len(report["factors"]) == 7
+    for factor in report["factors"]:
+        # The public factor carries interpretation only - no internal key, no
+        # evidence, no points.
+        assert set(factor) == {"label", "subtitle", "status", "summary"}
     blob = str(report).lower()
     for banned in ("score", "out of", "/36", "percentage"):
         assert banned not in blob, banned
@@ -375,12 +387,12 @@ def test_endpoint_requires_both_names_and_birth_details():
     assert client.post("/api/compatibility", json=bad2).json()["status"] == "invalid"
 
 
-def test_endpoint_returns_the_six_qualitative_factors():
+def test_endpoint_returns_the_qualitative_factors():
     body = TestClient(main.app).post("/api/compatibility", json=_payload()).json()
     assert body["status"] == "ok"
     assert [p["role"] for p in body["people"]] == ["bride", "groom"]
     assert body["report"]["label"] == "COMPATIBILITY FACTORS ANALYZED"
-    assert len(body["report"]["factors"]) == 6
+    assert len(body["report"]["factors"]) == 7
     blob = str(body).lower()
     for banned in ("yoni", "36", "score", "planet", "nakshatra lord"):
         assert banned not in blob, banned

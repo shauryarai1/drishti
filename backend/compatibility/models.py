@@ -33,14 +33,16 @@ class FactorResult:
     points_awarded: Optional[int] = None
 
     def to_public(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
-            "key": self.key,
+        """Customer-facing view.
+
+        Internal evidence (`facts`), points and rule identity never cross this
+        boundary: they stay on the server for tests, tracing and debugging. The
+        customer receives a category, a state and plain-language interpretation
+        only.
+        """
+        return {
             "label": self.label,
             "subtitle": self.subtitle,
             "status": self.status,
             "summary": self.summary,
-            "facts": self.facts,
         }
-        if self.points_awarded is not None:
-            payload["points"] = self.points_awarded
-        return payload

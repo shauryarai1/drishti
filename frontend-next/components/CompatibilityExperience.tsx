@@ -270,8 +270,8 @@ export function CompatibilityExperience() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {report.factors.map((factor) => (
-                <article key={factor.key} className={PANEL}>
+              {report.factors.map((factor, index) => (
+                <article key={index} className={PANEL}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className={LABEL}>{factor.label}</div>
