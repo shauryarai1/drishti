@@ -3,7 +3,6 @@
 import React, { useRef } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 import { Header } from './Header';
-import { Button } from './Button';
 import { MicroPanel } from './MicroPanel';
 import { SectionLabel } from './SectionLabel';
 import { CelestialField } from './motion/CelestialField';
@@ -17,6 +16,14 @@ interface HeroSectionProps {
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+const TRUST_MARKERS = ['PERSONALIZED', 'SIMPLE', 'NON-FATALISTIC'];
+
+const PRIMARY_CTA =
+  'inline-flex w-full items-center justify-center rounded bg-[#7B1D26] px-8 py-4 text-base font-medium tracking-wide text-[#F7F5F0] border border-[#A62A34]/40 shadow-[0_4px_24px_rgba(123,29,38,0.35)] transition-colors hover:bg-[#A62A34] sm:w-auto';
+
+const SECONDARY_CTA =
+  'inline-flex w-full items-center justify-center rounded border border-[#B39250]/40 px-8 py-4 text-base tracking-wide text-[#F7F5F0] transition-colors hover:border-[#B39250] hover:bg-[#2B0C11]/60 sm:w-auto';
 
 export function HeroSection({
   onStartReading,
@@ -48,7 +55,6 @@ export function HeroSection({
       {/* LAYER 1: BACKGROUND (Celestial environment + architectural grid lines)     */}
       {/* ========================================================================= */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        {/* Revolving planetary environment â€” the shared visual system with the intro. */}
         {/* Deep layer: large faint structures that drift slower than the near layer. */}
         <motion.div
           className="absolute inset-0"
@@ -83,14 +89,6 @@ export function HeroSection({
         <div className="absolute top-0 bottom-0 right-[10%] w-[1px] bg-[#A62A34]/10 hidden lg:block" />
         <div className="absolute top-[28%] left-0 right-0 h-[1px] bg-[#A62A34]/10 hidden xl:block" />
         <div className="absolute bottom-[18%] left-0 right-0 h-[1px] bg-[#A62A34]/10 hidden xl:block" />
-
-        {/* Fine coordinate markers in corners */}
-        <div className="absolute top-6 left-6 font-mono text-[9px] text-[#A62A34]/40 tracking-widest hidden sm:block">
-          SEC.01 // LAT:28.61 // TIME:SYS
-        </div>
-        <div className="absolute top-6 right-6 font-mono text-[9px] text-[#A62A34]/40 tracking-widest hidden sm:block">
-          REF:KUNDLI.GEOM.3D
-        </div>
       </div>
 
       {/* Integrated Header */}
@@ -100,10 +98,10 @@ export function HeroSection({
       {/* MAIN VIEWPORT COMPOSITION (Midground Sculptural Centerpiece + Foreground Copy) */}
       {/* ========================================================================= */}
       <motion.div
-        className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16 flex-1 flex flex-col justify-center py-6 sm:py-12 lg:py-16"
+        className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16 flex-1 flex flex-col justify-center py-10 sm:py-14 lg:py-16"
         style={reduceMotion ? undefined : { y: copyY }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           {/* ========================================== */}
           {/* LEFT / FOREGROUND: Restrained Copy & CTAs */}
           {/* ========================================== */}
@@ -114,12 +112,12 @@ export function HeroSection({
               transition={{ duration: 0.75, ease: EASE }}
               className="space-y-4"
             >
-              <SectionLabel label="ASTROLOGICAL EARLY-WARNING SYSTEM" tone="crimson" />
+              <SectionLabel label="ASTROLOGICAL GUIDANCE FOR EVERYDAY LIFE" tone="crimson" />
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-[#F7F5F0] tracking-tight leading-[1.12]">
-                Know what deserves
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-[#F7F5F0] tracking-tight leading-[1.14]">
+                Know where to be careful.
                 <br />
-                <span className="text-[#EEE9DF] font-light">your attention.</span>
+                <span className="text-[#EEE9DF] font-light">Know where to move forward.</span>
               </h1>
             </motion.div>
 
@@ -129,70 +127,44 @@ export function HeroSection({
               transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.12 }}
               className="text-base sm:text-lg text-[#EEE9DF]/80 leading-relaxed max-w-xl font-normal"
             >
-              A personalized reading built from your birth details, revealing the areas of life
-              that may deserve greater awareness and care.
+              KAVACH uses your birth details to give you simple, personalized guidance about the areas
+              of life that may need your attention.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
               transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.24 }}
-              className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6"
+              className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4"
             >
-              <Button
-                size="lg"
-                variant="primary"
-                showArrow
-                onClick={onStartReading}
-                className="w-full sm:w-auto"
-              >
-                Begin your reading
-              </Button>
-
-              <a
-                href="/life-summary"
-                className="inline-flex items-center justify-center rounded border border-[#A62A34]/40 px-6 py-4 text-base tracking-wide text-[#F7F5F0] transition-colors hover:border-[#A62A34] hover:bg-[#2B0C11]/60"
-              >
-                Explore My Life
+              <a href="/life-summary" className={PRIMARY_CTA}>
+                EXPLORE MY LIFE
               </a>
-
-              <a
-                href="/ask"
-                className="inline-flex items-center justify-center rounded border border-[#B39250]/40 px-6 py-4 text-base tracking-wide text-[#F7F5F0] transition-colors hover:border-[#B39250] hover:bg-[#2B0C11]/60"
-              >
-                Ask Kavach
+              <a href="/ask" className={SECONDARY_CTA}>
+                ASK KAVACH
               </a>
-              <button
-                onClick={onExploreHowItWorks}
-                className="group inline-flex items-center justify-center gap-2 text-sm uppercase tracking-widest text-[#EEE9DF]/80 hover:text-[#F7F5F0] transition-colors py-3 px-2 cursor-pointer"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#B39250] group-hover:scale-125 transition-transform" />
-                <span>How it works</span>
-              </button>
             </motion.div>
 
-            {/* Micro credibility indicator */}
+            {/* Three restrained trust markers */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: introActive ? 0 : 1, y: introActive ? 20 : 0 }}
               transition={{ duration: 0.75, ease: EASE, delay: introActive ? 0 : 0.36 }}
-              className="pt-4 flex items-center gap-6 border-t border-[#A62A34]/20 text-xs font-mono text-[#EEE9DF]/50"
+              className="pt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#A62A34]/20 text-[11px] font-mono tracking-[0.16em] text-[#EEE9DF]/55"
             >
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 rounded-full bg-[#A62A34]" />
-                <span>NON-FATALISTIC</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 rounded-full bg-[#B39250]" />
-                <span>3 DIMENSIONS OF CARE</span>
-              </div>
+              {TRUST_MARKERS.map((marker, index) => (
+                <React.Fragment key={marker}>
+                  {index > 0 && <span className="text-[#B39250]/60">&bull;</span>}
+                  <span>{marker}</span>
+                </React.Fragment>
+              ))}
             </motion.div>
           </div>
 
           {/* ========================================================================= */}
           {/* RIGHT / MIDGROUND: Large Organic Dimensional Centerpiece + Micro UI Units */}
           {/* ========================================================================= */}
-          <div className="lg:col-span-7 xl:col-span-7 relative flex items-center justify-center min-h-[380px] sm:min-h-[460px] lg:min-h-[560px]">
+          <div className="lg:col-span-7 xl:col-span-7 relative flex items-center justify-center min-h-[260px] sm:min-h-[440px] lg:min-h-[560px]">
             {/* Ambient backlight glow under sculpture */}
             <div className="absolute inset-4 bg-gradient-to-tr from-[#7B1D26]/30 via-[#541219]/20 to-[#B39250]/10 rounded-2xl filter blur-2xl opacity-70 pointer-events-none" />
 
@@ -203,10 +175,9 @@ export function HeroSection({
               transition={{ duration: 0.9, delay: introActive ? 1.5 : 0, ease: EASE }}
               className="relative w-full aspect-[16/10] max-h-[540px] rounded-xl overflow-hidden border border-[#A62A34]/30 shadow-[0_24px_80px_rgba(0,0,0,0.85)] group"
             >
-              {/* Genuine bespoke visual artwork */}
               <img
                 src="/assets/hero_sculpture.jpg"
-                alt="Dimensional Kundli chart art installation in ruby tinted glass and ivory vellum"
+                alt="Ruby tinted glass and ivory Kundli chart artwork"
                 className="w-full h-full object-cover object-center transform transition-transform duration-1000 group-hover:scale-[1.02]"
                 referrerPolicy="no-referrer"
               />
@@ -220,16 +191,6 @@ export function HeroSection({
               <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-[#B39250]/60 pointer-events-none" />
               <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-[#B39250]/60 pointer-events-none" />
               <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-[#B39250]/60 pointer-events-none" />
-
-              {/* Micro-inscription at base of visual */}
-              <div className="absolute bottom-3.5 left-4 right-4 flex items-center justify-between pointer-events-none">
-                <span className="text-[10px] font-mono tracking-widest text-[#EEE9DF]/60 bg-[#090909]/80 backdrop-blur-sm px-2 py-0.5 rounded-[2px] border border-[#A62A34]/20">
-                  FIG. 01 // KUNDLI CARTOGRAPHY INSTALLATION
-                </span>
-                <span className="text-[10px] font-mono text-[#B39250]/80">
-                  NORTH INDIAN GEOMETRY
-                </span>
-              </div>
             </motion.div>
 
             {/* ======================================================================= */}
@@ -246,7 +207,7 @@ export function HeroSection({
               <MicroPanel
                 category="ATTENTION AREA"
                 label="Relationships"
-                actionText="A closer look â†’"
+                actionText="A closer look →"
                 accent="crimson"
                 onAction={onInspectMicroAttention || onStartReading}
               />
@@ -291,17 +252,13 @@ export function HeroSection({
       </motion.div>
 
       {/* Bottom subtle scroll-indicator bar */}
-      <div className="relative z-10 w-full border-t border-[#A62A34]/15 py-3 px-6 flex items-center justify-between text-[11px] font-mono text-[#EEE9DF]/40">
-        <div className="flex items-center gap-3">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#A62A34] animate-pulse" />
-          <span>KAVACH ENGINE // READY</span>
-        </div>
+      <div className="relative z-10 w-full border-t border-[#A62A34]/15 py-3 px-6 flex items-center justify-center text-[11px] font-mono text-[#EEE9DF]/40">
         <button
           onClick={onExploreHowItWorks}
           className="flex items-center gap-2 hover:text-[#EEE9DF] transition-colors cursor-pointer"
         >
-          <span>EXPLORE THE ARCHITECTURE</span>
-          <span>â†“</span>
+          <span>How it works</span>
+          <span aria-hidden="true">&darr;</span>
         </button>
       </div>
     </section>

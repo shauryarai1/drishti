@@ -89,7 +89,7 @@ export function KavachIntro({ onComplete }: KavachIntroProps) {
           animate={{ opacity: [0, 0.75, 0.75, 0] }}
           transition={{ duration: TIMELINE_SECONDS, times: [0, 0.34, 0.66, 0.94] }}
         >
-          Astrological Early-Warning System
+          Astrological guidance for everyday life
         </motion.p>
       </div>
     </motion.div>

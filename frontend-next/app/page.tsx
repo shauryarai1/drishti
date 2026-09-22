@@ -3,10 +3,11 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeroSection } from '../components/HeroSection';
-import { LightEditorialSection } from '../components/LightEditorialSection';
-import { ExploreSection } from '../components/ExploreSection';
-import { ImmersiveStorySection } from '../components/ImmersiveStorySection';
+import { HomeToolsSection } from '../components/HomeToolsSection';
+import { HomeHowItWorks } from '../components/HomeHowItWorks';
 import { ReadingPreviewSection } from '../components/ReadingPreviewSection';
+import { HomeServicesSection } from '../components/HomeServicesSection';
+import { HomePhilosophy } from '../components/HomePhilosophy';
 import { Footer } from '../components/Footer';
 import { KavachIntro } from '../components/KavachIntro';
 import { wakeBackend } from '../lib/api';
@@ -34,7 +35,7 @@ export default function HomePage() {
         setIntroActive(true);
       }
     } catch {
-      // Motion preference unavailable â€” skip the intro rather than risk a stuck overlay.
+      // Motion preference unavailable - skip the intro rather than risk a stuck overlay.
     }
   }, []);
 
@@ -52,24 +53,27 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF]">
       {introActive && <KavachIntro onComplete={() => setIntroActive(false)} />}
 
-      {/* 01: Viewport Hero with Midground Sculptural Centerpiece */}
+      {/* 01: Hero - what KAVACH does and where to start */}
       <HeroSection
         onStartReading={handleStartReading}
         onExploreHowItWorks={handleExploreHowItWorks}
         introActive={introActive}
       />
 
-      {/* Explore hub: the two primary features + Panchang */}
-      <ExploreSection />
+      {/* 02: What can KAVACH help you with? (primary tools + more tools) */}
+      <HomeToolsSection />
 
-      {/* 02: Dark Editorial Section */}
-      <LightEditorialSection onStartReading={handleStartReading} />
+      {/* 03: How it works - three simple steps */}
+      <HomeHowItWorks />
 
-      {/* 03: Organic Crimson Landscape & Synthesis Story */}
-      <ImmersiveStorySection onStartReading={handleStartReading} />
+      {/* 04: Three focus areas (Attention, Protect, Danger) */}
+      <ReadingPreviewSection />
 
-      {/* 04: Editorial Triad Narrative (Attention, Protect, Danger) */}
-      <ReadingPreviewSection onStartReading={handleStartReading} />
+      {/* 05: Deeper guidance - consultation and pooja */}
+      <HomeServicesSection />
+
+      {/* 06: Philosophy and trust */}
+      <HomePhilosophy />
 
       {/* Footer */}
       <Footer onStartReading={handleStartReading} />

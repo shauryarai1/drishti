@@ -35,7 +35,7 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
             </p>
             <div className="pt-2">
               <span className="inline-block text-[11px] font-mono tracking-wider text-[#B39250] border border-[#B39250]/30 px-2.5 py-1 rounded-[2px] bg-[#B39250]/5">
-                Astrological Early-Warning System
+                Personalized Astrological Guidance
               </span>
             </div>
           </div>

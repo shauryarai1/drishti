@@ -4,13 +4,13 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'KAVACH — Astrological Early-Warning System',
+  title: 'KAVACH – Astrological Guidance',
   description:
-    'KAVACH is an Astrological Early-Warning System that reveals the areas of life that may deserve greater awareness and care.',
+    'Personalized astrological guidance designed to help you understand what may deserve your attention.',
   openGraph: {
-    title: 'KAVACH — Astrological Early-Warning System',
+    title: 'KAVACH – Astrological Guidance',
     description:
-      'KAVACH is an Astrological Early-Warning System that reveals the areas of life that may deserve greater awareness and care.',
+      'Personalized astrological guidance designed to help you understand what may deserve your attention.',
     type: 'website',
   },
 };
