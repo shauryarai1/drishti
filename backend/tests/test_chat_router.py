@@ -73,8 +73,8 @@ def test_normal_chat_routing(message):
     assert router.route_message(message, has_active_reading=False) == router.NORMAL_CHAT
 
 
-@pytest.mark.parametrize("message", ["How will my business go?", "Should I open my shop on Friday?",
-                                     "How will my exam go tomorrow?", "Will this opportunity work out?",
+@pytest.mark.parametrize("message", ["How will my business go as per my chart?", "Should I open my shop on Friday as per my chart?",
+                                     "How will my exam go tomorrow as per my chart?", "Will this opportunity work out as per my chart?",
                                      "What does KAVACH say about my career right now?",
                                      "Give me a reading about my relationship."])
 def test_reading_routing(message):
@@ -136,7 +136,7 @@ def test_new_reading_draws_exactly_once(monkeypatch):
     monkeypatch.setattr("chat.reading.draw_cards", spy)
     session.reset("reading-1")
     trace.clear("reading-1")
-    body = _ask("Should I open my shop on Friday?", "reading-1")
+    body = _ask("Should I open my shop on Friday as per my chart?", "reading-1")
     assert body["answered"] is True
     assert len(draws) == 1
     reading = session.get_reading("reading-1")
@@ -154,7 +154,7 @@ def test_follow_up_reuses_and_new_question_draws(monkeypatch):
     _stub(monkeypatch)
     session.reset("reading-2")
     trace.clear("reading-2")
-    first = _ask("Should I open my shop on Friday?", "reading-2")
+    first = _ask("Should I open my shop on Friday as per my chart?", "reading-2")
     assert first["answered"] is True
     draw_a = session.get_reading("reading-2")["draw_id"]
     cards_a = [card["card_id"] for card in session.get_reading("reading-2")["cards"]]
@@ -164,7 +164,7 @@ def test_follow_up_reuses_and_new_question_draws(monkeypatch):
     assert session.get_reading("reading-2")["draw_id"] == draw_a
     assert [card["card_id"] for card in session.get_reading("reading-2")["cards"]] == cards_a
 
-    again = _ask("How will my exam go tomorrow?", "reading-2")
+    again = _ask("How will my exam go tomorrow as per my chart?", "reading-2")
     assert again["answered"] is True
     assert session.get_reading("reading-2")["draw_id"] != draw_a
 
@@ -180,7 +180,7 @@ def test_subject_change_then_normal_chat(monkeypatch):
     _stub(monkeypatch)
     session.reset("reading-3")
     trace.clear("reading-3")
-    _ask("How will my exam go?", "reading-3")
+    _ask("How will my exam go as per my chart?", "reading-3")
     _ask("why?", "reading-3")
     _ask("okay thanks", "reading-3")
     _ask("what is photosynthesis?", "reading-3")
@@ -212,7 +212,7 @@ def test_tarot_crash_falls_back_to_normal_chat(monkeypatch):
     monkeypatch.setattr("chat.reading.build_reading", exploding)
     session.reset("bound-2")
     trace.clear("bound-2")
-    body = _ask("Should I open my shop on Friday?", "bound-2")
+    body = _ask("Should I open my shop on Friday as per my chart?", "bound-2")
     assert body["status"] == "ok"
     assert body["answered"] is True
     assert session.get_reading("bound-2") is None
@@ -227,7 +227,7 @@ def test_inspector_crash_does_not_break_chat(monkeypatch):
 
     monkeypatch.setattr("chat.inspector._card_payload", exploding)
     session.reset("bound-3")
-    body = _ask("Should I open my shop on Friday?", "bound-3")
+    body = _ask("Should I open my shop on Friday as per my chart?", "bound-3")
     assert body["answered"] is True
 
 
@@ -248,7 +248,7 @@ def test_model_unavailable_keeps_reading_for_inspection(monkeypatch):
     _stub(monkeypatch, status=429, body='{"error":{"message":"quota"}}')
     session.reset("bound-5")
     trace.clear("bound-5")
-    body = _ask("Should I open my shop on Friday?", "bound-5")
+    body = _ask("Should I open my shop on Friday as per my chart?", "bound-5")
     assert body["answered"] is False
     assert body["answer"] == gemini.UNAVAILABLE_MESSAGE
     event = trace.list_events("bound-5")[0]
@@ -261,7 +261,7 @@ def test_model_unavailable_keeps_reading_for_inspection(monkeypatch):
 def test_public_contract_unchanged(monkeypatch):
     _stub(monkeypatch)
     session.reset("contract-1")
-    body = _ask("Should I open my shop on Friday?", "contract-1")
+    body = _ask("Should I open my shop on Friday as per my chart?", "contract-1")
     assert set(body) == {"status", "answered", "answer", "conversation_id"}
     blob = json.dumps(body).lower()
     for banned in ("card", "draw", "tarot", "route", "model", "reading"):

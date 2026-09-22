@@ -59,43 +59,27 @@ TIER_QUALITY = "QUALITY"
 TIER_FALLBACK = "GENERAL_FALLBACK"
 TIER_ORDER: Tuple[str, ...] = (TIER_FAST, TIER_QUALITY, TIER_FALLBACK)
 
-# Approved registry: id, tier, per-attempt timeout (seconds).
+# Approved provider registry: ONE primary model, chosen from live evidence.
 #
-# Every id below was verified present for this account via `GET /v1/models`
-# (200) on the NVIDIA hosted NIM API, and the order is based on live inference
-# results for this account. Restricted to general-purpose text chat/reasoning
-# models: image generation, speech/ASR, embeddings, reranking, document parsers,
-# safety/guard, vision-only, coding-only and finance/prediction models are
-# deliberately excluded.
-#
-# Live findings that shaped this list:
-#   * nvidia/nemotron-3.5-lightning-30b-a3b answered in ~0.8s -> clear PRIMARY.
-#   * nvidia/nemotron-3-super-120b-a12b answered 503 (reachable but overloaded)
-#     -> first realistic fallback.
-#   * nvidia/nemotron-nano-3-30b-a3b returned an account-specific 404 on
-#     inference despite being listed by /v1/models -> removed entirely.
-#   * z-ai/glm-5.3, google/gemma-4-31b-it and nvidia/nemotron-3-ultra-550b-a55b
-#     timed out on a congested snapshot -> kept only as late fallbacks.
-#   * openai/gpt-oss-20b timed out even with a 150s probe -> lowest priority, so
-#     it is only reached when every other approved model is parked.
+# Every id was verified present for this account via `GET /v1/models` (200).
+# Operational evidence from this deployment:
+#   * nvidia/nemotron-3-super-120b-a12b answered 200 (sub-second) -> PRIMARY.
+#   * nvidia/nemotron-3.5-lightning-30b-a3b timed out repeatedly (never a
+#     usable first attempt), and the other candidates either timed out or
+#     returned 503, so they were removed rather than left as slow dead weight.
+# Ask KAVACH is therefore: one NVIDIA primary attempt, then the Gemini
+# emergency fallback - no long chain of models.
 MODEL_REGISTRY: Tuple[Tuple[str, str, float], ...] = (
-    ("nvidia/nemotron-3.5-lightning-30b-a3b", TIER_FAST, 10.0),
-    ("nvidia/nemotron-3-super-120b-a12b", TIER_QUALITY, 12.0),
-    ("z-ai/glm-5.3", TIER_FALLBACK, 12.0),
-    ("google/gemma-4-31b-it", TIER_FALLBACK, 12.0),
-    ("nvidia/nemotron-3-ultra-550b-a55b", TIER_FALLBACK, 12.0),
-    ("openai/gpt-oss-20b", TIER_FALLBACK, 12.0),
+    ("nvidia/nemotron-3-super-120b-a12b", TIER_FAST, 12.0),
 )
 
 DEFAULT_MODEL_TIMEOUT = 12.0
 
-# Latency budget, tuned for low user-perceived latency:
-#   * at most 2 NVIDIA attempts per user message (primary -> one fallback),
-#   * short per-attempt timeouts (10s primary, 12s fallbacks),
-#   * a hard 20s ceiling across all NVIDIA attempts — each attempt's timeout is
-#     clipped to what is left of the budget.
-MAX_ATTEMPTS = 2
-TOTAL_BUDGET_SECONDS = 20.0
+# One primary attempt, one short budget: a dead model must never make the user
+# wait. After the single attempt the caller falls through to the Gemini
+# emergency fallback.
+MAX_ATTEMPTS = 1
+TOTAL_BUDGET_SECONDS = 12.0
 
 # Transient problems park a model briefly. An account-specific unavailable model
 # is parked far longer so repeated users do not keep wasting attempts on it.

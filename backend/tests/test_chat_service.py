@@ -24,9 +24,13 @@ class Response:
         return {"steps": [{"type": "model_output", "content": [{"type": "text", "text": "Reply from model."}]}]}
 
 
-def test_fallback_order_is_quality_first():
-    assert gemini.MODEL_PRIORITY[0] == "gemini-3.6-flash"
-    assert gemini.MODEL_PRIORITY[-1].endswith("lite")
+def test_fallback_order_is_evidence_based():
+    # Live evidence: flash-lite answered in ~4s, so it is tried first; the daily
+    # quota for gemini-3.6-flash is exhausted and gemini-2.5-flash was retired.
+    assert gemini.MODEL_PRIORITY[0] == "gemini-3.5-flash-lite"
+    assert gemini.MODEL_PRIORITY[1] == "gemini-3.5-flash"
+    assert "gemini-3.6-flash" not in gemini.MODEL_PRIORITY
+    assert "gemini-2.5-flash" not in gemini.MODEL_PRIORITY
     assert len(set(gemini.MODEL_PRIORITY)) == len(gemini.MODEL_PRIORITY)
 
 
@@ -39,7 +43,7 @@ def test_success_on_preferred_model(monkeypatch):
 
     monkeypatch.setattr(gemini.httpx, "post", fake_post)
     assert gemini.generate_reply("hello", []) == "Reply from model."
-    assert seen == ["gemini-3.6-flash"]
+    assert seen == [gemini.MODEL_PRIORITY[0]]
 
 
 def test_quota_falls_back_to_next_model(monkeypatch):
@@ -47,13 +51,13 @@ def test_quota_falls_back_to_next_model(monkeypatch):
 
     def fake_post(url, **kwargs):
         seen.append(kwargs["json"]["model"])
-        if kwargs["json"]["model"] == "gemini-3.6-flash":
+        if kwargs["json"]["model"] == gemini.MODEL_PRIORITY[0]:
             return Response(429, '{"error":{"message":"Rate limit exceeded"}}')
         return Response(200)
 
     monkeypatch.setattr(gemini.httpx, "post", fake_post)
     assert gemini.generate_reply("hello", []) == "Reply from model."
-    assert seen == ["gemini-3.6-flash", "gemini-3.5-flash"]
+    assert seen == [gemini.MODEL_PRIORITY[0], gemini.MODEL_PRIORITY[1]]
 
 
 def test_each_model_attempted_at_most_once(monkeypatch):
@@ -78,7 +82,7 @@ def test_auth_error_does_not_fall_back(monkeypatch):
 
     monkeypatch.setattr(gemini.httpx, "post", fake_post)
     assert gemini.generate_reply("hello", []) is None
-    assert seen == ["gemini-3.6-flash"]
+    assert seen == [gemini.MODEL_PRIORITY[0]]
 
 
 def test_bad_request_does_not_fall_back(monkeypatch):
@@ -121,11 +125,11 @@ def test_network_error_returns_none_without_cycling(monkeypatch):
 
 def test_history_survives_a_model_switch():
     session.reset("switch-test")
-    session.append("switch-test", "user", "Should I become an engineer?")
+    session.append("switch-test", "user", "Should I become an engineer as per my chart?")
     session.append("switch-test", "assistant", "Depends on what you enjoy.")
     history = session.get_history("switch-test")
     assert [item["role"] for item in history] == ["user", "assistant"]
-    assert history[0]["content"] == "Should I become an engineer?"
+    assert history[0]["content"] == "Should I become an engineer as per my chart?"
 
 
 def test_history_is_bounded():
@@ -152,7 +156,7 @@ def test_api_returns_stub_and_reuses_conversation_id(monkeypatch):
     import main
 
     client = TestClient(main.app)
-    payload = {"question": "Should I become an engineer?", "conversation_id": "api-test-1",
+    payload = {"question": "Should I become an engineer as per my chart?", "conversation_id": "api-test-1",
                "timestamp": "2026-09-20T14:15:00+05:30", "latitude": 28.6, "longitude": 77.2,
                "timezone": "Asia/Kolkata", "location_label": "New Delhi"}
     first = client.post("/api/ask", json=payload).json()
@@ -177,7 +181,7 @@ def test_api_all_models_exhausted(monkeypatch):
     session.reset("exhausted-1")
     client = TestClient(main.app)
     body = client.post("/api/ask", json={
-        "question": "Will I do okay?", "conversation_id": "exhausted-1",
+        "question": "Will I do okay as per my chart?", "conversation_id": "exhausted-1",
         "timestamp": "2026-09-20T14:15:00+05:30", "latitude": 28.6, "longitude": 77.2,
         "timezone": "Asia/Kolkata", "location_label": "New Delhi"}).json()
     assert body["answered"] is False

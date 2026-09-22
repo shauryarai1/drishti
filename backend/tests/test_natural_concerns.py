@@ -23,7 +23,7 @@ def _pin_primary_provider_off(monkeypatch):
 REPLY = "That sounds draining, and there are a few likely reasons this is happening."
 
 NATURAL_CONCERNS = (
-    "I am working continuously but not getting any clients",
+    "I am working continuously but not getting any clients. What does my chart say?",
     "My business isn't growing",
     "I keep studying but my marks aren't improving",
     "Things have been difficult at work lately",
@@ -68,7 +68,7 @@ def test_exact_clients_concern_full_pipeline_with_mocked_gemini(monkeypatch):
     calls = _stub(monkeypatch)
     session.reset("natural-1")
     trace.clear("natural-1")
-    question = "I am working continuously but not getting any clients"
+    question = "I am working continuously but not getting any clients. What does my chart say?"
 
     body = _ask(question, "natural-1")
     assert body["status"] == "ok"
@@ -93,7 +93,7 @@ def test_exact_clients_concern_full_pipeline_with_mocked_gemini(monkeypatch):
 def test_clients_concern_context_is_career_like():
     from chat.reading import build_reading
 
-    context = build_reading("I am working continuously but not getting any clients")["context"]
+    context = build_reading("I am working continuously but not getting any clients. What does my chart say?")["context"]
     assert context["domain"] in ("career", "money", "general")
     assert context["subcontext"]
 
@@ -120,7 +120,7 @@ def test_trace_failure_never_breaks_the_public_answer(monkeypatch):
 
     monkeypatch.setattr("chat.trace.record_event", exploding)
     session.reset("safety-1")
-    body = _ask("Should I become an engineer?", "safety-1")
+    body = _ask("Should I become an engineer as per my chart?", "safety-1")
     assert body["status"] == "ok"
     assert body["answered"] is True
     assert body["answer"] == REPLY
@@ -140,7 +140,7 @@ def test_quota_failure_keeps_reading_and_trace(monkeypatch):
     _stub(monkeypatch, status=429, body='{"error":{"message":"quota"}}')
     session.reset("quota-1")
     trace.clear("quota-1")
-    body = _ask("I am working continuously but not getting any clients", "quota-1")
+    body = _ask("I am working continuously but not getting any clients. What does my chart say?", "quota-1")
     assert body["answered"] is False
     assert body["answer"] == gemini.UNAVAILABLE_MESSAGE
 
@@ -163,7 +163,7 @@ def test_inspector_retrieval_matches_public_draw(monkeypatch):
     _stub(monkeypatch)
     session.reset("match-1")
     trace.clear("match-1")
-    _ask("I am working continuously but not getting any clients", "match-1")
+    _ask("I am working continuously but not getting any clients. What does my chart say?", "match-1")
     stored = session.get_reading("match-1")
     client = TestClient(__import__("main").app)
     ids = set()
@@ -179,7 +179,7 @@ def test_trace_has_no_secret_fields_or_values(monkeypatch):
     _stub(monkeypatch)
     session.reset("secret-1")
     trace.clear("secret-1")
-    _ask("I am working continuously but not getting any clients", "secret-1")
+    _ask("I am working continuously but not getting any clients. What does my chart say?", "secret-1")
     event = trace.list_events("secret-1")[0]
 
     def keys(node):

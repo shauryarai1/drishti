@@ -20,7 +20,7 @@ def _pin_primary_provider_off(monkeypatch):
 
 ASK = {"timestamp": "2026-09-26T13:00:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata", "location_label": "New Delhi"}
-READING_QUESTION = "Why am I continuously working but not getting any clients?"
+READING_QUESTION = "Why am I continuously working but not getting any clients? What does my chart say?"
 
 
 class Response:

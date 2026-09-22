@@ -248,26 +248,29 @@ def test_one_ask_request_creates_exactly_one_archive_row(store, client, ask_read
     assert store.inserts == 1
 
 
-def test_nvidia_retry_does_not_duplicate_the_archive_row(store, client, monkeypatch):
+def test_primary_failure_then_fallback_does_not_duplicate_the_archive_row(store, client, monkeypatch):
+    """One user request archives one row, even across the fallback chain."""
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
     monkeypatch.setattr("chat.reading.build_reading", lambda _q: (_ for _ in ()).throw(RuntimeError("no tarot")))
 
     attempts = {"n": 0}
 
-    def flaky_post(url, headers=None, json=None, timeout=None):
+    def failing_post(url, headers=None, json=None, timeout=None):
         attempts["n"] += 1
-        if attempts["n"] == 1:
-            return FakeResponse(503, text="overloaded")
-        return FakeResponse(200, reply_payload("Second NVIDIA model answered."))
+        return FakeResponse(503, text="overloaded")
 
-    monkeypatch.setattr(nvidia.httpx, "post", flaky_post)
+    monkeypatch.setattr(nvidia.httpx, "post", failing_post)
     monkeypatch.setenv("NVIDIA_API_KEY", "test-sentinel")
+    monkeypatch.setattr("chat.gemini.generate_reply_detailed",
+                        lambda *a, **k: {"text": "Gemini answered.", "model": "gemini-3.5-flash-lite",
+                                         "preferred": "gemini-3.5-flash-lite", "provider": "gemini",
+                                         "attempts": []})
 
     body = _ask(client).json()
 
-    assert body["answer"] == "Second NVIDIA model answered."
-    assert attempts["n"] == 2, "the router should have retried once"
-    assert store.inserts == 1, "a provider retry must not create a second submission"
+    assert body["answer"] == "Gemini answered."
+    assert attempts["n"] == 1, "there is exactly one primary attempt"
+    assert store.inserts == 1, "primary failure + fallback must not create two submissions"
 
 
 def test_gemini_fallback_does_not_duplicate_the_archive_row(store, client, monkeypatch):
