@@ -92,6 +92,12 @@ app.add_middleware(
     allow_headers=ALLOWED_HEADERS,
 )
 
+# KAVACH YES / NO is an additive, isolated feature: it mounts its own router and
+# shares no state with Ask KAVACH, the reading engine or the archive.
+from yesno.api import router as yes_no_router
+
+app.include_router(yes_no_router)
+
 
 @app.get("/api/health")
 def health():

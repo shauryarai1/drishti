@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { label: 'Life Summary', href: '/life-summary' },
   { label: 'Ask Kavach', href: '/ask' },
   { label: 'Panchang', href: '/panchang' },
+  { label: 'Services', href: '/services' },
 ];
 
 const FADE_BASE =

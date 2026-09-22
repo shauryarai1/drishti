@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { Container } from './Container';
 
 interface FooterProps {
@@ -68,6 +69,14 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
                 >
                   The Three Focus Areas
                 </button>
+              </li>
+              <li>
+                <Link
+                  href="/services"
+                  className="hover:text-[#F7F5F0] transition-colors"
+                >
+                  Services
+                </Link>
               </li>
               <li>
                 <button
