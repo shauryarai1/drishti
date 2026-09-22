@@ -1,33 +1,42 @@
 """Message router for Ask KAVACH.
 
-Three outcomes only:
+Ask KAVACH is an ASTROLOGY / KAVACH ADVISORY assistant, not a general-purpose
+assistant. Four conceptual modes:
 
-    NORMAL_CHAT       - general knowledge, help, small talk.
-    NEW_READING       - KAVACH's hidden reading for the user's OWN uncertain
-                        situation, future or decision (this is what most people
-                        mean by "personal prediction").
-    READING_FOLLOWUP  - continues the reading already active.
+    CASUAL           greetings, thanks, lightweight conversation.
+    ASTROLOGY        explicit Kundli / chart / planet / rashi / nakshatra /
+                     dasha / transit / Panchang / Hora / KAVACH-reading wording.
+    PERSONAL_READING the user's OWN uncertain situation, future or decision
+                     (the hidden KAVACH/Tarot reading), plus the user's own
+                     life topics (career, money, relationships, studies...).
+    OUT_OF_SCOPE     unrelated knowledge, coding, writing, maths, science,
+                     sport, weather and everything else. Answered with a short
+                     KAVACH scope message, never substantively.
 
-Three conceptual question types:
+    READING_FOLLOWUP continues the reading already active.
 
-    A. General knowledge / assistance  -> NORMAL_CHAT, never a reading.
-    B. Personal uncertainty / decision -> NEW_READING (hidden Tarot reading).
-    C. Explicit astrology / chart      -> NEW_READING (KAVACH astrology context).
-
-The signal for a personal reading is FIRST-PERSON predictive or decision
-wording ("will I", "should I", "how will this turn out", "what is blocking me"),
-never a bare subject word. "What is financial success?" or "explain investing"
-stay general; "will I be successful moneywise?" is a personal reading.
+The distinction that matters most: a personal question does NOT need astrology
+vocabulary ("will I be successful?", "what is blocking my career?"), while a
+general-knowledge question about the same subject ("what is financial
+success?") is out of scope rather than a reading.
 """
 
 from __future__ import annotations
 
-NORMAL_CHAT = "NORMAL_CHAT"
-NEW_READING = "NEW_READING"
+CASUAL = "CASUAL"
+ASTROLOGY = "ASTROLOGY"
+PERSONAL_READING = "PERSONAL_READING"
 READING_FOLLOWUP = "READING_FOLLOWUP"
+OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
-# Explicit astrology vocabulary: the only thing that selects the astrology/chart
-# context. Deliberately narrow - situational or future-oriented phrasing is not.
+# The short, natural scope reply. Never a lecture, never the requested answer.
+SCOPE_MESSAGE = (
+    "I'm here for astrology, KAVACH readings and questions about your personal "
+    "path. Ask me about your chart, career, relationships, money, timing or "
+    "something you're uncertain about."
+)
+
+# Explicit astrology vocabulary: the only thing that selects the astrology path.
 ASTROLOGY_SIGNALS = (
     "kundli", "birth chart", "chart", "planet", "planets", "rashi", "nakshatra",
     "dasha", "transit", "astrology", "astrological", "astrologer", "saturn",
@@ -37,9 +46,8 @@ ASTROLOGY_SIGNALS = (
     "career period",
 )
 
-# First-person predictive / decision wording: the user asking KAVACH about their
-# own uncertain situation. Paired with a first-person pronoun so that subject
-# words alone ("money", "success", "business") never trigger a reading.
+# First-person predictive / decision wording: the user asking about their own
+# uncertain situation.
 PREDICTIVE_MARKERS = (
     "will i", "will my", "will we", "will our", "will this", "will it", "will they",
     "will things", "will there be",
@@ -58,9 +66,7 @@ PREDICTIVE_MARKERS = (
 
 PERSONAL_PRONOUNS = ("i", "i'm", "im", "my", "me", "myself", "we", "our", "ours", "us")
 
-# Markers that are already about the user's own future even without a pronoun
-# ("how will this situation turn out?"). Everything else needs a first-person
-# pronoun, so bare subject words never trigger a reading.
+# Markers that are already about the user's own future even without a pronoun.
 SELF_IMPLYING_MARKERS = (
     "how will", "when will", "how long will", "how soon",
     "will this", "will it", "will they", "will things", "will there be",
@@ -70,6 +76,57 @@ SELF_IMPLYING_MARKERS = (
     "why is this happening", "what is likely to happen", "what's likely to happen",
     "what does the future hold", "what is my future", "future of my",
     "how is my", "how is this", "how is it looking", "how does this look",
+)
+
+# The user's own life topics: explicitly in scope for Ask KAVACH even without
+# predictive wording, because they are about the person's own path.
+PERSONAL_TOPIC_MARKERS = (
+    "my career", "my job", "my work", "my money", "my finances", "my business",
+    "my relationship", "my marriage", "my partner", "my studies", "my education",
+    "my future", "my life", "my situation", "my decision", "my project",
+    "my exam", "my interview", "my health", "my family", "my child", "my path",
+    "my growth", "about me", "for me", "guide me", "help me decide",
+    "i feel stuck", "i'm stuck", "im stuck", "i feel lost", "i am confused",
+    "i'm confused", "im confused", "what do you think about me",
+    "i'm sad", "i am sad", "i feel sad", "i'm worried", "i am worried",
+    "i'm anxious", "i am anxious", "i'm stressed", "i am stressed",
+    "i feel low", "i'm unhappy", "i am unhappy", "i'm scared", "i am scared",
+    "i'm afraid", "i am afraid",
+    # Personal-situation phrasing: clearly about the user's own life.
+    "isn't growing", "is not growing", "not growing", "isn't improving",
+    "is not improving", "not improving", "haven't heard back", "hasn't heard back",
+    "not heard back", "no response from", "difficult at work", "hard at work",
+    "struggling at work", "trouble at work", "not working out", "going wrong",
+    "keeps failing", "keep failing", "things have been difficult", "things are difficult",
+    "things have been hard", "things are hard", "i'm losing", "i am losing",
+)
+
+# Life-domain nouns: with a first-person pronoun these mark the user's own life
+# (in scope), while a general question about the same subject stays out of scope.
+PERSONAL_DOMAIN_NOUNS = (
+    "business", "career", "job", "work", "money", "finances", "finance", "marks",
+    "grades", "studies", "study", "exam", "exams", "clients", "customers",
+    "relationship", "marriage", "partner", "health", "family", "interview",
+    "project", "promotion", "salary", "income", "savings", "investment",
+    "investments", "debt", "loan", "startup", "venture", "degree", "college",
+    "visa", "contract", "deal", "offer", "opportunity",
+)
+
+# Clearly unrelated domains: never answered substantively.
+OUT_OF_SCOPE_SIGNALS = (
+    "python", "javascript", "typescript", "java", "c++", "c#", "golang", "rust",
+    "code", "coding", "script", "program", "function", "debug", "compile",
+    "html", "css", "sql", "react", "regex", "algorithm", "api endpoint",
+    "gravity", "photosynthesis", "physics", "chemistry", "biology",
+    "equation", "maths", "math problem", "solve this", "solve the", "solve for",
+    "solve x", "integral", "derivative", "algebra", "calculus",
+    "recipe", "ingredients", "how to cook", "cook", "bake",
+    "email", "essay", "article", "poem", "resume", "cover letter", "blog post",
+    "translate", "translation", "grammar", "spell",
+    "weather", "forecast", "rain", "temperature", "humidity",
+    "who won", "match", "football", "cricket", "score", "tournament",
+    "capital of", "president of", "history of", "wikipedia", "stock price",
+    "bitcoin", "movie", "song", "lyrics",
 )
 
 # Short continuations that refer to what was just said.
@@ -99,7 +156,7 @@ SUBJECT_NOUNS = (
     "money", "job", "career", "business", "client", "study", "home", "property", "health",
 )
 
-# Standalone general/factual questions always break out of an astrology reading.
+# Standalone general/factual questions break out of an active reading.
 STANDALONE_FACTUAL = (
     "what is", "what are", "what's", "explain", "define", "tell me about",
     "how do i", "how can i", "how does", "how do", "who is", "where is", "when is",
@@ -110,6 +167,12 @@ STANDALONE_FACTUAL = (
 CHIT_CHAT = ("hi", "hello", "hey", "thanks", "thank", "thx", "bye", "ok", "okay",
              "cool", "nice", "great", "got", "hmm", "good", "night", "morning")
 GREETINGS = ("how are you", "how's it going", "how are things", "what's up", "whats up")
+
+
+def _tokens(text: str) -> list:
+    import re as _re
+
+    return _re.findall(r"[a-z']+", text)
 
 
 def has_astrology_signal(message: str) -> bool:
@@ -126,47 +189,74 @@ def is_personal_uncertainty(message: str) -> bool:
         return False
     if any(m in text for m in SELF_IMPLYING_MARKERS):
         return True
-    import re as _re
-
-    tokens = _re.findall(r"[a-z']+", text)
-    return any(token in PERSONAL_PRONOUNS for token in tokens)
+    return any(token in PERSONAL_PRONOUNS for token in _tokens(text))
 
 
-def route_message(message: str, has_active_reading: bool,
-                  active_reading: dict | None = None) -> str:
-    """Return NORMAL_CHAT, NEW_READING or READING_FOLLOWUP."""
+def is_personal_topic(message: str) -> bool:
+    """True for the user's own life topics (career, money, relationships...)."""
+    text = (message or "").lower()
+    if any(marker in text for marker in PERSONAL_TOPIC_MARKERS):
+        return True
+    tokens = _tokens(text)
+    if not any(token in PERSONAL_PRONOUNS for token in tokens):
+        return False
+    return any(token in PERSONAL_DOMAIN_NOUNS for token in tokens)
+
+
+def is_out_of_scope(message: str) -> bool:
+    """True for unrelated knowledge, coding, writing, maths, science, sport."""
+    text = (message or "").lower()
+    return any(signal in text for signal in OUT_OF_SCOPE_SIGNALS)
+
+
+def route_message(message: str, has_active_reading: bool = False,
+                  active_reading: dict | None = None,
+                  last_mode: str | None = None) -> str:
+    """Return CASUAL, ASTROLOGY, PERSONAL_READING, READING_FOLLOWUP or OUT_OF_SCOPE."""
     text = (message or "").lower().strip()
     if not text:
-        return NORMAL_CHAT
+        return CASUAL
 
-    import re as _re
-
-    tokens = _re.findall(r"[a-z']+", text)
+    tokens = _tokens(text)
     astrology = has_astrology_signal(text)
-    personal = is_personal_uncertainty(text)
+    personal = is_personal_uncertainty(text) or is_personal_topic(text)
+    out_of_scope = is_out_of_scope(text)
     standalone = any(signal in text for signal in STANDALONE_FACTUAL) and len(tokens) > 1
     has_marker = any(marker in text for marker in FOLLOW_UP_MARKERS)
     strong_marker = any(marker in text for marker in STRONG_FOLLOW_UP_MARKERS)
-    chit_chat = ((not has_marker) and (any(token in CHIT_CHAT for token in tokens) and len(tokens) <= 3
-                                      or any(greeting in text for greeting in GREETINGS)))
+    chit_chat = ((not has_marker)
+                 and (any(token in CHIT_CHAT for token in tokens) and len(tokens) <= 3
+                      or any(greeting in text for greeting in GREETINGS)))
 
-    # A. Continue the reading already on the table for short continuations
-    #    ("What's the biggest obstacle?"), but never trap a general question:
-    #    a standalone factual question breaks out unless it explicitly refers
-    #    back to the reading ("what should I focus on?").
-    if has_active_reading and not chit_chat:
+    # 1. Lightweight conversation.
+    if chit_chat:
+        return CASUAL
+
+    # 2. Explicit astrology always wins: it selects the chart context.
+    if astrology:
+        return ASTROLOGY
+
+    # 3. Clearly unrelated requests are refused before anything else.
+    if out_of_scope:
+        return OUT_OF_SCOPE
+
+    # 4. Continue an astrology conversation on short continuations, but a
+    #    personal question still opens its own reading.
+    if (last_mode == ASTROLOGY and not personal
+            and (has_marker or len(tokens) <= 8) and not standalone):
+        return ASTROLOGY
+
+    # 5. Continue the reading already on the table for short continuations
+    #    ("What's the biggest obstacle?"), but never trap a general question.
+    if has_active_reading:
         if not any(noun in text for noun in SUBJECT_NOUNS):
             breaks_out = standalone and not strong_marker
-            if (has_marker or astrology or personal or len(tokens) <= 8) and not breaks_out:
+            if (has_marker or personal or len(tokens) <= 8) and not breaks_out:
                 return READING_FOLLOWUP
 
-    # B. Explicit astrology question -> KAVACH astrology/chart context.
-    if astrology:
-        return NEW_READING
-
-    # C. Personal uncertainty / decision -> the hidden KAVACH reading.
+    # 6. The user's own uncertainty, decision or life topic -> hidden reading.
     if personal:
-        return NEW_READING
+        return PERSONAL_READING
 
-    # D. Everything else is ordinary conversation.
-    return NORMAL_CHAT
+    # 7. Everything else is not KAVACH's business.
+    return OUT_OF_SCOPE

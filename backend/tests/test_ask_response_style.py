@@ -24,14 +24,20 @@ ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude
        "timezone": "Asia/Kolkata"}
 
 REPRESENTATIVE_PROMPTS = {
-    "hi": "general",
-    "What is gravity?": "general",
+    "hi": "casual",
+    "What is gravity?": "out_of_scope",
+    "Write a Python script": "out_of_scope",
+    "Explain photosynthesis": "out_of_scope",
     "Will I be successful?": "reading",
-    "Explain photosynthesis": "general",
-    "Explain Newton's laws in detail": "general",
-    "Compare Newton's three laws in a table": "general",
     "What does Saturn mean in my chart?": "astrology",
     "Give me a full detailed reading of my chart": "astrology",
+}
+
+EXPECTED_ROUTE = {
+    "casual": router.CASUAL,
+    "out_of_scope": router.OUT_OF_SCOPE,
+    "reading": router.PERSONAL_READING,
+    "astrology": router.ASTROLOGY,
 }
 
 
@@ -122,12 +128,12 @@ def captured(monkeypatch):
     """
     seen: dict = {"groq": None, "gemini": None}
 
-    def fake_groq(message, history, private_context=""):
+    def fake_groq(message, history, private_context="", astrology_context=""):
         seen["groq"] = groq._build_messages(history, message, private_context)
         return {"text": "Ok.", "model": groq.MODEL, "preferred": groq.MODEL,
                 "provider": "groq", "attempts": [], "fallback": False}
 
-    def fake_gemini(message, history, private_context=""):
+    def fake_gemini(message, history, private_context="", astrology_context=""):
         seen["gemini"] = gemini._system_instruction_for(private_context)
         return {"text": "Ok.", "model": "gemini-3.5-flash-lite",
                 "preferred": "gemini-3.5-flash-lite", "provider": "gemini", "attempts": []}
@@ -148,7 +154,7 @@ def test_groq_primary_receives_the_style_instruction(captured, monkeypatch):
     import archive
 
     monkeypatch.setattr(archive, "store", FakeStore())
-    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What is gravity?",
+    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                                        "conversation_id": "style-1"}).json()
 
     assert body["answer"] == "Ok."
@@ -165,7 +171,7 @@ def test_gemini_fallback_receives_the_same_style_instruction(captured, monkeypat
                                          "attempts": [{"model": groq.MODEL, "reason": "timeout"}],
                                          "fallback": True})
 
-    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What is gravity?",
+    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                                        "conversation_id": "style-2"}).json()
 
     assert body["answer"] == "Ok."
@@ -176,11 +182,7 @@ def test_gemini_fallback_receives_the_same_style_instruction(captured, monkeypat
 # --- behavior that must NOT change ------------------------------------------
 @pytest.mark.parametrize("question,kind", REPRESENTATIVE_PROMPTS.items())
 def test_routing_is_unchanged(question, kind):
-    route = router.route_message(question, has_active_reading=False)
-    if kind == "general":
-        assert route == router.NORMAL_CHAT, question
-    else:
-        assert route == router.NEW_READING, question
+    assert router.route_message(question, has_active_reading=False) == EXPECTED_ROUTE[kind], question
 
 
 def test_architecture_is_unchanged():
@@ -193,7 +195,7 @@ def test_architecture_is_unchanged():
 
 @pytest.fixture()
 def mock_env(monkeypatch):
-    seen: dict = {"private": [], "geocoder": 0}
+    seen: dict = {"private": [], "astrology": [], "geocoder": 0}
 
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
     monkeypatch.setattr("chat.reading.build_reading",
@@ -202,6 +204,7 @@ def mock_env(monkeypatch):
 
     def fake_groq(*_a, **_k):
         seen["private"].append(_k.get("private_context", ""))
+        seen["astrology"].append(_k.get("astrology_context", ""))
         return {"text": "Ok.", "model": groq.MODEL, "preferred": groq.MODEL, "provider": "groq",
                 "attempts": [], "fallback": False}
 
@@ -218,15 +221,17 @@ def mock_env(monkeypatch):
     return seen
 
 
-def test_general_questions_get_no_astrology_context_and_no_geocoder(mock_env):
+def test_out_of_scope_questions_get_no_context_and_no_geocoder(mock_env):
     client = TestClient(main.app)
-    for index, question in enumerate(("hi", "What is gravity?", "How do I make pasta?",
-                                      "Explain photosynthesis", "Explain Newton's laws in detail",
-                                      "Compare Newton's three laws in a table")):
-        client.post("/api/ask", json={**ASK, "question": question, "conversation_id": f"g-{index}"})
+    for index, question in enumerate(("What is gravity?", "How do I make pasta?",
+                                      "Write a Python script", "Explain photosynthesis",
+                                      "Will it rain tomorrow?", "Who won the match?")):
+        body = client.post("/api/ask", json={**ASK, "question": question,
+                                             "conversation_id": f"oos-{index}"}).json()
+        assert body["answer"] == router.SCOPE_MESSAGE, question
 
-    assert mock_env["geocoder"] == 0, "general chat must never geocode"
-    assert mock_env["private"] == ["", "", "", "", "", ""], "no astrology context for general chat"
+    assert mock_env["geocoder"] == 0, "out-of-scope chat must never geocode"
+    assert mock_env["private"] == [], "out-of-scope requests must not reach the model"
 
 
 def test_astrology_questions_get_context_and_internals_stay_hidden(mock_env, caplog):
@@ -234,7 +239,9 @@ def test_astrology_questions_get_context_and_internals_stay_hidden(mock_env, cap
     body = client.post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                          "conversation_id": "a-1"}).text
 
-    assert mock_env["private"][-1] == "PRIVATE READING CONTEXT"
+    assert mock_env["private"] == [""], "astrology must not carry the Tarot reading"
+    assert "CHART CONTEXT" in mock_env["astrology"][-1], "the chart context is supplied"
     assert set(json.loads(body)) == {"status", "answered", "answer", "conversation_id"}
-    for forbidden in ("PRIVATE READING CONTEXT", "You are Ask KAVACH", "system", "groq", "gpt-oss"):
+    for forbidden in ("PRIVATE READING CONTEXT", "CHART CONTEXT", "You are Ask KAVACH",
+                      "system", "groq", "gpt-oss"):
         assert forbidden not in body

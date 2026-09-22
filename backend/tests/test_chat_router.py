@@ -1,11 +1,13 @@
-"""Simplified Ask KAVACH chat-first pipeline.
+"""Simplified Ask KAVACH pipeline with four modes.
 
-NORMAL_CHAT      : history + message -> Gemini (Tarot never touched)
-NEW_READING      : one local draw + approved meanings -> Gemini (private)
-READING_FOLLOWUP : history + existing reading -> Gemini (no redraw)
+CASUAL            : greetings -> provider, Tarot never touched
+ASTROLOGY         : explicit chart wording -> chart context, Tarot never touched
+PERSONAL_READING  : one local draw + approved meanings -> provider (private)
+READING_FOLLOWUP  : history + existing reading -> provider (no redraw)
+OUT_OF_SCOPE      : deterministic scope message, no provider call at all
 
 Tarot, inspector and dev tracing are optional: any failure in them must leave
-normal conversation working.
+KAVACH answering.
 """
 
 from __future__ import annotations
@@ -66,19 +68,30 @@ def _ask(question, conversation_id):
 
 
 # --- 4: routing -----------------------------------------------------------
-@pytest.mark.parametrize("message", ["hi", "what", "I'm sad", "thanks", "how are you",
-                                     "I am working continuously but not getting any clients",
-                                     "What is marketing?", "I don't understand", "tell me more"])
-def test_normal_chat_routing(message):
-    assert router.route_message(message, has_active_reading=False) == router.NORMAL_CHAT
+@pytest.mark.parametrize("message", ["hi", "hello", "thanks", "okay", "how are you"])
+def test_casual_routing(message):
+    assert router.route_message(message, has_active_reading=False) == router.CASUAL
 
 
 @pytest.mark.parametrize("message", ["How will my business go as per my chart?", "Should I open my shop on Friday as per my chart?",
                                      "How will my exam go tomorrow as per my chart?", "Will this opportunity work out as per my chart?",
                                      "What does KAVACH say about my career right now?",
                                      "Give me a reading about my relationship."])
-def test_reading_routing(message):
-    assert router.route_message(message, has_active_reading=False) == router.NEW_READING
+def test_astrology_routing(message):
+    assert router.route_message(message, has_active_reading=False) == router.ASTROLOGY
+
+
+@pytest.mark.parametrize("message", ["Will I be successful moneywise?", "Will my business work?",
+                                     "What is blocking my career?",
+                                     "How is this situation likely to turn out?"])
+def test_personal_reading_routing(message):
+    assert router.route_message(message, has_active_reading=False) == router.PERSONAL_READING
+
+
+@pytest.mark.parametrize("message", ["write python code", "what is gravity?",
+                                     "give me a recipe", "will it rain tomorrow?"])
+def test_out_of_scope_routing(message):
+    assert router.route_message(message, has_active_reading=False) == router.OUT_OF_SCOPE
 
 
 @pytest.mark.parametrize("message", ["why?", "are you sure?", "explain", "what does that mean?",
@@ -88,20 +101,19 @@ def test_follow_up_routing(message):
     assert router.route_message(message, has_active_reading=True) == router.READING_FOLLOWUP
 
 
-# --- 5/21: NORMAL_CHAT never touches Tarot --------------------------------
-def test_normal_chat_never_draws(monkeypatch):
+# --- 5/21: CASUAL chat never touches Tarot --------------------------------
+def test_casual_chat_never_draws(monkeypatch):
     calls = _stub(monkeypatch)
     draws = []
 
     def spy(*args, **kwargs):
         draws.append(1)
-        raise AssertionError("Tarot must not run for normal chat")
+        raise AssertionError("Tarot must not run for casual chat")
 
     monkeypatch.setattr("tarot.engine.draw_cards", spy)
     monkeypatch.setattr("chat.reading.draw_cards", spy)
 
-    for index, message in enumerate(("hi", "what", "I'm sad",
-                                     "I am working continuously but not getting any clients")):
+    for index, message in enumerate(("hi", "hello", "thanks")):
         conversation = f"chat-{index}"
         session.reset(conversation)
         trace.clear(conversation)
@@ -110,20 +122,38 @@ def test_normal_chat_never_draws(monkeypatch):
         assert body["answer"] == REPLY
         assert session.get_reading(conversation) is None
         event = trace.list_events(conversation)[0]
-        assert event["route"] == router.NORMAL_CHAT
+        assert event["route"] == router.CASUAL
         assert event["tarot"] == "NOT USED"
     assert draws == []
-    assert len(calls) == 4
+    assert len(calls) == 3
 
 
-def test_normal_chat_uses_no_private_context(monkeypatch):
+def test_out_of_scope_never_calls_a_provider_and_never_draws(monkeypatch):
+    calls = _stub(monkeypatch)
+
+    def spy(*args, **kwargs):
+        raise AssertionError("Tarot must not run for out-of-scope requests")
+
+    monkeypatch.setattr("chat.reading.draw_cards", spy)
+    session.reset("scope-1")
+    trace.clear("scope-1")
+    body = _ask("write a python script", "scope-1")
+
+    assert body["answered"] is True
+    assert body["answer"] == router.SCOPE_MESSAGE
+    assert calls == [], "out-of-scope requests must not reach a paid provider"
+    assert session.get_reading("scope-1") is None
+    assert trace.list_events("scope-1") == []
+
+
+def test_casual_chat_uses_no_private_context(monkeypatch):
     calls = _stub(monkeypatch)
     session.reset("chat-ctx")
     _ask("hi", "chat-ctx")
     assert "PRIVATE KAVACH READING" not in calls[0]["input"]
 
 
-# --- 6/21: NEW_READING draws exactly once ---------------------------------
+# --- 6/21: PERSONAL_READING draws exactly once ----------------------------
 def test_new_reading_draws_exactly_once(monkeypatch):
     _stub(monkeypatch)
     original = __import__("tarot.engine", fromlist=["draw_cards"]).draw_cards
@@ -136,7 +166,7 @@ def test_new_reading_draws_exactly_once(monkeypatch):
     monkeypatch.setattr("chat.reading.draw_cards", spy)
     session.reset("reading-1")
     trace.clear("reading-1")
-    body = _ask("Should I open my shop on Friday as per my chart?", "reading-1")
+    body = _ask("Should I open my shop on Friday?", "reading-1")
     assert body["answered"] is True
     assert len(draws) == 1
     reading = session.get_reading("reading-1")
@@ -144,7 +174,7 @@ def test_new_reading_draws_exactly_once(monkeypatch):
     assert len(reading["cards"]) == 3
     assert len(set(card["card_id"] for card in reading["cards"])) == 3
     event = trace.list_events("reading-1")[0]
-    assert event["route"] == router.NEW_READING
+    assert event["route"] == router.PERSONAL_READING
     assert event["tarot"] == "USED"
     assert len(event["cards"]) == 3
 
@@ -154,7 +184,7 @@ def test_follow_up_reuses_and_new_question_draws(monkeypatch):
     _stub(monkeypatch)
     session.reset("reading-2")
     trace.clear("reading-2")
-    first = _ask("Should I open my shop on Friday as per my chart?", "reading-2")
+    first = _ask("Should I open my shop on Friday?", "reading-2")
     assert first["answered"] is True
     draw_a = session.get_reading("reading-2")["draw_id"]
     cards_a = [card["card_id"] for card in session.get_reading("reading-2")["cards"]]
@@ -164,33 +194,33 @@ def test_follow_up_reuses_and_new_question_draws(monkeypatch):
     assert session.get_reading("reading-2")["draw_id"] == draw_a
     assert [card["card_id"] for card in session.get_reading("reading-2")["cards"]] == cards_a
 
-    again = _ask("How will my exam go tomorrow as per my chart?", "reading-2")
+    again = _ask("How will my exam go tomorrow?", "reading-2")
     assert again["answered"] is True
     assert session.get_reading("reading-2")["draw_id"] != draw_a
 
     events = trace.list_events("reading-2")
-    assert [event["route"] for event in events] == [router.NEW_READING,
+    assert [event["route"] for event in events] == [router.PERSONAL_READING,
                                                     router.READING_FOLLOWUP,
-                                                    router.NEW_READING]
+                                                    router.PERSONAL_READING]
     assert events[1]["tarot"] == "REUSED"
     assert events[1]["draw"]["after"] == events[0]["draw"]["after"]
 
 
-def test_subject_change_then_normal_chat(monkeypatch):
+def test_subject_change_then_out_of_scope(monkeypatch):
     _stub(monkeypatch)
     session.reset("reading-3")
     trace.clear("reading-3")
-    _ask("How will my exam go as per my chart?", "reading-3")
+    _ask("How will my exam go?", "reading-3")
     _ask("why?", "reading-3")
     _ask("okay thanks", "reading-3")
-    _ask("what is photosynthesis?", "reading-3")
+    body = _ask("what is photosynthesis?", "reading-3")
+    assert body["answer"] == router.SCOPE_MESSAGE
     routes = [event["route"] for event in trace.list_events("reading-3")]
-    assert routes == [router.NEW_READING, router.READING_FOLLOWUP,
-                      router.NORMAL_CHAT, router.NORMAL_CHAT]
+    assert routes == [router.PERSONAL_READING, router.READING_FOLLOWUP, router.CASUAL]
 
 
 # --- 8/9/10: error boundaries --------------------------------------------
-def test_tarot_crash_does_not_break_normal_chat(monkeypatch):
+def test_tarot_crash_does_not_break_casual_chat(monkeypatch):
     _stub(monkeypatch)
 
     def exploding(*args, **kwargs):
@@ -203,7 +233,7 @@ def test_tarot_crash_does_not_break_normal_chat(monkeypatch):
     assert body["answer"] == REPLY
 
 
-def test_tarot_crash_falls_back_to_normal_chat(monkeypatch):
+def test_tarot_crash_still_answers_a_personal_question(monkeypatch):
     _stub(monkeypatch)
 
     def exploding(*args, **kwargs):
@@ -212,7 +242,7 @@ def test_tarot_crash_falls_back_to_normal_chat(monkeypatch):
     monkeypatch.setattr("chat.reading.build_reading", exploding)
     session.reset("bound-2")
     trace.clear("bound-2")
-    body = _ask("Should I open my shop on Friday as per my chart?", "bound-2")
+    body = _ask("Should I open my shop on Friday?", "bound-2")
     assert body["status"] == "ok"
     assert body["answered"] is True
     assert session.get_reading("bound-2") is None
@@ -227,7 +257,7 @@ def test_inspector_crash_does_not_break_chat(monkeypatch):
 
     monkeypatch.setattr("chat.inspector._card_payload", exploding)
     session.reset("bound-3")
-    body = _ask("Should I open my shop on Friday as per my chart?", "bound-3")
+    body = _ask("Should I open my shop on Friday?", "bound-3")
     assert body["answered"] is True
 
 
@@ -248,11 +278,11 @@ def test_model_unavailable_keeps_reading_for_inspection(monkeypatch):
     _stub(monkeypatch, status=429, body='{"error":{"message":"quota"}}')
     session.reset("bound-5")
     trace.clear("bound-5")
-    body = _ask("Should I open my shop on Friday as per my chart?", "bound-5")
+    body = _ask("Should I open my shop on Friday?", "bound-5")
     assert body["answered"] is False
     assert body["answer"] == gemini.UNAVAILABLE_MESSAGE
     event = trace.list_events("bound-5")[0]
-    assert event["route"] == router.NEW_READING
+    assert event["route"] == router.PERSONAL_READING
     assert len(event["cards"]) == 3
     assert event["pipeline"]["status"] == "model_unavailable"
 
@@ -261,7 +291,7 @@ def test_model_unavailable_keeps_reading_for_inspection(monkeypatch):
 def test_public_contract_unchanged(monkeypatch):
     _stub(monkeypatch)
     session.reset("contract-1")
-    body = _ask("Should I open my shop on Friday as per my chart?", "contract-1")
+    body = _ask("Should I open my shop on Friday?", "contract-1")
     assert set(body) == {"status", "answered", "answer", "conversation_id"}
     blob = json.dumps(body).lower()
     for banned in ("card", "draw", "tarot", "route", "model", "reading"):

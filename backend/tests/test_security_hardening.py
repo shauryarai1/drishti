@@ -240,7 +240,7 @@ def test_model_output_with_html_is_returned_as_plain_text(monkeypatch, fake_stor
     monkeypatch.setenv("GROQ_API_KEY", "test-sentinel")
 
     body = TestClient(main.app).post(
-        "/api/ask", json={"question": "tell me", "timestamp": "2026-09-21T22:40:00+05:30",
+        "/api/ask", json={"question": "hi", "timestamp": "2026-09-21T22:40:00+05:30",
                           "conversation_id": "xss-test"}).json()
 
     # The API transports text, not markup; the frontend must never interpret it.

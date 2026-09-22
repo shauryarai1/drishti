@@ -1,4 +1,4 @@
-"""Naturally phrased concerns must work, and dev tracing must never break /ask."""
+﻿"""Naturally phrased concerns must work, and dev tracing must never break /ask."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _pin_primary_provider_off(monkeypatch):
 REPLY = "That sounds draining, and there are a few likely reasons this is happening."
 
 NATURAL_CONCERNS = (
-    "I am working continuously but not getting any clients. What does my chart say?",
+    "I am working continuously but not getting any clients. What is blocking me?",
     "My business isn't growing",
     "I keep studying but my marks aren't improving",
     "Things have been difficult at work lately",
@@ -68,7 +68,7 @@ def test_exact_clients_concern_full_pipeline_with_mocked_gemini(monkeypatch):
     calls = _stub(monkeypatch)
     session.reset("natural-1")
     trace.clear("natural-1")
-    question = "I am working continuously but not getting any clients. What does my chart say?"
+    question = "I am working continuously but not getting any clients. What is blocking me?"
 
     body = _ask(question, "natural-1")
     assert body["status"] == "ok"
@@ -93,12 +93,13 @@ def test_exact_clients_concern_full_pipeline_with_mocked_gemini(monkeypatch):
 def test_clients_concern_context_is_career_like():
     from chat.reading import build_reading
 
-    context = build_reading("I am working continuously but not getting any clients. What does my chart say?")["context"]
+    context = build_reading("I am working continuously but not getting any clients. What is blocking me?")["context"]
     assert context["domain"] in ("career", "money", "general")
     assert context["subcontext"]
 
 
 def test_natural_concerns_do_not_crash(monkeypatch):
+    gemini.reset_health()
     _stub(monkeypatch)
     for index, question in enumerate(NATURAL_CONCERNS):
         conversation = f"natural-many-{index}"
@@ -120,7 +121,7 @@ def test_trace_failure_never_breaks_the_public_answer(monkeypatch):
 
     monkeypatch.setattr("chat.trace.record_event", exploding)
     session.reset("safety-1")
-    body = _ask("Should I become an engineer as per my chart?", "safety-1")
+    body = _ask("Should I become an engineer?", "safety-1")
     assert body["status"] == "ok"
     assert body["answered"] is True
     assert body["answer"] == REPLY
@@ -137,10 +138,11 @@ def test_record_event_itself_swallows_errors(monkeypatch):
 
 # --- 6/7/8: failed generations are still inspectable ----------------------
 def test_quota_failure_keeps_reading_and_trace(monkeypatch):
+    gemini.reset_health()
     _stub(monkeypatch, status=429, body='{"error":{"message":"quota"}}')
     session.reset("quota-1")
     trace.clear("quota-1")
-    body = _ask("I am working continuously but not getting any clients. What does my chart say?", "quota-1")
+    body = _ask("I am working continuously but not getting any clients. What is blocking me?", "quota-1")
     assert body["answered"] is False
     assert body["answer"] == gemini.UNAVAILABLE_MESSAGE
 
@@ -163,7 +165,7 @@ def test_inspector_retrieval_matches_public_draw(monkeypatch):
     _stub(monkeypatch)
     session.reset("match-1")
     trace.clear("match-1")
-    _ask("I am working continuously but not getting any clients. What does my chart say?", "match-1")
+    _ask("I am working continuously but not getting any clients. What is blocking me?", "match-1")
     stored = session.get_reading("match-1")
     client = TestClient(__import__("main").app)
     ids = set()
@@ -179,7 +181,7 @@ def test_trace_has_no_secret_fields_or_values(monkeypatch):
     _stub(monkeypatch)
     session.reset("secret-1")
     trace.clear("secret-1")
-    _ask("I am working continuously but not getting any clients. What does my chart say?", "secret-1")
+    _ask("I am working continuously but not getting any clients. What is blocking me?", "secret-1")
     event = trace.list_events("secret-1")[0]
 
     def keys(node):
@@ -202,3 +204,4 @@ def test_trace_has_no_secret_fields_or_values(monkeypatch):
     key = gemini.api_key()
     if key:
         assert key not in blob
+

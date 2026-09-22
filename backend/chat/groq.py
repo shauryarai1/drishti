@@ -43,11 +43,12 @@ def api_key() -> Optional[str]:
 
 
 def _build_messages(
-    history: List[Dict[str, str]], message: str, private_context: str
+    history: List[Dict[str, str]], message: str, private_context: str,
+    astrology_context: str = "",
 ) -> List[Dict[str, str]]:
     """System instruction + bounded conversation history + the user message."""
     messages: List[Dict[str, str]] = [
-        {"role": "system", "content": _system_instruction_for(private_context)}
+        {"role": "system", "content": _system_instruction_for(private_context, astrology_context)}
     ]
     for item in history:
         role = item.get("role")
@@ -95,7 +96,8 @@ def _classify(status: int) -> str:
 
 
 def generate_reply_detailed(
-    message: str, history: List[Dict[str, str]], private_context: str = ""
+    message: str, history: List[Dict[str, str]], private_context: str = "",
+    astrology_context: str = "",
 ) -> Dict[str, Any]:
     """One Groq attempt. Same contract as the Gemini implementation."""
     result: Dict[str, Any] = {
@@ -113,7 +115,7 @@ def generate_reply_detailed(
         logger.warning("ask_kavach provider=groq model=%s outcome=no_api_key fallback_used=true", MODEL)
         return result
 
-    messages = _build_messages(history, message, private_context)
+    messages = _build_messages(history, message, private_context, astrology_context)
     started = time.monotonic()
 
     try:

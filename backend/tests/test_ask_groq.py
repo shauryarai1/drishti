@@ -1,4 +1,4 @@
-"""Ask KAVACH primary provider: Groq `openai/gpt-oss-120b`, Gemini as fallback.
+﻿"""Ask KAVACH primary provider: Groq `openai/gpt-oss-120b`, Gemini as fallback.
 
 Groq HTTP is always mocked - no automated test consumes real Groq quota.
 """
@@ -112,8 +112,8 @@ def ask(client, question, conversation_id="groq-1"):
 
 
 # --- 1/2/3/4/5: behaviour ----------------------------------------------------
-def test_general_question_answered_by_groq(env, client):
-    body = ask(client, "what is gravity?").json()
+def test_in_scope_question_answered_by_groq(env, client):
+    body = ask(client, "hi").json()
 
     assert body["answered"] is True
     assert body["answer"] == "Here is a helpful answer."
@@ -123,10 +123,10 @@ def test_general_question_answered_by_groq(env, client):
     assert env["seen"]["groq"][0]["auth"] == f"Bearer {FAKE_KEY}"
 
 
-def test_general_question_carries_no_astrology_context(env, client):
+def test_casual_question_carries_no_astrology_context(env, client):
     from chat.gemini import READING_INSTRUCTION, SYSTEM_INSTRUCTION
 
-    ask(client, "explain photosynthesis")
+    ask(client, "hi")
     request = env["seen"]["groq"][0]
 
     assert SYSTEM_INSTRUCTION in request["messages"][0]["content"]
@@ -134,46 +134,55 @@ def test_general_question_carries_no_astrology_context(env, client):
     assert "PRIVATE READING CONTEXT" not in json.dumps(request["messages"])
 
 
-def test_astrology_question_carries_the_kavach_context(env, client):
-    from chat.gemini import READING_INSTRUCTION
+def test_astrology_question_carries_the_chart_context(env, client):
+    from chat.gemini import ASTROLOGY_INSTRUCTION, READING_INSTRUCTION
 
     ask(client, "what does Saturn mean in my chart?")
     request = env["seen"]["groq"][0]
 
-    assert READING_INSTRUCTION in request["messages"][0]["content"]
-    assert "PRIVATE READING CONTEXT" in request["messages"][-1]["content"]
+    assert ASTROLOGY_INSTRUCTION in request["messages"][0]["content"]
+    assert "CHART CONTEXT" in request["messages"][0]["content"]
+    assert READING_INSTRUCTION not in request["messages"][0]["content"]
+    assert "PRIVATE READING CONTEXT" not in json.dumps(request["messages"])
 
 
-def test_astrology_follow_up_keeps_context_then_general_returns(env, client):
+def test_astrology_follow_up_keeps_context_then_out_of_scope_returns(env, client):
+    import chat.router as router
+
     ask(client, "read my kundli", conversation_id="switch")
-    assert "PRIVATE READING CONTEXT" in env["seen"]["groq"][-1]["messages"][-1]["content"]
+    assert "CHART CONTEXT" in env["seen"]["groq"][-1]["messages"][0]["content"]
 
     ask(client, "what about Jupiter?", conversation_id="switch")
-    assert "PRIVATE READING CONTEXT" in env["seen"]["groq"][-1]["messages"][-1]["content"]
+    assert "CHART CONTEXT" in env["seen"]["groq"][-1]["messages"][0]["content"]
 
-    ask(client, "thanks. Now explain gravity.", conversation_id="switch")
-    assert "PRIVATE READING CONTEXT" not in env["seen"]["groq"][-1]["messages"][-1]["content"]
+    before = len(env["seen"]["groq"])
+    body = ask(client, "thanks. Now explain gravity.", conversation_id="switch").json()
+    assert body["answer"] == router.SCOPE_MESSAGE
+    assert len(env["seen"]["groq"]) == before, "an unrelated question is not sent to the model"
 
 
-def test_general_chat_never_touches_astrology_or_the_geocoder(env, client):
+def test_out_of_scope_and_casual_never_carry_hidden_context(env, client):
     for index, question in enumerate(("hi", "how are you?", "what is gravity?",
-                                      "write an email", "help me study", "what is financial success?")):
+                                      "write an email", "what is financial success?",
+                                      "write a python script")):
         ask(client, question, conversation_id=f"general-{index}")
 
     assert env["seen"]["geocoder"] == 0
     assert all("PRIVATE READING CONTEXT" not in json.dumps(item["messages"])
                for item in env["seen"]["groq"])
+    assert all("CHART CONTEXT" not in json.dumps(item["messages"])
+               for item in env["seen"]["groq"])
 
 
 # --- 6/7/8/9/10/11: provider failure ----------------------------------------
 def test_groq_success_does_not_call_gemini(env, client):
-    ask(client, "what is gravity?")
+    ask(client, "hi")
     assert env["seen"]["gemini"] == [], "the fallback must not run when Groq answers"
 
 
 def test_groq_timeout_falls_back_to_gemini_once(env, client):
     env["script"]["response"] = httpx.TimeoutException("slow")
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answer"] == "Gemini emergency answer."
     assert env["seen"]["gemini"] == [1], "the fallback runs exactly once"
@@ -183,7 +192,7 @@ def test_groq_timeout_falls_back_to_gemini_once(env, client):
 def test_groq_429_falls_back_to_gemini_once(env, client):
     env["script"]["response"] = FakeResponse(429, {"error": "rate limited"},
                                              headers={"retry-after": "7"})
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answer"] == "Gemini emergency answer."
     assert env["seen"]["gemini"] == [1]
@@ -192,7 +201,7 @@ def test_groq_429_falls_back_to_gemini_once(env, client):
 
 def test_groq_5xx_falls_back_to_gemini_once(env, client):
     env["script"]["response"] = FakeResponse(503, {"error": "overloaded"})
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answer"] == "Gemini emergency answer."
     assert env["seen"]["gemini"] == [1]
@@ -200,7 +209,7 @@ def test_groq_5xx_falls_back_to_gemini_once(env, client):
 
 def test_groq_malformed_response_falls_back_safely(env, client):
     env["script"]["response"] = FakeResponse(200, malformed=True)
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answer"] == "Gemini emergency answer."
     assert env["seen"]["gemini"] == [1]
@@ -212,7 +221,7 @@ def test_both_providers_unavailable_gives_the_friendly_error(env, client, monkey
                         lambda *a, **k: {"text": None, "provider": "gemini",
                                          "preferred": gemini.MODEL_PRIORITY[0], "attempts": []})
 
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answered"] is False
     assert body["answer"] == gemini.UNAVAILABLE_MESSAGE
@@ -221,7 +230,7 @@ def test_both_providers_unavailable_gives_the_friendly_error(env, client, monkey
 
 def test_missing_groq_key_falls_back_without_calling_out(env, client, monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    body = ask(client, "what is gravity?").json()
+    body = ask(client, "hi").json()
 
     assert body["answer"] == "Gemini emergency answer."
     assert env["seen"]["groq"] == [], "no request may be attempted without a key"
@@ -237,7 +246,7 @@ def test_nvidia_is_removed_from_the_active_path():
 
 def test_no_geocoder_request_for_any_ask_traffic(env, client):
     ask(client, "read my kundli")
-    ask(client, "what is gravity?")
+    ask(client, "hi")
     assert env["seen"]["geocoder"] == 0
 
 
@@ -254,19 +263,19 @@ def test_api_key_never_returned_or_logged(env, client):
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     try:
-        body = ask(client, "what is gravity?").text
+        body = ask(client, "will my startup succeed?").text
     finally:
         logger.removeHandler(handler)
 
     joined = "\n".join(records)
     assert FAKE_KEY not in body and FAKE_KEY not in joined
-    assert "gravity" not in joined.lower(), "questions are never logged"
+    assert "startup" not in joined.lower(), "questions are never logged"
     assert "Here is a helpful answer." not in joined, "answer text is never logged"
 
 
 def test_system_prompt_and_reasoning_are_never_exposed(env, client):
     env["script"]["response"] = FakeResponse(200, groq_payload("Public answer.", reasoning=REASONING))
-    body = json.dumps(ask(client, "what is gravity?").json())
+    body = json.dumps(ask(client, "hi").json())
 
     assert "Public answer." in body
     assert REASONING not in body
@@ -298,7 +307,7 @@ def test_observability_logs_are_safe_and_useful(env, client):
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     try:
-        ask(client, "what is gravity?")
+        ask(client, "hi")
     finally:
         logger.removeHandler(handler)
 
@@ -316,3 +325,4 @@ def test_provider_chain_is_exactly_one_primary_and_one_fallback():
     assert groq.TIMEOUT_SECONDS <= 20.0, "users must not wait 30-60s"
     assert len(gemini.MODEL_PRIORITY) == 2
     assert gemini.PER_ATTEMPT_TIMEOUT <= 15.0
+

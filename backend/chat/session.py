@@ -12,6 +12,7 @@ MAX_CONVERSATIONS = 2000
 
 _CONVERSATIONS: Dict[str, List[Dict[str, str]]] = {}
 _READINGS: Dict[str, Dict[str, Any]] = {}
+_MODES: Dict[str, str] = {}
 
 
 def new_conversation_id() -> str:
@@ -26,6 +27,7 @@ def _evict_oldest(keep: str) -> None:
         if oldest != keep:
             _CONVERSATIONS.pop(oldest, None)
             _READINGS.pop(oldest, None)
+            _MODES.pop(oldest, None)
             return
 
 
@@ -52,9 +54,20 @@ def get_reading(conversation_id: str) -> Optional[Dict[str, Any]]:
     return _READINGS.get(conversation_id)
 
 
+def set_mode(conversation_id: str, mode: str) -> None:
+    """Remember the last KAVACH mode so follow-ups stay in the right context."""
+    if conversation_id and mode:
+        _MODES[conversation_id] = mode
+
+
+def get_mode(conversation_id: str) -> Optional[str]:
+    return _MODES.get(conversation_id)
+
+
 def reset(conversation_id: str) -> None:
     _CONVERSATIONS.pop(conversation_id, None)
     _READINGS.pop(conversation_id, None)
+    _MODES.pop(conversation_id, None)
 
 
 def stats() -> Dict[str, Any]:

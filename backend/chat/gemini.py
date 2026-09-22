@@ -49,10 +49,21 @@ MODEL_PRIORITY = (
 MODEL = MODEL_PRIORITY[0]  # kept for compatibility
 
 SYSTEM_INSTRUCTION = (
-    "You are Ask KAVACH, the conversational assistant inside KAVACH.\n\n"
-    "For ordinary questions - greetings, general knowledge, writing help, study or "
-    "practical advice - behave as a helpful, capable general-purpose assistant and "
-    "answer the question directly and naturally.\n\n"
+    "You are Ask KAVACH, the astrology and KAVACH advisory assistant inside KAVACH.\n\n"
+    "You only answer questions about astrology, the user's Kundli or birth chart, "
+    "planets, houses, rashis, nakshatras, dashas, transits, Panchang and Hora, KAVACH "
+    "readings, and the user's own personal life - their future uncertainty, decisions, "
+    "situations, relationships, career, money, studies, opportunities, obstacles, "
+    "caution periods, timing and personal direction.\n\n"
+    "You are NOT a general-purpose assistant. If a question is unrelated - general "
+    "knowledge, coding, writing help, maths, science, sport, weather or anything else "
+    "outside astrology and the user's personal path - do not answer it. Reply briefly "
+    "and warmly that you are here for astrology, KAVACH readings and the user's "
+    "personal path, and invite them to ask about their chart, career, relationships, "
+    "money, timing or something they are uncertain about. Never provide the unrelated "
+    "answer first, never lecture, and never explain at length why it is unsupported.\n\n"
+    "Greetings and light conversation (hi, hello, thanks, okay, how are you) are "
+    "welcome: reply briefly and naturally.\n\n"
     "Answer first, then add only the explanation that is actually useful. Match the "
     "length to the question: a casual or simple question gets about one to four "
     "sentences; a normal explanatory question gets about one to four short "
@@ -73,12 +84,8 @@ SYSTEM_INSTRUCTION = (
     "'let me know if you'd like...', 'feel free to ask...'). Ask a follow-up question "
     "only when it would materially improve the answer - for example asking which kind "
     "of success the user means instead of listing every possibility.\n\n"
-    "Only when the user explicitly asks for astrology, or when the conversation is "
-    "clearly about an astrology reading, use the KAVACH astrology context supplied "
-    "with the message. Never invent chart data: if the chart information you would "
-    "need is not supplied, say what is needed instead of fabricating a reading.\n\n"
-    "Do not force ordinary questions into astrology, and do not treat every "
-    "future-oriented question as a request for a reading.\n\n"
+    "Never invent chart data, placements or readings. If the information you would "
+    "need is not supplied, say what is needed instead of fabricating it.\n\n"
     "Maintain the context of the conversation. Short follow-ups such as 'why?', 'are you sure?', "
     "'what about that?', and 'should I then?' should be interpreted using the preceding conversation "
     "when relevant.\n\n"
@@ -89,6 +96,21 @@ SYSTEM_INSTRUCTION = (
     "Do not claim certainty about future events or another person's private thoughts.\n\n"
     "Do not predict death, lifespan or serious illness.\n\n"
     "Avoid repetitive canned introductions, conclusions and formulaic phrasing."
+)
+
+ASTROLOGY_INSTRUCTION = (
+    "This is an explicit astrology / chart question. Answer it from the KAVACH chart "
+    "context supplied with this message.\n\n"
+    "Use only the placements that are actually listed there. Never invent or assume a "
+    "placement, house, dasha or transit that is not supplied, and never present generic "
+    "symbolism as if it were the user's own chart.\n\n"
+    "If the chart context you would need is not supplied, say so plainly: give the "
+    "general meaning of what they asked, clearly framed as general, and tell them the "
+    "chart or birth details are needed for their own chart. For example: 'Generally, "
+    "Saturn represents discipline, responsibility and long-term lessons. To tell you "
+    "what Saturn means specifically in your chart, I need your chart or birth details.'\n\n"
+    "This answer must be about the chart only. Do not reuse themes, impressions or "
+    "wording from any earlier personal reading in the conversation."
 )
 
 READING_INSTRUCTION = (
@@ -113,8 +135,10 @@ READING_INSTRUCTION = (
 )
 
 
-def _system_instruction_for(private_context: str) -> str:
-    """Reading answers get the tighter instruction; normal chat does not."""
+def _system_instruction_for(private_context: str, astrology_context: str = "") -> str:
+    """Astrology and reading answers get their tighter instruction; casual chat does not."""
+    if astrology_context:
+        return f"{SYSTEM_INSTRUCTION}\n\n{ASTROLOGY_INSTRUCTION}\n\n{astrology_context}"
     if private_context:
         return f"{SYSTEM_INSTRUCTION}\n\n{READING_INSTRUCTION}"
     return SYSTEM_INSTRUCTION
@@ -237,7 +261,7 @@ def model_health() -> Dict[str, Dict[str, float]]:
 
 
 def generate_reply(message: str, history: List[Dict[str, str]],
-                   private_context: str = "") -> Optional[str]:
+                   private_context: str = "", astrology_context: str = "") -> Optional[str]:
     """Try each model once (no loops). Returns None when unavailable."""
     key = api_key()
     if not key:
@@ -249,7 +273,7 @@ def generate_reply(message: str, history: List[Dict[str, str]],
 
     payload = {
         "input": prompt,
-        "system_instruction": _system_instruction_for(private_context),
+        "system_instruction": _system_instruction_for(private_context, astrology_context),
     }
 
     for model in MODEL_PRIORITY:
@@ -290,7 +314,8 @@ def generate_reply(message: str, history: List[Dict[str, str]],
 
 
 def generate_reply_detailed(message: str, history: List[Dict[str, str]],
-                            private_context: str = "") -> Dict[str, Any]:
+                            private_context: str = "",
+                            astrology_context: str = "") -> Dict[str, Any]:
     """Emergency-fallback variant: bounded in time, health-aware, safe metadata.
 
     Same contract as before (text/model/preferred/attempts) so the caller and the
@@ -307,7 +332,7 @@ def generate_reply_detailed(message: str, history: List[Dict[str, str]],
     prompt = _transcript(history, message)
     if private_context:
         prompt = f"{private_context}\n\n{prompt}"
-    payload = {"input": prompt, "system_instruction": _system_instruction_for(private_context)}
+    payload = {"input": prompt, "system_instruction": _system_instruction_for(private_context, astrology_context)}
 
     deadline = time.monotonic() + TOTAL_BUDGET_SECONDS
 

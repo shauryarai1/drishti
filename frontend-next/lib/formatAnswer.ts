@@ -2,13 +2,17 @@
  * Safe formatting for Ask KAVACH answers.
  *
  * The model may emit light Markdown (**bold**, *italic*, `- ` / `1. ` lists,
- * blank-line paragraphs). This module turns that text into a small, typed block
- * structure. It is DATA, never HTML: nothing is interpreted as markup and there
- * is no HTML injection path anywhere in the renderer, so raw HTML in a model
- * response can only ever appear as literal text.
+ * blank-line paragraphs) and, defensively, fenced code blocks. This module turns
+ * that text into a small, typed block structure. It is DATA, never HTML: nothing
+ * is interpreted as markup and there is no HTML injection path anywhere in the
+ * renderer, so raw HTML in a model response can only ever appear as literal text.
  *
- * Deliberately supports only: paragraphs, bold, italics, bullet lists and
- * numbered lists. No headings, no tables, no links, no raw HTML.
+ * Fenced code is recognised FIRST, before any inline processing, so code content
+ * is never treated as emphasis and its indentation and newlines are preserved.
+ * Only these forms are supported: paragraphs, bold (**), italics (*), bullet and
+ * numbered lists, and fenced code. No headings, tables, links or raw HTML.
+ * Underscore emphasis is deliberately NOT supported: identifiers such as
+ * `__name__` must never be reinterpreted as formatting.
  */
 
 export interface AnswerSpan {
@@ -19,15 +23,17 @@ export interface AnswerSpan {
 
 export type AnswerBlock =
   | { type: 'paragraph'; spans: AnswerSpan[] }
-  | { type: 'list'; ordered: boolean; items: AnswerSpan[][] };
+  | { type: 'list'; ordered: boolean; items: AnswerSpan[][] }
+  | { type: 'code'; language: string; code: string };
 
 const BULLET = /^\s*[-*•]\s+(.*)$/;
 const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
+const FENCE = /^\s*```(.*)$/;
 
 /** Split one line into bold/italic spans. Never produces HTML. */
 export function parseSpans(line: string): AnswerSpan[] {
   const spans: AnswerSpan[] = [];
-  const pattern = /(\*\*([^*]+)\*\*|\*([^*]+)\*|__([^_]+)__|_([^_]+)_)/g;
+  const pattern = /(\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -35,10 +41,10 @@ export function parseSpans(line: string): AnswerSpan[] {
     if (match.index > lastIndex) {
       spans.push({ text: line.slice(lastIndex, match.index) });
     }
-    if (match[2] !== undefined || match[4] !== undefined) {
-      spans.push({ text: (match[2] ?? match[4]) as string, bold: true });
+    if (match[2] !== undefined) {
+      spans.push({ text: match[2], bold: true });
     } else {
-      spans.push({ text: (match[3] ?? match[5]) as string, italic: true });
+      spans.push({ text: (match[3] ?? '') as string, italic: true });
     }
     lastIndex = pattern.lastIndex;
   }
@@ -50,6 +56,7 @@ export function parseSpans(line: string): AnswerSpan[] {
 /** Turn an answer into blocks. Unknown syntax is kept as plain text. */
 export function formatAnswer(input: string): AnswerBlock[] {
   const text = (input ?? '').replace(/\r\n?/g, '\n');
+  const rawLines = text.split('\n');
   const blocks: AnswerBlock[] = [];
   let list: { ordered: boolean; items: AnswerSpan[][] } | null = null;
   let paragraph: string[] = [];
@@ -66,12 +73,32 @@ export function formatAnswer(input: string): AnswerBlock[] {
       list = null;
     }
   };
+  const flushAll = () => {
+    flushParagraph();
+    flushList();
+  };
 
-  for (const rawLine of text.split('\n')) {
+  for (let index = 0; index < rawLines.length; index += 1) {
+    const rawLine = rawLines[index];
+
+    const fence = rawLine.match(FENCE);
+    if (fence) {
+      flushAll();
+      const language = (fence[1] || '').trim();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < rawLines.length && !FENCE.test(rawLines[index])) {
+        codeLines.push(rawLines[index]);
+        index += 1;
+      }
+      // `index` now sits on the closing fence (or past the end of the input).
+      blocks.push({ type: 'code', language, code: codeLines.join('\n') });
+      continue;
+    }
+
     const line = rawLine.trimEnd();
     if (!line.trim()) {
-      flushParagraph();
-      flushList();
+      flushAll();
       continue;
     }
     const bullet = line.match(BULLET);
@@ -89,7 +116,6 @@ export function formatAnswer(input: string): AnswerBlock[] {
     flushList();
     paragraph.push(line.trim());
   }
-  flushParagraph();
-  flushList();
+  flushAll();
   return blocks;
 }

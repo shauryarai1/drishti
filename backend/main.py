@@ -371,9 +371,10 @@ def _sanitise_public_answer(text: str) -> str:
 async def ask_endpoint(payload: ChatRequest):
     """Public Ask KAVACH: chat first, hidden Tarot only when a reading is asked for."""
     from chat import append, get_history
-    from chat.session import get_reading, set_reading
+    from chat.session import get_mode, get_reading, set_mode, set_reading
     from chat.gemini import UNAVAILABLE_MESSAGE, generate_reply_detailed
-    from chat.router import NEW_READING, READING_FOLLOWUP, route_message
+    from chat.router import (ASTROLOGY, OUT_OF_SCOPE, PERSONAL_READING,
+                             READING_FOLLOWUP, SCOPE_MESSAGE, route_message)
 
     question = (getattr(payload, "question", "") or "").strip()
     conversation_id = (getattr(payload, "conversation_id", "") or "").strip()[:64]
@@ -407,19 +408,36 @@ async def ask_endpoint(payload: ChatRequest):
 
     history = get_history(conversation_id)
     active = get_reading(conversation_id)
-    route = route_message(question, bool(active), active)
+    route = route_message(question, bool(active), active, get_mode(conversation_id))
 
+    from archive import record_submission
+
+    # Out of scope: answered deterministically. No reading is drawn, no chart is
+    # built, no provider is called and the requested content is never produced.
+    if route == OUT_OF_SCOPE:
+        append(conversation_id, "user", question)
+        append(conversation_id, "assistant", SCOPE_MESSAGE)
+        set_mode(conversation_id, OUT_OF_SCOPE)
+        record_submission(
+            "ask",
+            {"question": question, "conversation_id": conversation_id},
+            {"answered": True, "answer": SCOPE_MESSAGE},
+        )
+        return {"status": "ok", "answered": True, "answer": SCOPE_MESSAGE,
+                "conversation_id": conversation_id}
+
+    # Context isolation: each mode carries ONLY its own hidden evidence.
     reading = active if route == READING_FOLLOWUP else None
     tarot = "REUSED" if reading else "NOT USED"
-    if route == NEW_READING:
+    if route == PERSONAL_READING:
         try:
             from chat.reading import build_reading
 
             reading = build_reading(question)
             tarot = "USED"
         except Exception as exc:
-            logger.warning("Reading skipped, continuing as chat: %s", type(exc).__name__)
-            reading, route, tarot = None, "NORMAL_CHAT", "NOT USED"
+            logger.warning("Reading skipped, answering without evidence: %s", type(exc).__name__)
+            reading, tarot = None, "NOT USED"
 
     private = ""
     if reading:
@@ -430,6 +448,18 @@ async def ask_endpoint(payload: ChatRequest):
         except Exception as exc:
             logger.warning("Reading context skipped: %s", type(exc).__name__)
             private = ""
+
+    # The chart context is built only for astrology mode, so a personal reading
+    # can never leak into a chart answer.
+    astrology = ""
+    if route == ASTROLOGY:
+        try:
+            from chat.astrology import chart_context
+
+            astrology = chart_context(payload)
+        except Exception as exc:
+            logger.warning("Chart context skipped: %s", type(exc).__name__)
+            astrology = ""
 
     detail = {}
     answer = None
@@ -463,7 +493,8 @@ async def ask_endpoint(payload: ChatRequest):
     try:
         from chat.groq import generate_reply_detailed as groq_reply
 
-        detail = groq_reply(question, history, private_context=private)
+        detail = groq_reply(question, history, private_context=private,
+                            astrology_context=astrology)
         answer = detail.get("text")
     except Exception as exc:
         safe_error = type(exc).__name__
@@ -473,7 +504,8 @@ async def ask_endpoint(payload: ChatRequest):
     if not answer:
         gemini_started = _time.monotonic()
         try:
-            fallback = generate_reply_detailed(question, history, private_context=private)
+            fallback = generate_reply_detailed(question, history, private_context=private,
+                                               astrology_context=astrology)
             gemini_ms = int((_time.monotonic() - gemini_started) * 1000)
             if fallback.get("text"):
                 # A different provider answered after NVIDIA failed.
@@ -555,6 +587,7 @@ async def ask_endpoint(payload: ChatRequest):
     safe_trace("ok", answer, clean)
     if reading is not None and route != READING_FOLLOWUP:
         set_reading(conversation_id, reading)
+    set_mode(conversation_id, route)
     append(conversation_id, "user", question)
     append(conversation_id, "assistant", clean)
     _archive_ask(clean, True)

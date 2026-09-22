@@ -1,4 +1,4 @@
-"""Reading answers must instruct Gemini to stay inside the supplied interpretation."""
+﻿"""Reading answers must instruct Gemini to stay inside the supplied interpretation."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _pin_primary_provider_off(monkeypatch):
 
 ASK = {"timestamp": "2026-09-26T13:00:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata", "location_label": "New Delhi"}
-READING_QUESTION = "Why am I continuously working but not getting any clients? What does my chart say?"
+READING_QUESTION = "Why am I continuously working but not getting any clients? What is blocking me?"
 
 
 class Response:
@@ -133,3 +133,4 @@ def test_instruction_builder_switch():
     combined = _system_instruction_for("[PRIVATE KAVACH READING]")
     assert combined.startswith(SYSTEM_INSTRUCTION)
     assert READING_INSTRUCTION in combined
+
