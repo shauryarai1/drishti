@@ -5,6 +5,7 @@ import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import { useAuth } from '../../lib/auth';
+import { displayPersonName } from '../../lib/personName';
 import {
   READING_TYPE_LABELS,
   deleteReading,
@@ -22,6 +23,11 @@ function createdDate(iso: string): string {
 function nativeName(item: SavedReadingSummary): string {
   const name = item.input_data?.name;
   return typeof name === 'string' && name.trim() ? name.trim() : '';
+}
+
+/** Kundli cards are identified by the person whose chart they are. */
+function personLabel(item: SavedReadingSummary): string {
+  return displayPersonName(item.input_data?.name);
 }
 
 export default function HistoryPage() {
@@ -185,11 +191,18 @@ export default function HistoryPage() {
                 ) : (
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
+                      {item.type === 'kundli' && (
+                        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#D6BE85]">
+                          {personLabel(item)}
+                        </div>
+                      )}
                       <h2 className="truncate text-[15px] font-medium text-[#F7F5F0]">{item.title}</h2>
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[#B39250]">
                         <span>{READING_TYPE_LABELS[item.type] ?? item.type}</span>
                         <span className="text-[#EEE9DF]/35">{createdDate(item.created_at)}</span>
-                        {nativeName(item) && <span className="text-[#EEE9DF]/35">{nativeName(item)}</span>}
+                        {item.type !== 'kundli' && nativeName(item) && (
+                          <span className="text-[#EEE9DF]/35">{nativeName(item)}</span>
+                        )}
                       </div>
                     </div>
 

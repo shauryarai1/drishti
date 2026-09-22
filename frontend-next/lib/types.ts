@@ -10,6 +10,8 @@ export interface BirthDetails {
   latitude?: number;
   longitude?: number;
   timezone?: string;
+  /** Person whose chart is being generated. Optional: not every flow asks for it. */
+  name?: string;
 }
 
 export interface PlanetPosition {

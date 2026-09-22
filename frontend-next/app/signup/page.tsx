@@ -1,21 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AUTH_INPUT, AUTH_LABEL, AuthShell } from '../../components/AuthShell';
+import { AuthOrDivider, GoogleAuthButton } from '../../components/GoogleAuthButton';
 import { useAuth } from '../../lib/auth';
+import { safeNextPath } from '../../lib/authPaths';
 
 const MIN_PASSWORD = 8;
 
 export default function SignupPage() {
   const router = useRouter();
   const { signUp } = useAuth();
+  const [next, setNext] = useState('/account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNext(safeNextPath(params.get('next')));
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -48,7 +56,7 @@ export default function SignupPage() {
       setNotice(result.message);
       return;
     }
-    router.replace('/account');
+    router.replace(next);
   };
 
   return (
@@ -63,6 +71,9 @@ export default function SignupPage() {
         </>
       }
     >
+      <GoogleAuthButton nextPath={next} />
+      <AuthOrDivider />
+
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div>
           <label className={AUTH_LABEL} htmlFor="email">Email</label>

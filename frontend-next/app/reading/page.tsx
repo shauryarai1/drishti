@@ -6,6 +6,9 @@ import { BirthDetails as BirthDetailsType } from '../../lib/types';
 import { BirthDetailsFlow } from '../../components/BirthDetails';
 import { LoadingExperience } from '../../components/LoadingExperience';
 import { api, wakeBackend } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
+import { loginHref } from '../../lib/authPaths';
+import { savePendingForm, takePendingForm } from '../../lib/pendingForms';
 
 const PREPARING_MESSAGE = 'Preparing your reading...';
 const COLD_START_MESSAGE = 'Preparing the KAVACH engine. This may take a moment...';
@@ -14,6 +17,7 @@ const FAILURE_MESSAGE =
 
 export default function ReadingPage() {
   const router = useRouter();
+  const { status: authStatus, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState(PREPARING_MESSAGE);
@@ -37,6 +41,15 @@ export default function ReadingPage() {
   const handleComplete = async (details: BirthDetailsType) => {
     // Duplicate-submission guard: one generation flow at a time.
     if (submittingRef.current) return;
+
+    // The result is protected, not the form. Preserve what the guest typed, ask
+    // them to sign in, and resume automatically when they come back.
+    if (authStatus !== 'signedIn' || !user) {
+      savePendingForm('reading', details as unknown as Record<string, unknown>);
+      window.location.href = loginHref('/reading');
+      return;
+    }
+
     submittingRef.current = true;
 
     setPendingDetails(details);
@@ -72,6 +85,16 @@ export default function ReadingPage() {
   const handleRetry = () => {
     if (pendingDetails) handleComplete(pendingDetails);
   };
+
+  // Resume a pending reading after the guest signs in: no retyping required.
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || !user) return;
+    const restored = takePendingForm('reading');
+    if (!restored) return;
+    void handleComplete(restored as unknown as BirthDetailsType);
+    // The pending form is consumed on first use, so this cannot double-generate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, user]);
 
   const handleEditDetails = () => {
     setIsLoading(false);

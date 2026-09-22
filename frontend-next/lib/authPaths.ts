@@ -13,6 +13,8 @@ const SAFE_PATHS = [
   '/daily',
   '/your-week',
   '/life-summary',
+  '/reading',
+  '/results',
   '/ask',
   '/panchang',
 ] as const;

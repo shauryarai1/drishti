@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
+import { ResultGate } from '../../components/ResultGate';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import {
   fetchWeekly,
@@ -10,6 +11,9 @@ import {
   type WeeklyForecast,
   type WeeklyPlace,
 } from '../../lib/weekly';
+import { useAuth } from '../../lib/auth';
+import { loginHref } from '../../lib/authPaths';
+import { savePendingForm, takePendingForm } from '../../lib/pendingForms';
 
 const LABEL = 'font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]';
 const PANEL = 'rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70';
@@ -167,6 +171,7 @@ function PlaceField({ label, value, onResolve, placeholder }: {
 }
 
 export default function YourWeekPage() {
+  const { status: authStatus, user } = useAuth();
   const [birthDate, setBirthDate] = useState('1990-05-15');
   const [birthTime, setBirthTime] = useState('14:15');
   const [birthPlace, setBirthPlace] = useState<WeeklyPlace | null>(null);
@@ -198,6 +203,31 @@ export default function YourWeekPage() {
       setError('Please select a valid forecast location.');
       return;
     }
+
+    // The result is protected, not the form: preserve the details, sign in, resume.
+    if (authStatus !== 'signedIn' || !user) {
+      savePendingForm('your_week', {
+        date: birthDate,
+        time: birthTime,
+        place: birthPlace.label,
+        latitude: birthPlace.latitude,
+        longitude: birthPlace.longitude,
+        timezone: birthPlace.timezone ?? undefined,
+        startDate,
+        forecastPlace: forecastPlace.label,
+        forecastLatitude: forecastPlace.latitude,
+        forecastLongitude: forecastPlace.longitude,
+        forecastTimezone: forecastPlace.timezone ?? undefined,
+      });
+      window.location.href = loginHref('/your-week');
+      return;
+    }
+
+    await runWeekly();
+  };
+
+  const runWeekly = async () => {
+    if (!birthPlace || !forecastPlace) return;
     setBusy(true);
     setWeek(null);
     try {
@@ -219,6 +249,56 @@ export default function YourWeekPage() {
       setBusy(false);
     }
   };
+
+  // Resume a pending week after the guest signs in: no retyping required.
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || !user) return;
+    const restored = takePendingForm('your_week');
+    if (!restored) return;
+
+    const restoredBirth: WeeklyPlace = {
+      label: restored.place,
+      latitude: restored.latitude ?? 0,
+      longitude: restored.longitude ?? 0,
+      timezone: restored.timezone ?? '',
+    };
+    const restoredForecast: WeeklyPlace = {
+      label: restored.forecastPlace ?? '',
+      latitude: restored.forecastLatitude ?? 0,
+      longitude: restored.forecastLongitude ?? 0,
+      timezone: restored.forecastTimezone ?? '',
+    };
+    if (!restoredForecast.label) return;
+
+    setBirthDate(restored.date);
+    setBirthTime(restored.time);
+    setBirthPlace(restoredBirth);
+    if (restored.startDate) setStartDate(restored.startDate);
+    setForecastPlace(restoredForecast);
+
+    // The pending form is consumed on first use, so this cannot double-generate.
+    void (async () => {
+      setBusy(true);
+      setWeek(null);
+      try {
+        const result = await fetchWeekly({
+          birth: { date: restored.date, time: restored.time, place: restoredBirth.label,
+                   latitude: restoredBirth.latitude, longitude: restoredBirth.longitude,
+                   timezone: restoredBirth.timezone },
+          forecast: { startDate: restored.startDate ?? startDate, place: restoredForecast.label,
+                      latitude: restoredForecast.latitude, longitude: restoredForecast.longitude,
+                      timezone: restoredForecast.timezone },
+        });
+        setWeek(result);
+        setSelected(0);
+      } catch {
+        setError("We couldn't prepare your week with those details. Check your birth and location information and try again.");
+      } finally {
+        setBusy(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, user]);
 
   return (
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF] architectural-grid">
@@ -296,7 +376,7 @@ export default function YourWeekPage() {
           </div>
         )}
 
-        {week && selectedDay && (
+        {week && selectedDay && authStatus === 'signedIn' && (
           <>
             <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
               <div>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AUTH_INPUT, AUTH_LABEL, AuthShell } from '../../components/AuthShell';
+import { AuthOrDivider, GoogleAuthButton } from '../../components/GoogleAuthButton';
 import { useAuth } from '../../lib/auth';
 import { safeNextPath } from '../../lib/authPaths';
 
@@ -59,6 +60,9 @@ export default function LoginPage() {
         </>
       }
     >
+      <GoogleAuthButton nextPath={next} />
+      <AuthOrDivider />
+
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div>
           <label className={AUTH_LABEL} htmlFor="email">Email</label>

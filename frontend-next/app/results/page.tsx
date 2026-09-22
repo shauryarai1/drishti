@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { DrishtiReading, BirthDetails } from '../../lib/types';
 import { ResultsView } from '../../components/ResultsView';
 import { PersonalReadingModal } from '../../components/PersonalReadingModal';
+import { ResultGate } from '../../components/ResultGate';
+import { useAuth } from '../../lib/auth';
 
 export default function ResultsPage() {
   const router = useRouter();
+  const { status: authStatus } = useAuth();
   const [reading, setReading] = useState<DrishtiReading | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -40,6 +43,25 @@ export default function ResultsPage() {
     }
     router.replace('/reading');
   }, []);
+
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#090909] flex items-center justify-center font-mono text-xs text-[#A62A34]">
+        CALIBRATING REPORT...
+      </div>
+    );
+  }
+
+  // The personalised result is only revealed to a signed-in visitor.
+  if (authStatus !== 'signedIn') {
+    return (
+      <main className="min-h-screen bg-[#090909] text-[#EEE9DF]">
+        <div className="mx-auto w-full max-w-2xl px-5 py-16 sm:px-8">
+          <ResultGate nextPath="/results" />
+        </div>
+      </main>
+    );
+  }
 
   if (!reading || !reading.birthDetails) {
     return (

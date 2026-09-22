@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Clock, MapPin, ArrowLeft, ArrowRight, Search, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, ArrowLeft, ArrowRight, Search, CheckCircle2, User } from 'lucide-react';
 import { BirthDetails as BirthDetailsType, PlaceSuggestion } from '../lib/types';
 import { api, wakeBackend } from '../lib/api';
+import { isValidPersonName, normalisePersonName } from '../lib/personName';
 import { Button } from './Button';
 import { BirthInput } from './BirthInput';
 import { ReadingProgress } from './ReadingProgress';
@@ -12,14 +13,21 @@ interface BirthDetailsFlowProps {
   onComplete: (details: BirthDetailsType) => void;
   onCancel: () => void;
   initialDetails?: Partial<BirthDetailsType>;
+  /** Show the person-name field (used by the Kundli Generator). */
+  showName?: boolean;
+  /** Make the person name mandatory for a new chart. */
+  requireName?: boolean;
 }
 
 export function BirthDetailsFlow({
   onComplete,
   onCancel,
   initialDetails,
+  showName = false,
+  requireName = false,
 }: BirthDetailsFlowProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [name, setName] = useState(initialDetails?.name || '');
   const [date, setDate] = useState(initialDetails?.date || '');
   const [time, setTime] = useState(initialDetails?.time || '');
   const [place, setPlace] = useState(initialDetails?.place || '');
@@ -83,6 +91,9 @@ export function BirthDetailsFlow({
     const newErrors: { [key: string]: string } = {};
 
     if (currentStep === 1) {
+      if (showName && requireName && !isValidPersonName(name)) {
+        newErrors.name = 'Please enter the name of the person whose chart this is';
+      }
       if (!date) {
         newErrors.date = 'Please enter your date of birth';
       } else {
@@ -119,6 +130,7 @@ export function BirthDetailsFlow({
       // Final step: lock the button so repeated clicks cannot start parallel flows.
       setIsSubmitting(true);
       onComplete({
+        ...(showName ? { name: normalisePersonName(name) } : {}),
         date,
         time,
         place,
@@ -254,6 +266,20 @@ export function BirthDetailsFlow({
                     </p>
                   </div>
 
+                  {showName && (
+                    <BirthInput
+                      id="person-name-input"
+                      label="Name"
+                      type="text"
+                      icon={User}
+                      placeholder="Enter person's name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      error={errors.name}
+                      autoFocus
+                    />
+                  )}
+
                   <BirthInput
                     id="dob-input"
                     label="Date of Birth"
@@ -262,7 +288,7 @@ export function BirthDetailsFlow({
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     error={errors.date}
-                    autoFocus
+                    autoFocus={!showName}
                   />
 
                 </motion.div>

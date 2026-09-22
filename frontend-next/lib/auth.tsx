@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './supabase';
+import { safeNextPath } from './authPaths';
 
 /**
  * Single shared session layer for the whole app.
@@ -34,6 +35,7 @@ interface AuthContextValue {
   configured: boolean;
   signIn: (email: string, password: string) => Promise<AuthActionResult>;
   signUp: (email: string, password: string) => Promise<AuthActionResult>;
+  signInWithGoogle: (nextPath: string) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string, redirectTo: string) => Promise<AuthActionResult>;
   updatePassword: (password: string) => Promise<AuthActionResult>;
@@ -139,6 +141,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, []);
 
+  // Google OAuth through Supabase. The return destination is validated by
+  // safeNextPath, so only an internal KAVACH path can ever be used.
+  const signInWithGoogle = useCallback(async (nextPath: string): Promise<AuthActionResult> => {
+    const supabase = getSupabase();
+    if (!supabase) return { ok: false, message: 'Accounts are not available on this deployment yet.' };
+    const target = `${window.location.origin}${safeNextPath(nextPath)}`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: target },
+    });
+    if (error) return { ok: false, message: describeAuthError(error) };
+    return { ok: true };
+  }, []);
+
   const signOut = useCallback(async () => {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -172,11 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       configured: isSupabaseConfigured,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
       sendPasswordReset,
       updatePassword,
     }),
-    [status, user, session, signIn, signUp, signOut, sendPasswordReset, updatePassword],
+    [status, user, session, signIn, signUp, signInWithGoogle, signOut, sendPasswordReset, updatePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
