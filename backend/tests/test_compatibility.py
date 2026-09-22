@@ -400,7 +400,7 @@ def test_endpoint_returns_the_interpreted_report():
                            "inDepth", "kavachView"}
     assert len(report["atAGlance"]) == 11
     blob = str(body).lower()
-    for banned in ("36", "planet", "percentage"):
+    for banned in ("/36", "planet", "percentage"):
         assert banned not in blob, banned
 
 

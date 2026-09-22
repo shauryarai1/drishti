@@ -105,6 +105,84 @@ def _merge_state(statuses: Sequence[str]) -> str:
     return MIXED
 
 
+# ---------------------------------------------------------------------------
+# Owner's BINARY scoring.
+#
+# Every factor with a maximum explicitly assigned by the supplied decks either
+# MATCHES the owner's favourable rule (full allocated points) or does not
+# (zero). There are no partial points: never 1/3, 2/3 or 3/6.
+#
+# The match condition is read from the SAME engine result that drives the
+# interpretation - one source of truth. No scoring rule of its own is invented.
+# ---------------------------------------------------------------------------
+BINARY_SCORING: Dict[str, Dict[str, Any]] = {
+    # source: "Dina Kuta (Tara gun milaan) (3 points)"
+    "tara": {"maximum": 3, "match": ("Supportive",)},
+    # source: "Gana gun milaan ... sanctioned 6 points" (same/acceptable direction)
+    "gana": {"maximum": 6, "match": ("Strong alignment", "Supportive")},
+    # source: "Rashi Kuta - 7 points are allocated"
+    "rashi": {"maximum": 7, "match": ("Strong alignment", "Supportive")},
+    # source: "Rashiadhipathi or Graha Maitre (5 points)"
+    "graha_maitri": {"maximum": 5, "match": ("Strong alignment",)},
+    # source: "Vasya Kuta (2 points)"
+    "vasya": {"maximum": 2, "match": ("Supportive",)},
+}
+
+# Factors with NO safely establishable binary rule. They keep their working and
+# their qualitative state, but award no points.
+UNSCORED_FACTORS: Dict[str, str] = {
+    "nadi": "The supplied deck assigns no points to Nadi, so no maximum exists.",
+    "yoni": ("The deck supplies a matrix but does not define which values count as a "
+             "match under a binary award, so no points are awarded pending the owner's rule."),
+}
+
+
+def _matched(key: str, status: str) -> Optional[bool]:
+    rule = BINARY_SCORING.get(key)
+    if not rule:
+        return None
+    return status in rule["match"]
+
+
+def _award(key: str, status: str) -> Optional[int]:
+    matched = _matched(key, status)
+    if matched is None:
+        return None
+    return BINARY_SCORING[key]["maximum"] if matched else 0
+
+
+def build_total_score(kuta_results: Sequence[Any]) -> Dict[str, Any]:
+    """TOTAL = the exact sum of the binary awards and their established maxima."""
+    rows: List[Dict[str, Any]] = []
+    awarded = 0
+    maximum = 0
+    for result in kuta_results:
+        rule = BINARY_SCORING.get(result.key)
+        if not rule:
+            continue
+        matched = _matched(result.key, result.status) or False
+        points = rule["maximum"] if matched else 0
+        awarded += points
+        maximum += rule["maximum"]
+        rows.append({
+            "factor": WORKING_DISPLAY[result.key][0],
+            "matched": matched,
+            "points": points,
+            "maximum": rule["maximum"],
+        })
+    return {
+        "awarded": awarded,
+        "maximum": maximum,
+        "factors": rows,
+        # Only labelled /36 when the configured maxima genuinely total 36.
+        "outOf36": maximum == 36,
+        "unscored": [
+            {"factor": WORKING_DISPLAY[key][0], "reason": reason}
+            for key, reason in UNSCORED_FACTORS.items()
+        ],
+    }
+
+
 def build_interpreted(
     kuta_results: Sequence[Any],
     deep_results: Sequence[Any],
@@ -153,6 +231,7 @@ def build_interpreted(
         # results the engine already produced - never recalculated here.
         "technicalAnalysis": build_technical_analysis(kuta_results, deep_results),
         "overallWorking": build_overall_working(kuta_results, deep_results, overall),
+        "totalScore": build_total_score(kuta_results),
     }
 
 
@@ -223,12 +302,18 @@ def build_technical_analysis(
             continue
         name, source, fields = WORKING_DISPLAY[key]
         raw = getattr(result, source, {}) or {}
-        working.append({
+        entry: Dict[str, Any] = {
             "factor": name,
             "values": {field: raw.get(field) for field in fields if field in raw},
             "result": result.status,
             "meaning": _meaning(result),
-        })
+        }
+        if key in BINARY_SCORING:
+            matched = _matched(key, result.status)
+            entry["matched"] = bool(matched)
+            entry["points"] = _award(key, result.status)
+            entry["maximum"] = BINARY_SCORING[key]["maximum"]
+        working.append(entry)
     return working
 
 

@@ -232,10 +232,11 @@ def test_ui_renders_the_interpreted_report_and_no_score_or_yoni():
         assert section in ui, section
     # A legacy renderer keeps older saved factor reports openable.
     assert "report.factors?.map" in ui
-    for banned in ("yoni", "/36", "percentage", "score", "star rating", "should marry",
+    # The owner's binary score is now intentionally displayed; partial scoring is not.
+    assert "TOTAL:" in ui and "Points:" in ui
+    for banned in ("yoni", "percentage", "star rating", "should marry",
                    "do not marry", "perfect match", "will fail", "will succeed"):
         assert banned not in lowered, banned
-    assert "points" not in ui
 
 
 def test_save_uses_the_authenticated_account_with_duplicate_protection():

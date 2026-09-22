@@ -86,7 +86,9 @@ def test_technical_analysis_is_published_as_an_allowlist():
         "Conflict & energy (Mars)", "Kuja Dosha balance",
     ]
     for entry in working:
-        assert set(entry) == {"factor", "values", "result", "meaning"}
+        assert {"factor", "values", "result", "meaning"} <= set(entry)
+        assert set(entry) <= {"factor", "values", "result", "meaning",
+                              "matched", "points", "maximum"}
         assert entry["result"] in ("Supportive", "Mixed", "Challenging", "Contextual",
                                    "Strong alignment", "Needs attention")
         assert entry["meaning"]
