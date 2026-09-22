@@ -9,7 +9,7 @@ import type { KundliResponse } from './kundli';
  * user_id can never reach another account's rows.
  */
 
-export type ReadingType = 'kundli' | 'daily' | 'weekly' | 'life_summary' | 'dasha' | 'ask';
+export type ReadingType = 'kundli' | 'daily' | 'weekly' | 'life_summary' | 'dasha' | 'ask' | 'compatibility';
 
 export const SCHEMA_VERSION = 1;
 
@@ -20,6 +20,7 @@ export const READING_TYPE_LABELS: Record<ReadingType, string> = {
   life_summary: 'Life Summary',
   dasha: 'Dasha Reading',
   ask: 'Ask KAVACH',
+  compatibility: 'Marriage Compatibility',
 };
 
 /** Metadata only: the heavy result payload is fetched on open. */
@@ -128,8 +129,44 @@ export async function saveKundliReading(
   });
 }
 
-export async function renameReading(userId: string, id: string, title: string): Promise<void> {
-  const clean = title.trim();
+/** Compatibility history input: both chart people, kept separate. */
+export interface CompatibilityHistoryInput {
+  bride_name: string;
+  bride_date: string;
+  bride_time: string;
+  bride_place: string;
+  bride_latitude?: number;
+  bride_longitude?: number;
+  bride_timezone?: string;
+  groom_name: string;
+  groom_date: string;
+  groom_time: string;
+  groom_place: string;
+  groom_latitude?: number;
+  groom_longitude?: number;
+  groom_timezone?: string;
+}
+
+export function buildCompatibilityTitle(bride: string, groom: string): string {
+  const a = (bride ?? '').trim() || 'Person 1';
+  const b = (groom ?? '').trim() || 'Person 2';
+  return `${a} & ${b} — Compatibility`;
+}
+
+export async function saveCompatibilityReading(
+  userId: string,
+  input: CompatibilityHistoryInput,
+  result: unknown,
+): Promise<string> {
+  return saveReading(userId, {
+    type: 'compatibility',
+    title: buildCompatibilityTitle(input.bride_name, input.groom_name),
+    input_data: { ...input },
+    result_data: result,
+  });
+}
+
+export async function renameReading(userId: string, id: string, title: string): Promise<void> {  const clean = title.trim();
   if (!clean) throw new Error('Please enter a title.');
 
   const { error } = await client()

@@ -53,7 +53,8 @@ STATS_TIMEZONE = "UTC"
 def archiving_enabled() -> bool:
     return (os.environ.get("KAVACH_ARCHIVE") or "").strip() != "0"
 
-PRODUCTS = ("kundli", "reading", "daily", "weekly", "life_summary", "dasha", "ask", "panchang")
+PRODUCTS = ("kundli", "reading", "daily", "weekly", "life_summary", "dasha", "ask", "panchang",
+            "compatibility")
 
 STATUS_SUCCEEDED = "SUCCEEDED"
 STATUS_FAILED = "FAILED"
@@ -78,7 +79,11 @@ INPUT_FIELDS: dict[str, tuple[str, ...]] = {
     "ask": ("question", "conversation_id", "timestamp", "location_label"),
     "weekly": ("birth", "forecast"),
     "dasha": ("birth", "asOf"),
-}
+    # Two chart people, kept separate from the authenticated account. Only the
+    # customer-facing birth details; no rule tables, tokens or traces.
+    "compatibility": ("bride_name", "bride_date", "bride_time", "bride_place",
+                      "groom_name", "groom_date", "groom_time", "groom_place"),
+    }
 
 NESTED_INPUT_FIELDS: dict[str, dict[str, tuple[str, ...]]] = {
     "weekly": {
@@ -563,6 +568,25 @@ def _person_name(row: dict) -> Optional[str]:
     return clean or None
 
 
+def _compatibility_people(row: dict) -> Optional[dict]:
+    """The two chart people for a compatibility submission, kept apart.
+
+    Neither name is ever treated as the account identity.
+    """
+    if row.get("product") != "compatibility":
+        return None
+    data = row.get("input_data")
+    if not isinstance(data, dict):
+        return None
+    bride = data.get("bride_name")
+    groom = data.get("groom_name")
+    people = {
+        "bride": " ".join(bride.split())[:80] if isinstance(bride, str) and bride.strip() else None,
+        "groom": " ".join(groom.split())[:80] if isinstance(groom, str) and groom.strip() else None,
+    }
+    return people if (people["bride"] or people["groom"]) else None
+
+
 def _bearer(authorization: str) -> Optional[str]:
     value = (authorization or "").strip()
     if value.lower().startswith("bearer "):
@@ -646,6 +670,7 @@ async def admin_list(
     for row in rows:
         row.update(identities.get(row.get("user_id"), {"account_email": None, "account_name": None}))
         row["person_name"] = _person_name(row)
+        row["compatibility"] = _compatibility_people(row)
 
     return {
         "status": "ok",
@@ -666,6 +691,7 @@ async def admin_detail(submission_id: str, authorization: str = Header(default="
         raise HTTPException(status_code=404, detail="Submission not found.")
     row.update(_identity_for(row.get("user_id")))
     row["person_name"] = _person_name(row)
+    row["compatibility"] = _compatibility_people(row)
     return {"status": "ok", "submission": row}
 
 

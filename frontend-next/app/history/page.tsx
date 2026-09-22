@@ -207,8 +207,15 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-3">
-                      {item.type === 'kundli' && (
-                        <a href={`/kundli?saved=${encodeURIComponent(item.id)}`} className={`${actionClass} text-[#D6BE85]`}>
+                      {(item.type === 'kundli' || item.type === 'compatibility') && (
+                        <a
+                          href={
+                            item.type === 'kundli'
+                              ? `/kundli?saved=${encodeURIComponent(item.id)}`
+                              : `/compatibility?saved=${encodeURIComponent(item.id)}`
+                          }
+                          className={`${actionClass} text-[#D6BE85]`}
+                        >
                           Open
                         </a>
                       )}

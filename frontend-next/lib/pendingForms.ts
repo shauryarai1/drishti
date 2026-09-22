@@ -13,7 +13,7 @@
  *   - Cleared as soon as the pending form has been consumed.
  */
 
-export type PendingProduct = 'kundli' | 'reading' | 'life_summary' | 'your_week';
+export type PendingProduct = 'kundli' | 'reading' | 'life_summary' | 'your_week' | 'compatibility';
 
 const KEY_PREFIX = 'kavach_pending_v1';
 const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
@@ -32,6 +32,21 @@ export interface PendingBirthForm {
   forecastLatitude?: number;
   forecastLongitude?: number;
   forecastTimezone?: string;
+  // Compatibility carries two complete birth profiles, kept separate.
+  bride_name?: string;
+  bride_date?: string;
+  bride_time?: string;
+  bride_place?: string;
+  bride_latitude?: number;
+  bride_longitude?: number;
+  bride_timezone?: string;
+  groom_name?: string;
+  groom_date?: string;
+  groom_time?: string;
+  groom_place?: string;
+  groom_latitude?: number;
+  groom_longitude?: number;
+  groom_timezone?: string;
 }
 
 const NUMERIC_FIELDS = new Set([
@@ -39,7 +54,21 @@ const NUMERIC_FIELDS = new Set([
   'longitude',
   'forecastLatitude',
   'forecastLongitude',
+  'bride_latitude',
+  'bride_longitude',
+  'groom_latitude',
+  'groom_longitude',
 ]);
+
+/** Fields that must be present for a restored form to be usable. */
+const REQUIRED_FIELDS: Record<PendingProduct, string[]> = {
+  kundli: ['date', 'time', 'place'],
+  reading: ['date', 'time', 'place'],
+  life_summary: ['date', 'time', 'place'],
+  your_week: ['date', 'time', 'place'],
+  compatibility: ['bride_date', 'bride_time', 'bride_place',
+                  'groom_date', 'groom_time', 'groom_place'],
+};
 
 const ALLOWED_FIELDS: Record<PendingProduct, (keyof PendingBirthForm)[]> = {
   kundli: ['name', 'date', 'time', 'place', 'latitude', 'longitude', 'timezone'],
@@ -49,6 +78,11 @@ const ALLOWED_FIELDS: Record<PendingProduct, (keyof PendingBirthForm)[]> = {
   your_week: ['date', 'time', 'place', 'latitude', 'longitude', 'timezone',
               'startDate', 'forecastPlace', 'forecastLatitude', 'forecastLongitude',
               'forecastTimezone'],
+  // Dedicated key: compatibility is its own product with two profiles.
+  compatibility: ['bride_name', 'bride_date', 'bride_time', 'bride_place',
+                  'bride_latitude', 'bride_longitude', 'bride_timezone',
+                  'groom_name', 'groom_date', 'groom_time', 'groom_place',
+                  'groom_latitude', 'groom_longitude', 'groom_timezone'],
 };
 
 function storageKey(product: PendingProduct): string {
@@ -81,8 +115,8 @@ function pick(product: PendingProduct, data: Record<string, unknown>): PendingBi
     }
   }
 
-  // A restored form is only usable when the required birth details are present.
-  if (typeof out.date !== 'string' || typeof out.time !== 'string' || typeof out.place !== 'string') {
+  // A restored form is only usable when its required fields are present.
+  if (REQUIRED_FIELDS[product].some((field) => typeof out[field] !== 'string')) {
     return null;
   }
   return out as unknown as PendingBirthForm;

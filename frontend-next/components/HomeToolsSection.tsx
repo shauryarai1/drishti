@@ -42,6 +42,12 @@ const PRIMARY_TOOLS: Tool[] = [
     description: 'See what may deserve your attention today.',
     cta: 'VIEW TODAY',
   },
+  {
+    href: '/compatibility',
+    title: 'Marriage Compatibility',
+    description: 'Check traditional compatibility between two charts.',
+    cta: 'CHECK COMPATIBILITY',
+  },
 ];
 
 // Secondary tools stay visually quiet.

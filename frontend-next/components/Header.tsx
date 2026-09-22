@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { label: 'Life Summary', href: '/life-summary' },
   { label: 'Ask Kavach', href: '/ask' },
   { label: 'YES / NO', href: '/yes-no' },
+  { label: 'Compatibility', href: '/compatibility' },
   { label: 'Panchang', href: '/panchang' },
   { label: 'Services', href: '/services' },
 ];
