@@ -104,20 +104,23 @@ def test_dev_endpoints_fail_closed_without_explicit_opt_in(monkeypatch, client, 
     assert client.post(path, json={}).status_code == 404
 
 
-def test_dev_gate_policy_is_fail_closed():
-    assert hardening.dev_tools_allowed("203.0.113.9") is False or True  # documented below
-    import os
+def test_dev_gate_policy_is_fail_closed(monkeypatch):
+    import chat.trace as trace
 
-    previous = os.environ.pop("KAVACH_DEV_TOOLS", None)
-    previous_env = os.environ.pop("KAVACH_ENV", None)
-    try:
-        assert hardening.dev_tools_allowed("203.0.113.9") is False, "public caller must be denied"
-        assert hardening.dev_tools_allowed("127.0.0.1") is True, "local development stays usable"
-    finally:
-        if previous is not None:
-            os.environ["KAVACH_DEV_TOOLS"] = previous
-        if previous_env is not None:
-            os.environ["KAVACH_ENV"] = previous_env
+    monkeypatch.delenv("KAVACH_DEV_TOOLS", raising=False)
+    monkeypatch.delenv("KAVACH_ENV", raising=False)
+    # Without an explicit development opt-in, nothing is available anywhere.
+    assert hardening.dev_tools_allowed() is False
+    assert trace.dev_tools_enabled() is False
+
+    monkeypatch.setenv("KAVACH_DEV_TOOLS", "1")
+    assert hardening.dev_tools_allowed() is True
+    assert trace.dev_tools_enabled() is True
+
+    # Production always wins, even with an explicit opt-in.
+    monkeypatch.setenv("KAVACH_ENV", "production")
+    assert hardening.dev_tools_allowed() is False
+    assert trace.dev_tools_enabled() is False
 
 
 # --- admin authorization ----------------------------------------------------
@@ -188,7 +191,7 @@ def test_normal_payloads_are_not_size_limited(client):
 # --- rate limiting ----------------------------------------------------------
 def test_rate_limit_returns_429_with_retry_after(monkeypatch, client):
     monkeypatch.setenv("KAVACH_RATELIMIT", "1")
-    monkeypatch.setattr(hardening, "RATE_LIMITS", (("/api/health", 3),))
+    monkeypatch.setattr(hardening, "RATE_LIMITS", (("/api/health", 3, 3),))
     hardening.LIMITER.reset()
     try:
         for _ in range(3):

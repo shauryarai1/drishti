@@ -55,6 +55,26 @@ interface DailyMoon {
 }
 
 export default function PanchangEngineTest() {
+  // Development-only tool. `process.env.NODE_ENV` is inlined at build time, so a
+  // production build always takes this branch and never renders the tool.
+  // The backend independently refuses every /api/dev/* request in production.
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#090909] p-8 text-[#EEE9DF]">
+        <div className="max-w-xl rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70 p-6 text-center">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#B39250]">KAVACH</div>
+          <h1 className="mt-2 text-lg font-semibold text-[#F7F5F0]">Not available</h1>
+          <p className="mt-2 text-[13px] text-[#EEE9DF]/60">
+            This is a development-only tool and is disabled in production.
+          </p>
+          <a href="/ask" className="mt-4 inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-[#D6BE85] hover:text-[#F7F5F0]">
+            Return to Ask KAVACH
+          </a>
+        </div>
+      </main>
+    );
+  }
+
   const [date, setDate] = useState('2008-05-14');
   const [time, setTime] = useState('14:35');
   const [place, setPlace] = useState('Delhi, India');

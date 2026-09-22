@@ -28,6 +28,13 @@ const STARTERS = [
 
 const STORAGE_KEY = 'kavach_ask_location';
 
+// Development-only inspector tooling. In a production build Next.js inlines
+// `process.env.NODE_ENV` as "production", so this is false, the probe never
+// runs, the control is never rendered, and no trace request is ever made. The
+// backend independently refuses inspector/trace data to ordinary production
+// requests, so this is defence in depth rather than the only control.
+const DEV_TOOLS_ENABLED = process.env.NODE_ENV !== 'production';
+
 interface Turn { id: number; question: string; answer: string; answered: boolean; assistantIndex: number }
 interface TraceCard {
   position_label: string; name: string; orientation: string; card_id: string; valence?: string | null;
@@ -166,7 +173,9 @@ export default function AskPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [conversationId, setConversationId] = useState('');
-  const [devEnabled, setDevEnabled] = useState(true);
+  // Fail-closed by default: the inspector control stays hidden unless the
+  // development probe below succeeds, and that probe never runs in production.
+  const [devEnabled, setDevEnabled] = useState(DEV_TOOLS_ENABLED);
   const [inspecting, setInspecting] = useState<number | null>(null);
   const [trace, setTrace] = useState<TraceEvent | null>(null);
   const [traceError, setTraceError] = useState('');
@@ -178,6 +187,7 @@ export default function AskPage() {
   }, []);
 
   useEffect(() => {
+    if (!DEV_TOOLS_ENABLED) return;
     fetch(`${API_BASE}/dev/kavach-trace`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ probe: true }),
@@ -368,7 +378,7 @@ export default function AskPage() {
                   <div className="rounded-2xl rounded-bl-sm border border-[#A62A34]/25 bg-[#160A0C]/80 px-4 py-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">
                     {turn.answer}
                   </div>
-                  {devEnabled && (
+                  {DEV_TOOLS_ENABLED && devEnabled && (
                     <button
                       onClick={() => openInspector(turn)}
                       className="mt-1 text-[11px] text-[#B39250]/80 hover:text-[#D6BE85]"
@@ -376,7 +386,7 @@ export default function AskPage() {
                       🔧 Inspect Reading
                     </button>
                   )}
-                  {devEnabled && inspecting === turn.id && (
+                  {DEV_TOOLS_ENABLED && devEnabled && inspecting === turn.id && (
                     trace
                       ? <DevInspector event={trace} onClose={() => setInspecting(null)} />
                       : <div className="mt-2 text-[11px] text-[#E5B567]">{traceError || 'Loading trace…'}</div>

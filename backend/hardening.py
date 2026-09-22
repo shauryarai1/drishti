@@ -5,19 +5,26 @@ astrology or provider code. Nothing here inspects or alters astrology payloads.
 
 Policies
 --------
-* Dev tooling (`/api/dev/*`) is FAIL-CLOSED: only allowed when explicitly enabled
-  with KAVACH_DEV_TOOLS=1, or (by default) when the caller is on loopback. It is
-  never allowed when KAVACH_ENV=production.
+* Inspector/trace tooling (`/api/dev/*`) is FAIL-CLOSED and explicit: allowed
+  only when a development environment sets KAVACH_DEV_TOOLS=1, and never when
+  KAVACH_ENV=production. Ordinary production requests cannot reach private model
+  context, routing metadata or hidden reading mechanics.
 * Request bodies over MAX_BODY_BYTES are rejected with 413 before any handler runs.
-* Expensive/public endpoints are rate limited per client. Authenticated callers are
-  keyed by a hash of their bearer token, guests by trusted client IP.
+* Expensive/public endpoints are rate limited. Anonymous callers are keyed by
+  trusted client IP; authenticated callers additionally get a per-token bucket
+  with a higher allowance. The IP bucket always applies, so inventing or rotating
+  tokens cannot lift the limit.
 * Security headers are attached to every response (HSTS only over HTTPS).
 
-Known limitation
-----------------
-The limiter is in-memory, per process. On a single Render instance that is
-effective; it is not shared across instances, so it is abuse mitigation rather
-than a hard guarantee. A distributed limiter would need shared infrastructure.
+Rate limiting limitations (important)
+-------------------------------------
+The limiter is IN-MEMORY and PER PROCESS:
+  * counters reset whenever the service restarts or redeploys;
+  * counters are not shared across multiple workers or Render instances, so the
+    effective limit is per instance;
+  * it is basic abuse protection, not a distributed security boundary.
+A shared limiter (Redis/Upstash or a CDN rule) would need new infrastructure and
+has deliberately not been added.
 """
 
 from __future__ import annotations
@@ -37,23 +44,24 @@ DEV_PREFIX = "/api/dev/"
 MAX_BODY_BYTES = 64 * 1024
 WINDOW_SECONDS = 60.0
 MAX_TRACKED_KEYS = 20_000
-LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
-# (path prefix, requests per window). Longest prefix wins.
-RATE_LIMITS: Tuple[Tuple[str, int], ...] = (
-    ("/api/ask", 12),
-    ("/api/interpretation", 10),
-    ("/api/chart", 10),
-    ("/api/kundli", 15),
-    ("/api/life-summary", 20),
-    ("/api/weekly", 20),
-    ("/api/current-dasha-reading", 20),
-    ("/api/daily", 30),
-    ("/api/panchang", 30),
-    ("/api/places/search", 20),
-    ("/api/admin", 120),
+# (path prefix, anonymous limit, authenticated limit) per window. Longest prefix wins.
+# Anonymous budgets are deliberately tighter than authenticated ones because a
+# guest identity cannot be verified.
+RATE_LIMITS: Tuple[Tuple[str, int, int], ...] = (
+    ("/api/ask", 8, 20),
+    ("/api/interpretation", 6, 15),
+    ("/api/chart", 6, 15),
+    ("/api/kundli", 10, 25),
+    ("/api/life-summary", 12, 30),
+    ("/api/weekly", 12, 30),
+    ("/api/current-dasha-reading", 12, 30),
+    ("/api/daily", 20, 60),
+    ("/api/panchang", 30, 90),
+    ("/api/places/search", 12, 30),
+    ("/api/admin", 60, 240),
 )
-DEFAULT_LIMIT = 120
+DEFAULT_LIMITS = (60, 180)
 
 # Only these headers are added; none of them can break the JSON API contract.
 SECURITY_HEADERS: Tuple[Tuple[str, str], ...] = (
@@ -72,16 +80,11 @@ def rate_limiting_enabled() -> bool:
     return os.environ.get("KAVACH_ENV", "").lower() != "test"
 
 
-def dev_tools_allowed(client_host: str) -> bool:
-    """Fail-closed dev policy: explicit opt-in, or loopback by default."""
+def dev_tools_allowed() -> bool:
+    """Explicit, fail-closed development gate (mirrors chat.trace.dev_tools_enabled)."""
     if os.environ.get("KAVACH_ENV", "").lower() == "production":
         return False
-    explicit = (os.environ.get("KAVACH_DEV_TOOLS") or "").strip()
-    if explicit == "0":
-        return False
-    if explicit == "1":
-        return True
-    return client_host in LOOPBACK_HOSTS
+    return (os.environ.get("KAVACH_DEV_TOOLS") or "").strip() == "1"
 
 
 def client_ip(scope: dict, headers: Dict[str, str]) -> str:
@@ -105,23 +108,42 @@ def client_ip(scope: dict, headers: Dict[str, str]) -> str:
     return peer[0] if peer else "unknown"
 
 
-def client_key(scope: dict, headers: Dict[str, str]) -> str:
-    """Authenticated callers are keyed by token hash, guests by client IP."""
+def bearer_token(headers: Dict[str, str]) -> Optional[str]:
     authorization = headers.get("authorization", "")
     if authorization.lower().startswith("bearer "):
-        token = authorization[7:].strip()
-        if token:
-            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
-            return f"user:{digest}"
-    return f"ip:{client_ip(scope, headers)}"
+        return authorization[7:].strip() or None
+    return None
 
 
-def limit_for(path: str) -> int:
+def token_fingerprint(token: str) -> str:
+    """Stable, non-reversible bucket id. Raw tokens are never stored or logged."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+
+
+def limits_for(path: str) -> Tuple[int, int]:
+    """Return (anonymous_limit, authenticated_limit) for this path."""
     best = ""
-    for prefix, limit in RATE_LIMITS:
+    chosen = DEFAULT_LIMITS
+    for prefix, anonymous, authenticated in RATE_LIMITS:
         if path.startswith(prefix) and len(prefix) > len(best):
-            best, chosen = prefix, limit
-    return chosen if best else DEFAULT_LIMIT
+            best, chosen = prefix, (anonymous, authenticated)
+    return chosen
+
+
+def buckets_for(scope: dict, headers: Dict[str, str]) -> List[Tuple[str, int]]:
+    """Buckets to charge for this request.
+
+    The IP bucket always applies and becomes the abuse ceiling, so a fabricated
+    or rotated token cannot raise the limit; a genuine bearer token additionally
+    gets its own higher-allowance bucket. A client-supplied user id is never
+    used, and X-Kavach-Session is explicitly not treated as authentication.
+    """
+    guest_limit, user_limit = limits_for(scope.get("path", ""))
+    ip_bucket = (f"ip:{client_ip(scope, headers)}", user_limit if bearer_token(headers) else guest_limit)
+    token = bearer_token(headers)
+    if token:
+        return [ip_bucket, (f"user:{token_fingerprint(token)}", user_limit)]
+    return [ip_bucket]
 
 
 class RateLimiter:
@@ -148,6 +170,17 @@ class RateLimiter:
             return False, retry_after
         hits.append(now)
         return True, 0
+
+    def charge(self, buckets: List[Tuple[str, int]]) -> Tuple[bool, int]:
+        """Charge every bucket. Allowed only when each bucket still has room."""
+        allowed = True
+        retry_after = 0
+        for key, limit in buckets:
+            ok, retry = self.check(key, limit)
+            if not ok:
+                allowed = False
+                retry_after = max(retry_after, retry)
+        return allowed, retry_after
 
 
 LIMITER = RateLimiter()
@@ -184,11 +217,9 @@ class HardeningMiddleware:
             key.decode("latin-1").lower(): value.decode("latin-1")
             for key, value in scope.get("headers", [])
         }
-        peer = scope.get("client")
-        host = peer[0] if peer else ""
 
-        # 1. Dev tooling gate (fail-closed).
-        if path.startswith(DEV_PREFIX) and not dev_tools_allowed(host):
+        # 1. Inspector/trace tooling gate (fail-closed, explicit opt-in only).
+        if path.startswith(DEV_PREFIX) and not dev_tools_allowed():
             await _json_response(send, 404, {"status": "error", "message": "Not found"})
             return
 
@@ -205,8 +236,9 @@ class HardeningMiddleware:
 
         # 3. Rate limiting (preflights are exempt).
         if method != "OPTIONS" and rate_limiting_enabled():
-            allowed, retry_after = LIMITER.check(client_key(scope, headers), limit_for(path))
+            allowed, retry_after = LIMITER.charge(buckets_for(scope, headers))
             if not allowed:
+                # Log only the path and the retry hint: no token, IP, or identity.
                 logger.info(
                     "ask_kavach security=ratelimit path=%s status=429 retry_after=%s",
                     path, retry_after,

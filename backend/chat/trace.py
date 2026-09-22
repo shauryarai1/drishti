@@ -19,9 +19,15 @@ _TRACES: Dict[str, List[Dict[str, Any]]] = {}
 
 
 def dev_tools_enabled() -> bool:
+    """Explicit, fail-closed development gate.
+
+    Trace recording holds private model context, so it must never run by default
+    (and never in production). A development environment has to opt in with
+    KAVACH_DEV_TOOLS=1.
+    """
     if os.environ.get("KAVACH_ENV", "").lower() == "production":
         return False
-    return os.environ.get("KAVACH_DEV_TOOLS", "1") != "0"
+    return os.environ.get("KAVACH_DEV_TOOLS", "").strip() == "1"
 
 
 def record_event(conversation_id: str, question: str, reading: Dict[str, Any],
