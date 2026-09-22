@@ -19,7 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import chat.gemini as gemini
-import chat.nvidia as nvidia
+import chat.groq as groq
 import main
 from panchang import PanchangRequest, compute_panchang
 from panchang import engine as panchang_engine
@@ -343,22 +343,22 @@ def _ask(client, conversation_id="bug1"):
 
 
 def test_nvidia_success_returns_the_answer(ask_env):
-    import chat.nvidia as nv
-    original = nv.generate_reply_detailed
-    nv.generate_reply_detailed = lambda *a, **k: {"text": "NVIDIA answered.", "model": nv.primary_model(),
-                                                  "preferred": nv.primary_model(), "provider": "nvidia",
+    import chat.groq as groq
+    original = groq.generate_reply_detailed
+    groq.generate_reply_detailed = lambda *a, **k: {"text": "NVIDIA answered.", "model": groq.MODEL,
+                                                  "preferred": groq.MODEL, "provider": "groq",
                                                   "attempts": [], "fallback": False}
     try:
         body = _ask(TestClient(main.app)).json()
     finally:
-        nv.generate_reply_detailed = original
+        groq.generate_reply_detailed = original
     assert body["answered"] is True and body["answer"] == "NVIDIA answered."
 
 
 def test_nvidia_failure_reaches_gemini_and_returns_its_answer(ask_env, monkeypatch):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "model": None, "provider": "nvidia",
-                                         "preferred": nvidia.primary_model(),
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "model": None, "provider": "groq",
+                                         "preferred": groq.MODEL,
                                          "attempts": [{"model": "x", "reason": "transient_503"}],
                                          "fallback": True})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
@@ -372,9 +372,9 @@ def test_nvidia_failure_reaches_gemini_and_returns_its_answer(ask_env, monkeypat
 
 
 def test_all_providers_unavailable_gives_the_existing_friendly_message(ask_env, monkeypatch):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "model": None, "provider": "nvidia",
-                                         "preferred": nvidia.primary_model(), "attempts": [], "fallback": True})
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "model": None, "provider": "groq",
+                                         "preferred": groq.MODEL, "attempts": [], "fallback": True})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": None, "model": None, "provider": "gemini",
                                          "preferred": gemini.MODEL_PRIORITY[0], "attempts": []})
@@ -451,9 +451,9 @@ def test_ordinary_ask_requests_are_not_rate_limited(monkeypatch, ask_env):
     try:
         client = TestClient(main.app)
         for index in range(5):
-            monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                                lambda *a, **k: {"text": "ok", "model": nvidia.primary_model(),
-                                                 "preferred": nvidia.primary_model(), "provider": "nvidia",
+            monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                                lambda *a, **k: {"text": "ok", "model": groq.MODEL,
+                                                 "preferred": groq.MODEL, "provider": "groq",
                                                  "attempts": [], "fallback": False})
             assert _ask(client, f"normal-{index}").status_code == 200
     finally:
@@ -479,9 +479,9 @@ def test_one_ask_request_still_archives_one_row(monkeypatch, ask_env):
 
     store = CountingStore()
     monkeypatch.setattr(archive, "store", store)
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "provider": "nvidia",
-                                         "preferred": nvidia.primary_model(), "attempts": [], "fallback": True})
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "provider": "groq",
+                                         "preferred": groq.MODEL, "attempts": [], "fallback": True})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": "Gemini answered.", "model": "gemini-3.5-flash",
                                          "preferred": "gemini-3.6-flash", "provider": "gemini", "attempts": []})
@@ -491,9 +491,9 @@ def test_one_ask_request_still_archives_one_row(monkeypatch, ask_env):
 
 
 def test_ask_response_never_leaks_secrets(ask_env, monkeypatch):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": "Fine.", "model": nvidia.primary_model(),
-                                         "preferred": nvidia.primary_model(), "provider": "nvidia",
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": "Fine.", "model": groq.MODEL,
+                                         "preferred": groq.MODEL, "provider": "groq",
                                          "attempts": [], "fallback": False})
     body = json.dumps(_ask(TestClient(main.app)).json())
     assert set(json.loads(body).keys()) == {"status", "answered", "answer", "conversation_id"}

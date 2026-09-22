@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 import archive
 import chat.gemini as gemini
-import chat.nvidia as nvidia
+import chat.groq as groq
 import main
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -47,7 +47,7 @@ class FakeStore:
 @pytest.fixture()
 def env(monkeypatch):
     """Mock both providers and the geocoder; record what each one saw."""
-    seen: dict = {"nvidia": [], "gemini": [], "geocoder": 0, "inserts": 0}
+    seen: dict = {"groq": [], "gemini": [], "geocoder": 0, "inserts": 0}
 
     monkeypatch.setattr(archive, "store", FakeStore())
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
@@ -55,10 +55,10 @@ def env(monkeypatch):
         {"reading": "context"}]})
     monkeypatch.setattr("chat.reading.private_context", lambda _r: "PRIVATE CONTEXT")
 
-    def fake_nvidia(_q, _h, private_context=""):
-        seen["nvidia"].append(bool(private_context))
-        return {"text": "NVIDIA answer.", "model": nvidia.primary_model(), "preferred": nvidia.primary_model(),
-                "provider": "nvidia", "attempts": [{"model": nvidia.primary_model(), "reason": "ok"}],
+    def fake_groq(_q, _h, private_context=""):
+        seen["groq"].append(bool(private_context))
+        return {"text": "Groq answer.", "model": groq.MODEL, "preferred": groq.MODEL,
+                "provider": "groq", "attempts": [{"model": groq.MODEL, "reason": "ok"}],
                 "fallback": False, "reasoning_content": "HIDDEN"}
 
     def fake_gemini(_q, _h, private_context=""):
@@ -66,7 +66,7 @@ def env(monkeypatch):
         return {"text": "Gemini answer.", "model": "gemini-3.5-flash-lite", "preferred": "gemini-3.5-flash-lite",
                 "provider": "gemini", "attempts": []}
 
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed", fake_nvidia)
+    monkeypatch.setattr("chat.groq.generate_reply_detailed", fake_groq)
     monkeypatch.setattr("chat.gemini.generate_reply_detailed", fake_gemini)
 
     import geocoding
@@ -95,7 +95,7 @@ def test_general_questions_get_a_normal_answer(env, client, question):
     body = ask(client, question).json()
 
     assert body["answered"] is True
-    assert body["answer"] == "NVIDIA answer."
+    assert body["answer"] == "Groq answer."
     assert set(body) == {"status", "answered", "answer", "conversation_id"}
 
 
@@ -104,8 +104,8 @@ def test_general_chat_uses_no_astrology_context_and_no_geocoder(env, client):
         ask(client, question, conversation_id=f"general-{index}")
 
     assert env["geocoder"] == 0, "ordinary conversation must never geocode"
-    assert env["nvidia"], "the primary provider should have been used"
-    assert all(private is False for private in env["nvidia"]), "no private astrology context for general chat"
+    assert env["groq"], "the primary provider should have been used"
+    assert all(private is False for private in env["groq"]), "no private astrology context for general chat"
 
 
 def test_general_chat_needs_no_birth_details(env, client):
@@ -114,7 +114,7 @@ def test_general_chat_needs_no_birth_details(env, client):
                                              "timestamp": "2026-09-22T11:45:00+05:30",
                                              "conversation_id": "no-birth-details"})
     assert response.status_code == 200
-    assert response.json()["answer"] == "NVIDIA answer."
+    assert response.json()["answer"] == "Groq answer."
 
 
 # --- astrology chat ---------------------------------------------------------
@@ -123,18 +123,18 @@ def test_astrology_questions_use_the_kavach_context(env, client, question):
     body = ask(client, question, conversation_id=f"astro-{question[:12]}").json()
 
     assert body["answered"] is True
-    assert env["nvidia"][-1] is True, "astrology questions must carry the private context"
+    assert env["groq"][-1] is True, "astrology questions must carry the private context"
 
 
 def test_astrology_follow_up_stays_in_context_then_general_returns(env, client):
     ask(client, "read my kundli", conversation_id="switch")
-    assert env["nvidia"][-1] is True
+    assert env["groq"][-1] is True
 
     ask(client, "what about Jupiter?", conversation_id="switch")
-    assert env["nvidia"][-1] is True, "an astrology follow-up keeps the context"
+    assert env["groq"][-1] is True, "an astrology follow-up keeps the context"
 
     ask(client, "thanks. Now explain gravity.", conversation_id="switch")
-    assert env["nvidia"][-1] is False, "an unrelated question returns to general chat"
+    assert env["groq"][-1] is False, "an unrelated question returns to general chat"
 
 
 # --- provider failure -------------------------------------------------------
@@ -144,9 +144,9 @@ def test_primary_success_is_used(env, client):
 
 
 def test_primary_timeout_reaches_the_fallback(env, client, monkeypatch):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "provider": "nvidia", "preferred": nvidia.primary_model(),
-                                         "attempts": [{"model": nvidia.primary_model(), "reason": "timeout"}],
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "provider": "groq", "preferred": groq.MODEL,
+                                         "attempts": [{"model": groq.MODEL, "reason": "timeout"}],
                                          "fallback": True})
     body = ask(client, "what is gravity?").json()
     assert body["answer"] == "Gemini answer."
@@ -155,18 +155,18 @@ def test_primary_timeout_reaches_the_fallback(env, client, monkeypatch):
 
 @pytest.mark.parametrize("reason", ["transient_429", "transient_503", "unavailable"])
 def test_primary_429_or_503_reaches_the_fallback(env, client, monkeypatch, reason):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "provider": "nvidia", "preferred": nvidia.primary_model(),
-                                         "attempts": [{"model": nvidia.primary_model(), "reason": reason}],
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "provider": "groq", "preferred": groq.MODEL,
+                                         "attempts": [{"model": groq.MODEL, "reason": reason}],
                                          "fallback": True})
     body = ask(client, "explain photosynthesis").json()
     assert body["answered"] is True and body["answer"] == "Gemini answer."
 
 
 def test_both_providers_unavailable_gives_the_friendly_message(env, client, monkeypatch):
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "provider": "nvidia",
-                                         "preferred": nvidia.primary_model(), "attempts": [], "fallback": True})
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "provider": "groq",
+                                         "preferred": groq.MODEL, "attempts": [], "fallback": True})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": None, "provider": "gemini",
                                          "preferred": gemini.MODEL_PRIORITY[0], "attempts": []})
@@ -178,10 +178,9 @@ def test_both_providers_unavailable_gives_the_friendly_message(env, client, monk
 
 
 def test_provider_chain_is_one_primary_and_one_fallback():
-    assert len(nvidia.MODEL_REGISTRY) == 1, "one NVIDIA primary only"
-    assert nvidia.MAX_ATTEMPTS == 1
+    assert groq.MODEL == "openai/gpt-oss-120b", "one Groq primary"
+    assert groq.TIMEOUT_SECONDS <= 20.0
     assert len(gemini.MODEL_PRIORITY) == 2, "one Gemini fallback provider, two viable models"
-    assert nvidia.TOTAL_BUDGET_SECONDS <= 15.0
     assert gemini.PER_ATTEMPT_TIMEOUT <= 15.0
 
 
@@ -190,12 +189,12 @@ def test_internal_metadata_and_prompts_are_never_returned(env, client):
     body = json.dumps(ask(client, "what is gravity?").json())
 
     for forbidden in ("HIDDEN", "reasoning", "PRIVATE CONTEXT", "system_instruction",
-                      "You are Ask KAVACH", "nvidia/nemotron", "gemini-3.5", "attempts", "provider"):
+                      "You are Ask KAVACH", "openai/gpt-oss", "gemini-3.5", "attempts", "provider"):
         assert forbidden not in body, forbidden
 
 
 def test_api_keys_are_never_returned_or_logged(env, client, monkeypatch, caplog):
-    monkeypatch.setenv("NVIDIA_API_KEY", "nvidia-sentinel-key")
+    monkeypatch.setenv("GROQ_API_KEY", "groq-sentinel-key")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-sentinel-key")
 
     records: list[str] = []
@@ -214,8 +213,8 @@ def test_api_keys_are_never_returned_or_logged(env, client, monkeypatch, caplog)
         logger.removeHandler(handler)
 
     joined = "\n".join(records)
-    for secret in ("nvidia-sentinel-key", "gemini-sentinel-key"):
+    for secret in ("groq-sentinel-key", "gemini-sentinel-key"):
         assert secret not in body and secret not in joined
     # Logs carry categories only - never the question or the answer text.
     assert "gravity" not in joined.lower()
-    assert "NVIDIA answer." not in joined
+    assert "Groq answer." not in joined

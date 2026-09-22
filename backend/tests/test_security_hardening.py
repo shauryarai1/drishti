@@ -220,7 +220,7 @@ def test_trusted_client_ip_ignores_spoofed_forwarding():
 
 # --- output handling --------------------------------------------------------
 def test_model_output_with_html_is_returned_as_plain_text(monkeypatch, fake_store):
-    import chat.nvidia as nvidia
+    import chat.groq as groq
 
     class FakeResponse:
         status_code = 200
@@ -230,14 +230,14 @@ def test_model_output_with_html_is_returned_as_plain_text(monkeypatch, fake_stor
             return {"choices": [{"message": {"role": "assistant",
                                              "content": "<script>alert('xss')</script>"}}]}
 
-    monkeypatch.setattr(nvidia.httpx, "post", lambda *a, **k: FakeResponse())
+    monkeypatch.setattr(groq.httpx, "post", lambda *a, **k: FakeResponse())
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
 
     def no_reading(_q):
         raise RuntimeError("no tarot in tests")
 
     monkeypatch.setattr("chat.reading.build_reading", no_reading)
-    monkeypatch.setenv("NVIDIA_API_KEY", "test-sentinel")
+    monkeypatch.setenv("GROQ_API_KEY", "test-sentinel")
 
     body = TestClient(main.app).post(
         "/api/ask", json={"question": "tell me", "timestamp": "2026-09-21T22:40:00+05:30",
@@ -251,7 +251,7 @@ def test_model_output_with_html_is_returned_as_plain_text(monkeypatch, fake_stor
 
 
 def test_reasoning_content_never_surfaces(monkeypatch):
-    import chat.nvidia as nvidia
+    import chat.groq as groq
 
     secret = "HIDDEN-REASONING-SENTINEL"
 
@@ -263,8 +263,9 @@ def test_reasoning_content_never_surfaces(monkeypatch):
             return {"choices": [{"message": {"role": "assistant", "content": "public",
                                              "reasoning_content": secret}}]}
 
-    monkeypatch.setattr(nvidia.httpx, "post", lambda *a, **k: FakeResponse())
-    detail = nvidia.generate_reply_detailed("q", [])
+    monkeypatch.setattr(groq.httpx, "post", lambda *a, **k: FakeResponse())
+    monkeypatch.setenv("GROQ_API_KEY", "test-sentinel")
+    detail = groq.generate_reply_detailed("q", [])
     assert detail["text"] == "public"
     assert secret not in json.dumps(detail)
 

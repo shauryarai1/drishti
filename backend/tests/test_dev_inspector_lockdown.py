@@ -59,9 +59,9 @@ def ask_env(monkeypatch):
 
     monkeypatch.setattr("chat.reading.build_reading", no_reading)
     monkeypatch.setattr(
-        "chat.nvidia.generate_reply_detailed",
+        "chat.groq.generate_reply_detailed",
         lambda *a, **k: {"text": "A safe answer.", "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-                         "preferred": "nvidia/nemotron-3.5-lightning-30b-a3b", "provider": "nvidia",
+                         "preferred": "nvidia/nemotron-3.5-lightning-30b-a3b", "provider": "groq",
                          "attempts": [{"model": "nvidia/nemotron-3.5-lightning-30b-a3b", "reason": "ok"}],
                          "fallback": False},
     )

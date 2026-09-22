@@ -459,15 +459,15 @@ async def ask_endpoint(payload: ChatRequest):
             return "5xx"
         return "other"
 
-    # Primary provider: NVIDIA NIM router (multiple approved models, bounded attempts).
+    # Primary provider: Groq (OpenAI-compatible), one attempt.
     try:
-        from chat.nvidia import generate_reply_detailed as nvidia_reply
+        from chat.groq import generate_reply_detailed as groq_reply
 
-        detail = nvidia_reply(question, history, private_context=private)
+        detail = groq_reply(question, history, private_context=private)
         answer = detail.get("text")
     except Exception as exc:
         safe_error = type(exc).__name__
-        logger.error("Ask KAVACH NVIDIA provider failed: %s", safe_error)
+        logger.error("Ask KAVACH Groq provider failed: %s", safe_error)
 
     # Emergency fallback: the existing Gemini implementation, unchanged.
     if not answer:

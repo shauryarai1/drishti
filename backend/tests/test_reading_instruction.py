@@ -14,7 +14,7 @@ import chat.gemini as gemini
 def _pin_primary_provider_off(monkeypatch):
     """These tests assert the Gemini request contract; keep the primary provider out of the way."""
     monkeypatch.setattr(
-        "chat.nvidia.generate_reply_detailed",
+        "chat.groq.generate_reply_detailed",
         lambda *args, **kwargs: {"text": None, "model": None, "preferred": None, "attempts": []},
     )
 

@@ -3,8 +3,8 @@
 Covers two things:
   1. The admin detail endpoint returns the exact selected database row, stays
      admin-only, and never leaks private fields.
-  2. One customer request produces AT MOST ONE archive row - including NVIDIA
-     retries and the Gemini fallback - and admin statistics are database-derived
+  2. One customer request produces AT MOST ONE archive row - including primary
+     provider failure and the Gemini fallback - and admin statistics are database-derived
      rather than hardcoded.
 """
 
@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import archive
-import chat.nvidia as nvidia
+import chat.groq as groq
 import main
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -128,10 +128,10 @@ def ask_ready(monkeypatch):
         raise RuntimeError("no tarot in tests")
 
     monkeypatch.setattr("chat.reading.build_reading", no_reading)
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": "NVIDIA answer.", "model": nvidia.primary_model(),
-                                         "preferred": nvidia.primary_model(), "provider": "nvidia",
-                                         "attempts": [{"model": nvidia.primary_model(), "reason": "ok"}],
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": "Groq answer.", "model": groq.MODEL,
+                                         "preferred": groq.MODEL, "provider": "groq",
+                                         "attempts": [{"model": groq.MODEL, "reason": "ok"}],
                                          "fallback": False})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": "Gemini answer.", "model": "gemini-3.6-flash",
@@ -188,7 +188,7 @@ def test_admin_detail_never_exposes_private_fields(store, client, ask_ready):
         assert key not in body.lower(), key
     detail = json.loads(body)["submission"]
     assert detail["input_data"]["question"] == "hello"
-    assert detail["result_data"]["answer"] == "NVIDIA answer."
+    assert detail["result_data"]["answer"] == "Groq answer."
 
 
 def test_admin_stats_are_database_derived_not_hardcoded(store, client):
@@ -259,8 +259,8 @@ def test_primary_failure_then_fallback_does_not_duplicate_the_archive_row(store,
         attempts["n"] += 1
         return FakeResponse(503, text="overloaded")
 
-    monkeypatch.setattr(nvidia.httpx, "post", failing_post)
-    monkeypatch.setenv("NVIDIA_API_KEY", "test-sentinel")
+    monkeypatch.setattr(groq.httpx, "post", failing_post)
+    monkeypatch.setenv("GROQ_API_KEY", "test-sentinel")
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": "Gemini answered.", "model": "gemini-3.5-flash-lite",
                                          "preferred": "gemini-3.5-flash-lite", "provider": "gemini",
@@ -276,9 +276,9 @@ def test_primary_failure_then_fallback_does_not_duplicate_the_archive_row(store,
 def test_gemini_fallback_does_not_duplicate_the_archive_row(store, client, monkeypatch):
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
     monkeypatch.setattr("chat.reading.build_reading", lambda _q: (_ for _ in ()).throw(RuntimeError("no tarot")))
-    monkeypatch.setattr("chat.nvidia.generate_reply_detailed",
-                        lambda *a, **k: {"text": None, "model": None, "preferred": nvidia.primary_model(),
-                                         "provider": "nvidia", "attempts": [{"model": "x", "reason": "transient_503"}],
+    monkeypatch.setattr("chat.groq.generate_reply_detailed",
+                        lambda *a, **k: {"text": None, "model": None, "preferred": groq.MODEL,
+                                         "provider": "groq", "attempts": [{"model": "x", "reason": "transient_503"}],
                                          "fallback": True})
     monkeypatch.setattr("chat.gemini.generate_reply_detailed",
                         lambda *a, **k: {"text": "Gemini rescued it.", "model": "gemini-3.6-flash",

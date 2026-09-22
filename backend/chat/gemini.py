@@ -7,7 +7,7 @@ Auth: x-goog-api-key header. api_version is a required query parameter.
 The API key is read from the server environment, or from backend/.env when the
 process environment does not define it. It is never logged or returned.
 
-This is the EMERGENCY fallback behind the NVIDIA router. It is deliberately
+This is the EMERGENCY fallback behind the Groq primary. It is deliberately
 latency-bounded: a short per-attempt timeout, a total budget for the tier, and a
 cooldown for models that are rate-limited (429), retired (404) or unsupported.
 Without that bound, dead or limited models made a single Ask request take 40s+
