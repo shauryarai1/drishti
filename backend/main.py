@@ -37,23 +37,40 @@ CACHE_TTL_SECONDS = 24 * 3600  # 24 hours
 
 app = FastAPI(title="DRISHTI")
 
+# Trusted browser origins: the deployed frontends plus local development.
+# Kept as an explicit list because authenticated calls carry credentials, and
+# allow_origins=["*"] must never be combined with allow_credentials=True.
+ALLOWED_ORIGINS = [
+    "https://kavachtoday.com",
+    "https://www.kavachtoday.com",
+    "https://kavachastrology.vercel.app",
+    "https://drishti-u3qt.vercel.app",
+    "https://drishti-red.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+]
+
+# Request headers the browser may send, including the preflight for authenticated
+# POSTs (Content-Type, Authorization) and the visitor session header.
+ALLOWED_HEADERS = [
+    "Content-Type",
+    "Authorization",
+    "X-Kavach-Session",
+    "Accept",
+    "Origin",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://drishti-u3qt.vercel.app",
-        "https://drishti-red.vercel.app",
-        "https://kavachastrology.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=ALLOWED_HEADERS,
 )
 
 
