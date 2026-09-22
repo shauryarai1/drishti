@@ -116,7 +116,8 @@ def test_places_search_results_include_the_derived_timezone(monkeypatch, client)
     def fake_provider(_query, _limit):
         return [{"display": "London, UK", "lat": 51.5074, "lon": -0.1278}]
 
-    monkeypatch.setattr(geocoding, "active_providers", lambda: [("fake", fake_provider)])
+    monkeypatch.setattr(geocoding, "_provider_search", fake_provider)
+    monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", "test-sentinel")
     geocoding.reset_state()
 
     body = client.get("/api/places/search", params={"q": "London"}).json()

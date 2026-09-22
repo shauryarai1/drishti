@@ -9,7 +9,7 @@ from __future__ import annotations
 import swisseph as swe
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from geopy.geocoders import Nominatim
+# Place geocoding lives in geocoding.py (Geoapify, server-side key).
 from timezonefinder import TimezoneFinder
 from config import (
     AYANAMSA,
@@ -34,7 +34,7 @@ if AYANAMSA == "lahiri":
 else:
     raise ValueError(f"Unsupported ayanamsa: {AYANAMSA}")
 
-_GEO = Nominatim(user_agent="kundli-minimal")
+# (The old public-Nominatim client was removed with the Geoapify migration.)
 _TZ_FINDER = TimezoneFinder()
 
 _PLANET_IDX = {

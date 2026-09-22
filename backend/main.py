@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from geopy.geocoders import Nominatim  # noqa: F401 - provider client lives in geocoding.py
+# Place geocoding lives in geocoding.py (Geoapify, server-side key).
 
 from models import BirthData
 from calculator import generate_chart

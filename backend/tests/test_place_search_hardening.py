@@ -56,7 +56,8 @@ class FakeProvider:
 @pytest.fixture()
 def fake_geocoder(monkeypatch):
     fake = FakeProvider()
-    monkeypatch.setattr(geocoding, "active_providers", lambda: [("fake", fake)])
+    monkeypatch.setattr(geocoding, "_provider_search", fake)
+    monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", "test-sentinel")
     geocoding.reset_state()
     yield fake
     geocoding.reset_state()
@@ -181,6 +182,9 @@ def test_places_endpoint_never_exposes_internals_on_success(fake_geocoder, clien
     ("life_summary", ("POST", "/api/life-summary", BIRTH)),
     ("weekly", ("POST", "/api/weekly", {"birth": BIRTH, "forecast": {
         "startDate": "2026-09-22", **COORDS}})),
+    ("daily", ("POST", "/api/daily", {"latitude": 28.6139, "longitude": 77.209,
+                                      "timezone": "Asia/Kolkata", "place": "New Delhi, India"})),
+    ("dasha", ("POST", "/api/current-dasha-reading", {"birth": BIRTH, "asOf": "2026-09-22"})),
 ])
 def test_products_work_with_selected_coordinates_while_the_geocoder_is_down(fake_geocoder, client, product, request_spec):
     fake_geocoder.mode = "rate_limited"
@@ -207,13 +211,12 @@ def test_coordinate_bypass_holds_while_the_breaker_is_open(fake_geocoder, client
 
 
 # --- provider policy + frontend behaviour -----------------------------------
-def test_fallback_provider_identifies_itself_per_provider_policy():
-    # The optional Nominatim fallback must identify itself per its usage policy;
-    # the primary provider authenticates with a server-side API key instead.
-    user_agent = geocoding.NOMINATIM_USER_AGENT
-    assert user_agent.startswith("drishti-")
-    assert "http" in user_agent
-    assert user_agent.lower() not in ("geopy", "python-requests", "mozilla/5.0")
+def test_provider_configuration_is_geoapify_only():
+    # Geoapify authenticates with a server-side API key; no public-Nominatim
+    # provider or multi-provider chain remains in the location path.
+    assert geocoding.PROVIDER_NAME == "geoapify"
+    assert not hasattr(geocoding, "NOMINATIM_USER_AGENT")
+    assert not hasattr(geocoding, "active_providers")
 
 
 def test_frontend_autocomplete_is_debounced_and_guards_stale_results():

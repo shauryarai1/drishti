@@ -1,6 +1,6 @@
-"""Provider adapter + breaker behaviour for the place-autocomplete backend.
+"""Geoapify provider adapter + breaker behaviour (KAVACH place autocomplete).
 
-HTTP is always mocked - no test consumes real provider quota.
+HTTP is always mocked - no test consumes real Geoapify quota.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def http(monkeypatch):
     script = {"response": FakeResponse(200, DELHI_PAYLOAD)}
 
     def fake_get(url, params=None, timeout=None, **kwargs):
-        calls.append({"url": url, "params": dict(params or {})})
+        calls.append({"url": url, "params": dict(params or {}), "timeout": timeout})
         item = script["response"]
         if isinstance(item, Exception):
             raise item
@@ -51,30 +51,32 @@ def http(monkeypatch):
 
     monkeypatch.setattr(geocoding.httpx, "get", fake_get)
     monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", FAKE_KEY)
-    monkeypatch.setattr(geocoding, "NOMINATIM_FALLBACK_ENABLED", False)
     geocoding.reset_state()
     yield {"calls": calls, "script": script}
     geocoding.reset_state()
 
 
-# --- chain selection --------------------------------------------------------
-def test_geoapify_is_the_only_production_provider(monkeypatch):
-    monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", FAKE_KEY)
-    monkeypatch.setattr(geocoding, "NOMINATIM_FALLBACK_ENABLED", False)
-    assert [name for name, _fn in geocoding.active_providers()] == ["geoapify"]
+# --- provider configuration -------------------------------------------------
+def test_geoapify_is_the_single_provider(monkeypatch):
+    assert geocoding.PROVIDER_NAME == "geoapify"
+    assert geocoding.GEOAPIFY_ENDPOINT.startswith("https://api.geoapify.com/")
+    # No chain / multi-provider routing remains.
+    assert not hasattr(geocoding, "active_providers")
 
 
-def test_nominatim_is_used_only_without_a_key_or_when_explicitly_enabled(monkeypatch):
+def test_missing_api_key_fails_closed_without_calling_out(http, monkeypatch):
     monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", "")
-    monkeypatch.setattr(geocoding, "NOMINATIM_FALLBACK_ENABLED", False)
-    assert [name for name, _fn in geocoding.active_providers()] == ["nominatim"]
+    geocoding.reset_state()
 
-    monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", FAKE_KEY)
-    monkeypatch.setattr(geocoding, "NOMINATIM_FALLBACK_ENABLED", True)
-    assert [name for name, _fn in geocoding.active_providers()] == ["geoapify", "nominatim"]
+    outcome = geocoding.search("Delhi")
+
+    assert outcome["status"] == "unavailable"
+    assert "temporarily unavailable" in outcome["message"]
+    assert http["calls"] == [], "no upstream call may be attempted without a key"
+    assert geocoding.provider_state()["api_key_configured"] is False
 
 
-# --- success / no results ---------------------------------------------------
+# --- success -----------------------------------------------------------------
 def test_provider_success_maps_to_display_lat_lon(http):
     outcome = geocoding.search("Delhi")
 
@@ -86,11 +88,22 @@ def test_provider_success_maps_to_display_lat_lon(http):
 
     call = http["calls"][0]
     assert call["url"] == geocoding.GEOAPIFY_ENDPOINT
-    assert call["params"]["apiKey"] == FAKE_KEY, "the key must be sent as a request parameter"
-    assert call["params"]["text"] == "delhi", "the query is normalized before the call"
+    assert call["params"]["apiKey"] == FAKE_KEY, "the key must travel as a request parameter"
+    assert call["params"]["text"] == "delhi", "queries are normalized before the call"
+    assert call["timeout"] == geocoding.TIMEOUT_SECONDS
 
 
-def test_provider_no_results_is_a_valid_empty_answer(http):
+def test_multiple_results_are_all_returned(http):
+    http["script"]["response"] = FakeResponse(200, {"results": [
+        {"formatted": "A, One", "lat": 1.1, "lon": 2.2},
+        {"formatted": "B, Two", "lat": 3.3, "lon": 4.4},
+        {"formatted": "C, Three", "lat": 5.5, "lon": 6.6},
+    ]})
+    outcome = geocoding.search("Delhi")
+    assert outcome["status"] == "ok" and len(outcome["results"]) == 3
+
+
+def test_no_results_is_a_valid_empty_answer(http):
     http["script"]["response"] = FakeResponse(200, {"results": []})
     outcome = geocoding.search("Nowhereville")
 
@@ -103,12 +116,23 @@ def test_short_queries_never_call_the_provider(http):
     assert http["calls"] == []
 
 
-# --- failure handling -------------------------------------------------------
+def test_partial_rows_are_skipped_rather_than_crashing(http):
+    http["script"]["response"] = FakeResponse(200, {"results": [
+        {"formatted": "Good, Place", "lat": 1.5, "lon": 2.5},
+        {"formatted": "No coordinates"},
+        {"lat": 3.0, "lon": 4.0},
+        "not-an-object",
+    ]})
+    outcome = geocoding.search("Delhi")
+    assert outcome["status"] == "ok"
+    assert outcome["results"] == [{"display": "Good, Place", "lat": 1.5, "lon": 2.5}]
+
+
+# --- failures ---------------------------------------------------------------
 def test_429_trips_the_breaker_and_never_retries(http):
     http["script"]["response"] = FakeResponse(429, {"error": "quota"})
 
-    first = geocoding.search("Delhi")
-    assert first["status"] == "unavailable"
+    assert geocoding.search("Delhi")["status"] == "unavailable"
     assert geocoding.cooldown_remaining() > 0
     assert geocoding.provider_state()["cooldown_reason"] == "rate_limited"
 
@@ -123,12 +147,19 @@ def test_5xx_is_treated_as_unavailable_with_a_short_cooldown(http):
     assert geocoding.search("Delhi")["status"] == "unavailable"
     assert geocoding.provider_state()["cooldown_reason"] == "unavailable"
     assert 0 < geocoding.cooldown_remaining() <= geocoding.ERROR_COOLDOWN_SECONDS
+    assert len(http["calls"]) == 1
 
 
 def test_timeout_is_handled_without_a_retry_storm(http):
     http["script"]["response"] = httpx.TimeoutException("slow")
     assert geocoding.search("Delhi")["status"] == "unavailable"
     assert geocoding.provider_state()["cooldown_reason"] == "timeout"
+    assert len(http["calls"]) == 1
+
+
+def test_connection_error_is_treated_as_unavailable(http):
+    http["script"]["response"] = httpx.ConnectError("refused")
+    assert geocoding.search("Delhi")["status"] == "unavailable"
     assert len(http["calls"]) == 1
 
 
@@ -154,42 +185,17 @@ def test_auth_failure_does_not_leak_the_body(http):
     assert "invalid api key" not in blob and "abc123" not in blob
 
 
-def test_partial_rows_are_skipped_rather_than_crashing(http):
-    http["script"]["response"] = FakeResponse(200, {"results": [
-        {"formatted": "Good, Place", "lat": 1.5, "lon": 2.5},
-        {"formatted": "No coordinates"},
-        {"lat": 3.0, "lon": 4.0},
-        "not-an-object",
-    ]})
-    outcome = geocoding.search("Delhi")
-    assert outcome["status"] == "ok"
-    assert outcome["results"] == [{"display": "Good, Place", "lat": 1.5, "lon": 2.5}]
-
-
-# --- optional emergency fallback --------------------------------------------
-def test_fallback_provider_is_used_only_when_the_primary_fails(monkeypatch):
-    monkeypatch.setattr(geocoding, "GEOAPIFY_API_KEY", FAKE_KEY)
-    monkeypatch.setattr(geocoding, "NOMINATIM_FALLBACK_ENABLED", True)
-    geocoding.reset_state()
-
-    def failing_primary(_query, _limit):
-        raise geocoding.ProviderRateLimited("rate limited")
-
-    def fallback(_query, _limit):
-        return [{"display": "Delhi, India", "lat": 28.6139, "lon": 77.209}]
-
-    monkeypatch.setattr(geocoding, "active_providers",
-                        lambda: [("geoapify", failing_primary), ("nominatim", fallback)])
-    outcome = geocoding.search("Delhi")
-
-    assert outcome["status"] == "ok"
-    assert outcome["results"][0]["display"] == "Delhi, India"
-
-
-# --- cache / concurrency / privacy -----------------------------------------
+# --- cache / concurrency ----------------------------------------------------
 def test_cache_hit_does_not_call_the_provider_again(http):
     geocoding.search("Delhi")
     geocoding.search("delhi")
+    assert len(http["calls"]) == 1
+
+
+def test_normalized_duplicate_queries_share_one_call(http):
+    first = geocoding.search("  Delhi  ")
+    second = geocoding.search("DELHI")
+    assert first["results"] == second["results"]
     assert len(http["calls"]) == 1
 
 
@@ -199,7 +205,6 @@ def test_concurrent_duplicate_queries_share_one_upstream_call(http):
 
     results: list[dict] = []
     barrier = threading.Barrier(4)
-    http["script"]["response"] = FakeResponse(200, DELHI_PAYLOAD)
 
     def worker():
         barrier.wait()
@@ -224,7 +229,8 @@ def test_stale_cache_is_served_when_the_provider_starts_failing(monkeypatch, htt
     assert outcome["status"] == "ok" and outcome["stale"] is True
 
 
-def test_provider_key_never_appears_in_logs_or_state(http, caplog):
+# --- privacy ----------------------------------------------------------------
+def test_provider_key_never_appears_in_logs_or_state(http):
     records: list[str] = []
 
     class Capture(logging.Handler):
@@ -246,8 +252,8 @@ def test_provider_key_never_appears_in_logs_or_state(http, caplog):
     assert "geocoder=geoapify" in joined
     assert FAKE_KEY not in joined
     assert FAKE_KEY not in json.dumps(geocoding.provider_state())
-    # Logs carry categories, not query text or payloads.
-    assert "quota" not in joined
+    assert "quota" not in joined, "logs carry categories, not upstream payloads"
+    assert "delhi" not in joined.lower(), "query text is never logged"
 
 
 def test_frontend_is_provider_agnostic():
@@ -257,7 +263,7 @@ def test_frontend_is_provider_agnostic():
         if "node_modules" in path.parts or ".next" in path.parts:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore").lower()
-        for forbidden in ("geoapify", "nominatim", "geopy", "mapbox", "opencage"):
+        for forbidden in ("geoapify", "nominatim", "geopy", "mapbox", "opencage", "geoapify_api_key"):
             if forbidden in text:
                 offenders.append(f"{path.name}:{forbidden}")
     assert offenders == [], offenders
