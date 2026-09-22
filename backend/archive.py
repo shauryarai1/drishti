@@ -44,6 +44,15 @@ SCHEMA_VERSION = 1
 TABLE = "product_submissions"
 ADMIN_TABLE = "admin_users"
 
+# "Today" for the admin dashboard is the UTC calendar day (00:00 to 24:00 UTC).
+# UTC is deliberate: deterministic, no DST ambiguity, and the same boundary the
+# database itself uses for timestamptz. The admin UI labels the tile "Today (UTC)".
+STATS_TIMEZONE = "UTC"
+
+# Escape hatch for operators: KAVACH_ARCHIVE=0 stops all archive writes.
+def archiving_enabled() -> bool:
+    return (os.environ.get("KAVACH_ARCHIVE") or "").strip() != "0"
+
 PRODUCTS = ("kundli", "reading", "daily", "weekly", "life_summary", "dasha", "ask", "panchang")
 
 STATUS_SUCCEEDED = "SUCCEEDED"
@@ -442,7 +451,7 @@ def record_submission(
 ) -> Optional[str]:
     """Archive one product submission. Fail-open: never raises to the caller."""
     try:
-        if not store.configured():
+        if not archiving_enabled() or not store.configured():
             return None
 
         clean_input = sanitise_input(product, input_data)
@@ -542,7 +551,13 @@ async def admin_stats(authorization: str = Header(default="")):
     import datetime as _dt
 
     midnight = _dt.datetime.now(_dt.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    return {"status": "ok", "stats": store.stats(midnight.isoformat())}
+    return {
+        "status": "ok",
+        "stats": store.stats(midnight.isoformat()),
+        # Documents the boundary used for "today" so the dashboard cannot mislead.
+        "statsTimezone": STATS_TIMEZONE,
+        "todayStartsAt": midnight.isoformat(),
+    }
 
 
 @router.get("/api/admin/submissions")

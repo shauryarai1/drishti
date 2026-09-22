@@ -26,7 +26,8 @@ const SELECT =
 
 const STAT_TILES: Array<{ key: keyof AdminStats; label: string }> = [
   { key: 'total', label: 'Total submissions' },
-  { key: 'today', label: 'Today' },
+  // Server-side boundary is the UTC calendar day (see archive.STATS_TIMEZONE).
+  { key: 'today', label: 'Today (UTC)' },
   { key: 'guests', label: 'Guests' },
   { key: 'accounts', label: 'Accounts' },
   { key: 'reading', label: 'KAVACH readings' },
@@ -35,6 +36,7 @@ const STAT_TILES: Array<{ key: keyof AdminStats; label: string }> = [
   { key: 'daily', label: 'Daily' },
   { key: 'weekly', label: 'Weekly' },
   { key: 'life_summary', label: 'Life summary' },
+  { key: 'dasha', label: 'Dasha reading' },
   { key: 'panchang', label: 'Panchang' },
 ];
 
@@ -148,6 +150,8 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<AdminSubmissionDetail | null>(null);
   const [detailError, setDetailError] = useState('');
+  // In-flight marker: prevents repeated VIEW clicks from firing many requests.
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
   const [rawOpen, setRawOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -188,13 +192,22 @@ export default function AdminPage() {
   }, [product, visitor, range, search, page]);
 
   const open = async (row: AdminSubmissionRow) => {
+    if (detailLoadingId === row.id) return; // already loading this row
     setDetailError('');
     setRawOpen(false);
+    setDetailLoadingId(row.id);
     try {
-      setDetail(await fetchAdminSubmission(row.id));
+      const loaded = await fetchAdminSubmission(row.id);
+      setDetail(loaded);
+      // The panel is rendered above the list; bring it into view so the action is obvious.
+      requestAnimationFrame(() => {
+        document.getElementById('admin-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch (exc) {
       setDetail(null);
-      setDetailError(exc instanceof Error ? exc.message : 'We could not open that submission.');
+      setDetailError(exc instanceof Error ? exc.message : 'Could not load submission details.');
+    } finally {
+      setDetailLoadingId(null);
     }
   };
 
@@ -299,6 +312,104 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-6">
+              {/* Detail panel is rendered ABOVE the list so VIEW is immediately visible. */}
+              {(detail || detailError || detailLoadingId) && (
+                <div id="admin-detail-panel" className={`${PANEL} mb-4 p-5`}>
+                  {detailError && (
+                    <div role="alert" className="text-[13px] text-[#EEE9DF]/80">{detailError}</div>
+                  )}
+                  {!detail && !detailError && detailLoadingId && (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[13px] text-[#EEE9DF]/70">Loading submission&hellip;</div>
+                      <button
+                        type="button"
+                        onClick={() => setDetailLoadingId(null)}
+                        className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#EEE9DF]/50 hover:text-[#D6BE85] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  {detail && (
+                    <>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className={LABEL}>{PRODUCT_LABELS[detail.product] ?? detail.product} submission</div>
+                          <h2 className="mt-1 text-lg font-semibold tracking-[0.04em] text-[#F7F5F0]">
+                            {formatWhen(detail.created_at)}
+                          </h2>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setDetail(null); setDetailError(''); }}
+                          className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#EEE9DF]/50 hover:text-[#D6BE85] cursor-pointer"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <Field label="User">{detail.user_id ? 'Account' : 'Guest'}</Field>
+                        <Field label="Account email">{detail.account_email ?? '—'}</Field>
+                        <Field label="Status">{detail.status}</Field>
+                        <Field label="Error category">{detail.error_category ?? '—'}</Field>
+                      </div>
+
+                      <div className="mt-6 border-t border-[#A62A34]/20 pt-5">
+                        <div className={LABEL}>Submitted information</div>
+                        {detail.product === 'ask' ? (
+                          <div className="mt-3">
+                            <Field label="User question">{String(inputData.question ?? '—')}</Field>
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                            {Object.entries(inputData).map(([key, value]) => (
+                              <Field key={key} label={key}>
+                                {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—')}
+                              </Field>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-6 border-t border-[#A62A34]/20 pt-5">
+                        <div className={LABEL}>Generated result</div>
+                        <div className="mt-3">
+                          {detail.product === 'kundli' && <KundliResult result={detail.result_data} />}
+                          {detail.product === 'ask' && <AskResult result={detail.result_data} />}
+                          {detail.product !== 'kundli' && detail.product !== 'ask' && (
+                            <GenericResult result={detail.result_data} />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 border-t border-[#A62A34]/20 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => setRawOpen((value) => !value)}
+                          aria-expanded={rawOpen}
+                          className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#EEE9DF]/50 hover:text-[#D6BE85] cursor-pointer"
+                        >
+                          {rawOpen ? 'Hide raw stored data' : 'Raw stored data'}
+                        </button>
+                        {rawOpen && (
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <div className={LABEL}>input_data</div>
+                              <Json value={detail.input_data} />
+                            </div>
+                            <div>
+                              <div className={LABEL}>result_data</div>
+                              <Json value={detail.result_data} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className={LABEL}>Recent submissions</div>
                 <div className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-[#EEE9DF]/40">
@@ -338,9 +449,11 @@ export default function AdminPage() {
                           <button
                             type="button"
                             onClick={() => void open(row)}
-                            className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#D6BE85] hover:text-[#F7F5F0] cursor-pointer"
+                            disabled={detailLoadingId === row.id}
+                            aria-busy={detailLoadingId === row.id}
+                            className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#D6BE85] hover:text-[#F7F5F0] disabled:opacity-40 cursor-pointer"
                           >
-                            View
+                            {detailLoadingId === row.id ? 'Loading…' : detail?.id === row.id ? 'Viewing' : 'View'}
                           </button>
                           {confirmId === row.id ? (
                             <>
@@ -384,90 +497,6 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
-
-            {(detail || detailError) && (
-              <div className={`${PANEL} mt-8 p-5`}>
-                {detailError && <div className="text-[13px] text-[#EEE9DF]/75">{detailError}</div>}
-
-                {detail && (
-                  <>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className={LABEL}>{PRODUCT_LABELS[detail.product] ?? detail.product} submission</div>
-                        <h2 className="mt-1 text-lg font-semibold tracking-[0.04em] text-[#F7F5F0]">
-                          {formatWhen(detail.created_at)}
-                        </h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setDetail(null); setDetailError(''); }}
-                        className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#EEE9DF]/50 hover:text-[#D6BE85] cursor-pointer"
-                      >
-                        Close
-                      </button>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      <Field label="User">{detail.user_id ? 'Account' : 'Guest'}</Field>
-                      <Field label="Account email">{detail.account_email ?? '—'}</Field>
-                      <Field label="Status">{detail.status}</Field>
-                      <Field label="Reference">{detail.id}</Field>
-                    </div>
-
-                    <div className="mt-6 border-t border-[#A62A34]/20 pt-5">
-                      <div className={LABEL}>Submitted information</div>
-                      {detail.product === 'ask' ? (
-                        <div className="mt-3">
-                          <Field label="User question">{String(inputData.question ?? '—')}</Field>
-                        </div>
-                      ) : (
-                        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                          {Object.entries(inputData).map(([key, value]) => (
-                            <Field key={key} label={key}>
-                              {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '—')}
-                            </Field>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-6 border-t border-[#A62A34]/20 pt-5">
-                      <div className={LABEL}>Generated result</div>
-                      <div className="mt-3">
-                        {detail.product === 'kundli' && <KundliResult result={detail.result_data} />}
-                        {detail.product === 'ask' && <AskResult result={detail.result_data} />}
-                        {detail.product !== 'kundli' && detail.product !== 'ask' && (
-                          <GenericResult result={detail.result_data} />
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-6 border-t border-[#A62A34]/20 pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setRawOpen((value) => !value)}
-                        aria-expanded={rawOpen}
-                        className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#EEE9DF]/50 hover:text-[#D6BE85] cursor-pointer"
-                      >
-                        {rawOpen ? 'Hide raw stored data' : 'Raw stored data'}
-                      </button>
-                      {rawOpen && (
-                        <div className="mt-3 space-y-3">
-                          <div>
-                            <div className={LABEL}>input_data</div>
-                            <Json value={detail.input_data} />
-                          </div>
-                          <div>
-                            <div className={LABEL}>result_data</div>
-                            <Json value={detail.result_data} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </>
         )}
       </Container>

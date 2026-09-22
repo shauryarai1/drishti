@@ -47,6 +47,7 @@ export const PRODUCT_FILTERS = [
   { value: 'daily', label: 'Daily Prediction' },
   { value: 'weekly', label: 'Your Week' },
   { value: 'life_summary', label: 'Life Summary' },
+  { value: 'dasha', label: 'Dasha Reading' },
   { value: 'ask', label: 'Ask KAVACH' },
   { value: 'panchang', label: 'Panchang' },
 ] as const;
@@ -77,8 +78,10 @@ export const RANGE_FILTERS = [
 
 const NO_SESSION = 'Sign in with an administrator account to continue.';
 const LOAD_ERROR = 'We could not load the archive. Please try again.';
+const DETAIL_ERROR = 'Could not load submission details.';
+const NOT_FOUND = 'That submission could not be found.';
 
-async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function adminFetch<T>(path: string, init?: RequestInit, fallbackMessage = LOAD_ERROR): Promise<T> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Administration is not available on this deployment yet.');
   const { data } = await supabase.auth.getSession();
@@ -92,13 +95,14 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
     });
   } catch {
-    throw new Error(LOAD_ERROR);
+    throw new Error(fallbackMessage);
   }
 
   if (response.status === 401) throw new Error('Your session expired. Please sign in again.');
   if (response.status === 403) throw new Error('This account is not authorised for administration.');
   if (response.status === 503) throw new Error('Administration is not configured on this deployment yet.');
-  if (!response.ok) throw new Error(LOAD_ERROR);
+  if (response.status === 404) throw new Error(NOT_FOUND);
+  if (!response.ok) throw new Error(fallbackMessage);
 
   return (await response.json()) as T;
 }
@@ -129,6 +133,8 @@ export async function fetchAdminSubmissions(filters: AdminFilters): Promise<{
 export async function fetchAdminSubmission(id: string): Promise<AdminSubmissionDetail> {
   const body = await adminFetch<{ submission: AdminSubmissionDetail }>(
     `/admin/submissions/${encodeURIComponent(id)}`,
+    undefined,
+    DETAIL_ERROR,
   );
   return body.submission;
 }
