@@ -98,6 +98,11 @@ from yesno.api import router as yes_no_router
 
 app.include_router(yes_no_router)
 
+# KAVACH MARRIAGE COMPATIBILITY: isolated methodology package, same pattern.
+from compatibility.api import router as compatibility_router
+
+app.include_router(compatibility_router)
+
 
 @app.get("/api/health")
 def health():
