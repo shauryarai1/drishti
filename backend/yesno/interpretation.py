@@ -1,23 +1,38 @@
 """Deterministic interpretation templates for KAVACH YES / NO.
 
-No language model is involved. The verdict is already decided by
-`yesno.relationships`; this module only verbalises it from the two planets, their
-relationship and their planetary themes.
+The engine decides the verdict from the two planets and their directional BNN
+relationship. This layer translates that into ordinary language and NEVER names
+its source: no planet names, no reduced numbers, no FRIEND / ENEMY / NEUTRAL and
+no mention of how the time was reduced. The calculation mechanics are private and
+must not appear in any public output.
 
-The wording never claims certainty and never overrides the verdict: Saturn can
-add delay without turning YES into NO, Mars can add speed without creating a YES,
-and Rahu or Ketu never by themselves produce a NO.
+No language model is involved, and the wording never overrides the verdict.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Mapping, Sequence, Tuple
+from types import MappingProxyType
+from typing import Mapping, Tuple
 
-from .planets import themes_for
 from .relationships import ENEMY, EVEN, FRIEND, NEUTRAL, NO, YES
 
 CERTAINTY_DISCLAIMER = "This is astrological guidance, not a guarantee of any outcome."
+
+# Natural-language voice for each planet's character. INTERNAL ONLY: the phrases
+# never name the planet they came from, and they are the only planetary material
+# allowed to reach the public interpretation.
+PLANET_VOICE: Mapping[str, str] = MappingProxyType({
+    "Sun": "there is a pull toward taking the lead and being seen for it",
+    "Moon": "feelings and comfort carry more weight than usual",
+    "Jupiter": "there is a helpful opening for growth and support",
+    "Rahu": "there may be stronger-than-usual uncertainty or unexpected developments",
+    "Mercury": "clear communication and attention to detail will matter",
+    "Venus": "there is a supportive tendency toward agreement, comfort or a favourable resolution",
+    "Ketu": "the matter may turn inward, or what matters most may not be the obvious outcome",
+    "Saturn": "there may be some delay, and patience and consistency will matter",
+    "Mars": "the situation may move quickly and could call for decisive action",
+})
 
 _OPENERS: Mapping[str, Tuple[str, ...]] = {
     YES: (
@@ -37,51 +52,19 @@ _OPENERS: Mapping[str, Tuple[str, ...]] = {
     ),
 }
 
-_RELATIONSHIP_LINES: Mapping[str, Tuple[str, ...]] = {
-    FRIEND: (
-        "Because {hour} and {minute} support one another, the two influences reinforce "
-        "the same direction.",
-        "{hour} and {minute} work together here, so the qualities they bring point the "
-        "same way.",
-    ),
-    ENEMY: (
-        "{hour} and {minute} are working against each other, which is where the "
-        "resistance comes from.",
-        "The two influences pull in different directions, so they do not carry the "
-        "outcome forward easily.",
-    ),
-    NEUTRAL: (
-        "Neither planet strongly supports nor strongly blocks the other, so the timing "
-        "alone does not decide this.",
-        "{hour} and {minute} neither strongly support nor strongly oppose each other.",
-    ),
-}
-
-_CLOSINGS: Mapping[str, Tuple[str, ...]] = {
-    YES: (
-        "It is a supportive indication, not a guarantee - treat it as guidance and let "
-        "your own judgement decide the next step.",
-        "The tilt is favourable, though the outcome still depends on what you do with it.",
-    ),
-    NO: (
-        "This is not permanent: conditions change, and this describes the current tilt "
-        "rather than a fixed outcome.",
-        "The indication is against it for now, but timing shifts and nothing here is final.",
-    ),
-    EVEN: (
-        "With a balanced indication, the outcome is likely to depend more on your own "
-        "next steps than on the timing.",
-        "Treat this as a genuinely open question rather than a prediction either way.",
-    ),
+# How the two tendencies relate - the relationship status is never named.
+_INTERACTIONS: Mapping[str, str] = {
+    FRIEND: "The two tendencies support each other, so the indication points in a "
+            "favourable direction - though the result will still depend on what you do with it.",
+    ENEMY: "The two tendencies work against each other, which is where the resistance comes "
+           "from; this describes the current tilt rather than a fixed outcome.",
+    NEUTRAL: "Neither tendency strongly outweighs the other, so the outcome is likely to "
+             "depend more on your own next steps than on the timing.",
 }
 
 
-def _join(items: Sequence[str]) -> str:
-    if not items:
-        return ""
-    if len(items) == 1:
-        return items[0]
-    return ", ".join(items[:-1]) + " and " + items[-1]
+def _capitalise(text: str) -> str:
+    return text[:1].upper() + text[1:] if text else text
 
 
 def _clean_question(question: str, limit: int = 140) -> str:
@@ -94,46 +77,20 @@ def _clean_question(question: str, limit: int = 140) -> str:
     return text
 
 
-def _themes(planet: str) -> str:
-    return _join(list(themes_for(planet, limit=3)))
-
-
-def _same_planet_line(planet: str) -> str:
-    return (
-        f"Because both the hour and the minute reduce to {planet}, the same quality is "
-        f"doubled: {_themes(planet)}. That strengthens the planet's own character but "
-        "gives it no partner to support or oppose it, which is why the indication stays "
-        "balanced."
-    )
-
-
-def _nuances(verdict: str, hour_planet: str, minute_planet: str) -> list:
-    planets = (hour_planet, minute_planet)
-    lines: list = []
-    if "Saturn" in planets:
-        lines.append({
-            YES: "Saturn adds patience, responsibility and delay, so what develops is more "
-                 "likely to become established than to arrive immediately.",
-            NO: "Saturn's delay and weight are part of the friction here, so this is not the "
-                "moment for forcing a result.",
-            EVEN: "Saturn adds patience and a slower tempo, which keeps things measured "
-                  "rather than quick.",
-        }[verdict])
-    if "Mars" in planets:
-        lines.append({
-            YES: "Mars adds drive and urgency, so progress can come quickly, though it still "
-                 "needs support to hold.",
-            NO: "Mars adds urgency and friction, which can make the matter feel more "
-                "confrontational than it needs to.",
-            EVEN: "Mars adds speed and pressure, which can push the situation either way.",
-        }[verdict])
-    if "Rahu" in planets:
-        lines.append("Rahu amplifies and unsettles, so the situation may feel more intense or "
-                     "unconventional than it first appears.")
-    if "Ketu" in planets:
-        lines.append("Ketu turns the matter inward or away from the material side, so what "
-                     "matters here may not be the obvious outcome.")
-    return lines
+def _combination(hour_planet: str, minute_planet: str) -> str:
+    """Weave both planetary voices without naming either of them."""
+    hour_voice = PLANET_VOICE.get(hour_planet, "")
+    minute_voice = PLANET_VOICE.get(minute_planet, "")
+    if not hour_voice and not minute_voice:
+        return ""
+    if hour_planet == minute_planet:
+        return (
+            f"The same quality shows up on both sides - {hour_voice} - which strengthens it "
+            "but leaves nothing to balance it against."
+        )
+    if not minute_voice:
+        return f"{_capitalise(hour_voice)}."
+    return f"{_capitalise(hour_voice)}, while {minute_voice}."
 
 
 def build_interpretation(
@@ -149,6 +106,8 @@ def build_interpretation(
     if verdict not in _OPENERS:
         raise ValueError(f"Unknown verdict {verdict!r}")
 
+    # The reduced numbers only pick which neutral phrasing variant is used; they
+    # are never written into the text.
     index = (int(hour_number) + int(minute_number)) % 3
     topic = _clean_question(question)
 
@@ -156,18 +115,10 @@ def build_interpretation(
     if topic:
         opener = f'"{topic}" - {opener}'
 
-    if hour_planet == minute_planet:
-        # The doubling sentence already explains the balance, so no separate
-        # relationship sentence is added for a planet paired with itself.
-        combination = _same_planet_line(hour_planet)
-        relationship_line = ""
-    else:
-        combination = f"{hour_planet} brings {_themes(hour_planet)}; {minute_planet} brings {_themes(minute_planet)}."
-        relationship_line = _RELATIONSHIP_LINES[relationship][index % len(_RELATIONSHIP_LINES[relationship])]
-        relationship_line = relationship_line.format(hour=hour_planet, minute=minute_planet)
-
-    parts = [opener, combination, relationship_line]
-    parts.extend(_nuances(verdict, hour_planet, minute_planet))
-    parts.append(_CLOSINGS[verdict][index % 2])
-    parts.append(CERTAINTY_DISCLAIMER)
+    parts = [
+        opener,
+        _combination(hour_planet, minute_planet),
+        _INTERACTIONS.get(relationship, ""),
+        CERTAINTY_DISCLAIMER,
+    ]
     return " ".join(part for part in parts if part)

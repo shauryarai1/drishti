@@ -43,8 +43,8 @@ def test_yes_still_reports_delay_for_saturn():
     text = outcome.interpretation.lower()
 
     assert outcome.verdict == "YES"
-    assert "delay" in text or "patience" in text
-    assert "established" in text or "gradual" in text or "longer" in text
+    assert "delay" in text
+    assert "patience" in text
 
 
 @pytest.mark.parametrize("hour,minute,expected", [
@@ -74,12 +74,12 @@ def test_no_explanation_reflects_resistance_without_absolutes():
 
 
 def test_even_explanation_reflects_a_mixed_result():
-    outcome = result(23, 59)  # Mercury with Mercury
+    outcome = result(23, 59)  # the same planet on both sides
     text = outcome.interpretation.lower()
 
     assert outcome.verdict == "50/50"
     assert "mixed" in text or "not strongly tilted" in text or "balanced" in text
-    assert "mercury" in text
+    assert "same quality" in text
 
 
 def test_every_interpretation_carries_the_disclaimer():
@@ -93,21 +93,22 @@ def test_mars_speed_does_not_create_a_yes():
     text = outcome.interpretation.lower()
     assert outcome.hour_planet == "Mars"
     assert outcome.verdict == "NO"
-    assert "urgency" in text or "friction" in text
+    assert "quickly" in text or "decisive" in text
 
 
 def test_rahu_does_not_automatically_mean_no():
-    outcome = result(4, 5)  # Rahu -> Mercury is a friend pair
+    outcome = result(4, 5)
     assert outcome.hour_planet == "Rahu"
     assert outcome.verdict == "YES"
-    assert "rahu" in outcome.interpretation.lower()
+    assert "uncertainty" in outcome.interpretation.lower()
 
 
 def test_ketu_does_not_automatically_mean_no():
-    outcome = result(7, 9)  # Ketu -> Mars is a friend pair
+    outcome = result(7, 9)
     assert outcome.hour_planet == "Ketu"
     assert outcome.verdict == "YES"
-    assert "ketu" in outcome.interpretation.lower()
+    text = outcome.interpretation.lower()
+    assert "inward" in text or "obvious outcome" in text
 
 
 # --- the question can never change the verdict ------------------------------
@@ -214,6 +215,58 @@ def test_public_payload_hides_the_mechanics():
     for banned in ("FRIEND", "ENEMY", "NEUTRAL", "hour_number", "minute_number",
                    "hour_planet", "relationship", "15:53"):
         assert banned not in blob, banned
+
+
+PLANET_NAMES = ("Sun", "Moon", "Jupiter", "Rahu", "Mercury", "Venus", "Ketu", "Saturn", "Mars")
+PRIVATE_TOKENS = ("friend", "enemy", "neutral", "relationship", "hour", "minute", "planet",
+                  "reduced", "number")
+
+
+def test_public_interpretation_never_reveals_the_mechanics():
+    """Every minute of the day: no planet name, no status, no reduced numbers."""
+    for hour in range(24):
+        for minute in range(60):
+            text = evaluate_yes_no("Will it work?", at(hour, minute)).interpretation
+            lowered = text.lower()
+            for name in PLANET_NAMES:
+                assert name.lower() not in lowered, f"{hour:02d}:{minute:02d} names {name}"
+            for token in PRIVATE_TOKENS:
+                assert token not in lowered, f"{hour:02d}:{minute:02d} leaks {token!r}"
+            assert not any(character.isdigit() for character in text), text
+
+
+def test_public_api_response_hides_the_mechanics():
+    """The serialized response itself must not carry the private mechanics."""
+    import main
+
+    client = TestClient(main.app)
+    # 15:53, 09:05, 23:59 and 00:00 in Asia/Kolkata (UTC+5:30).
+    for timestamp in ("2026-09-22T10:23:00+00:00", "2026-09-22T03:35:00+00:00",
+                      "2026-09-22T18:29:00+00:00", "2026-09-21T18:30:00+00:00"):
+        body = client.post("/api/yes-no", json={
+            "question": "Will it work?", "timestamp": timestamp, "timezone": "Asia/Kolkata",
+        }).json()
+
+        assert set(body) == {"status", "verdict", "interpretation"}, body
+        assert body["verdict"] in {"YES", "NO", "50/50"}
+
+        lowered = json.dumps(body).lower()
+        for name in PLANET_NAMES:
+            assert name.lower() not in lowered, f"{timestamp} exposes {name}"
+        for token in ("friend", "enemy", "neutral", "hour_number", "minute_number",
+                      "hour_planet", "minute_planet", "relationship"):
+            assert token not in lowered, f"{timestamp} exposes {token}"
+
+
+def test_mechanics_are_still_computed_internally():
+    """Hiding the output must not remove the calculation."""
+    outcome = result(15, 53)
+
+    assert (outcome.hour_number, outcome.minute_number) == (6, 8)
+    assert (outcome.hour_planet, outcome.minute_planet) == ("Venus", "Saturn")
+    assert outcome.relationship == "FRIEND"
+    assert outcome.verdict == "YES"
+    assert outcome.metadata()["hour_planet"] == "Venus"
 
 
 def test_invalid_input_is_rejected():
@@ -368,3 +421,17 @@ def test_yes_no_ui_has_no_monetization_or_provider_calls():
 
     for banned in ("servicescta", "wa.me", "whatsapp", "razorpay", "stripe", "groq", "gemini"):
         assert banned not in ui, banned
+
+
+def test_yes_no_page_uses_its_own_button_label():
+    ui = YES_NO_UI.read_text(encoding="utf-8")
+
+    assert "REVEAL ANSWER" in ui
+    assert "Ask KAVACH" not in ui, "the Yes/No button must not reuse the Ask KAVACH name"
+
+
+def test_yes_no_and_services_are_in_the_navbar():
+    header = (FRONTEND / "components" / "Header.tsx").read_text(encoding="utf-8")
+
+    assert "'YES / NO'" in header and "'/yes-no'" in header
+    assert "'Services'" in header and "'/services'" in header, "the Services link must remain"

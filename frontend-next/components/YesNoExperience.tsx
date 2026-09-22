@@ -133,7 +133,7 @@ export function YesNoExperience() {
             disabled={!canSubmit}
             className="w-full sm:w-auto"
           >
-            {phase === 'loading' ? 'Reading the moment…' : 'Ask KAVACH'}
+            {phase === 'loading' ? 'Reading the moment…' : 'REVEAL ANSWER'}
           </Button>
         </div>
       </form>
