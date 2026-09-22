@@ -57,6 +57,20 @@ _ATTENTION = {
     "Relationship timing": "The current phase may reward patience",
 }
 
+_GLANCE = {
+    "Emotional connection": "How naturally you read each other's feelings.",
+    "Temperament": "How well your everyday natures sit together.",
+    "Day-to-day ease": "How smoothly ordinary life together is likely to run.",
+    "Attraction & chemistry": "The instinctive pull between you.",
+    "Communication": "How easily you understand and resolve things together.",
+    "Core personality fit": "How your underlying personalities meet.",
+    "Relationship foundation": "How settled the base of the partnership looks.",
+    "Deep partnership dynamics": "How you handle the deeper, more private side of partnership.",
+    "Conflict & energy style": "How your action styles meet when things get tense.",
+    "Conflict balance": "How evenly matched your intensity is.",
+    "Relationship timing": "How supportive the present phase looks for the relationship.",
+}
+
 _IN_DEPTH = {
     SUPPORTIVE: (
         "This area reads as naturally supportive. You are likely to find this part of the "
@@ -101,7 +115,8 @@ def build_interpreted(
     prose_by_key: Dict[str, str] = {}
     for result in list(kuta_results) + list(deep_results):
         status_by_key[result.key] = result.status
-        prose_by_key[result.key] = result.prose
+        # Kuta factors carry `summary`; deep factors carry `prose`.
+        prose_by_key[result.key] = getattr(result, "prose", "") or getattr(result, "summary", "")
 
     at_a_glance: List[Dict[str, str]] = []
     in_depth: List[Dict[str, str]] = []
@@ -113,8 +128,7 @@ def build_interpreted(
         if not present:
             continue
         state = _merge_state(present)
-        detail = next((prose_by_key[s] for s in sources if s in prose_by_key), "")
-        at_a_glance.append({"category": label, "status": state, "interpretation": detail})
+        at_a_glance.append({"category": label, "status": state, "interpretation": _GLANCE[label]})
         in_depth.append({"category": label, "interpretation": _IN_DEPTH[state]})
         if state == SUPPORTIVE:
             strengths.append(_STRENGTHS[label])

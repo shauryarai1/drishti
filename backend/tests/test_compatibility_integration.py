@@ -223,19 +223,18 @@ def test_pending_key_is_dedicated_and_complete():
     assert "MAX_AGE_MS" in source and "takePendingForm" in source
 
 
-def test_ui_renders_the_factor_set_and_no_score_or_yoni():
-    # The factors come from the backend engine, and the UI renders them all.
-    from compatibility.engine import FACTOR_ORDER
-
-    assert FACTOR_ORDER == ("tara", "gana", "nadi", "rashi", "graha_maitri", "vasya", "yoni")
-
+def test_ui_renders_the_interpreted_report_and_no_score_or_yoni():
     ui = _read(EXPERIENCE)
     lowered = ui.lower()
+    # The interpreted sections are what the customer sees.
+    for section in ("report.overall", "report.atAGlance", "report.strengths",
+                    "report.attentionAreas", "report.inDepth", "report.kavachView"):
+        assert section in ui, section
+    # A legacy renderer keeps older saved factor reports openable.
+    assert "report.factors?.map" in ui
     for banned in ("yoni", "/36", "percentage", "score", "star rating", "should marry",
                    "do not marry", "perfect match", "will fail", "will succeed"):
         assert banned not in lowered, banned
-    # The result comes from the backend, never recalculated in React.
-    assert "report.factors.map" in ui
     assert "points" not in ui
 
 

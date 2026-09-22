@@ -19,13 +19,14 @@ DISCLAIMER = (
 )
 
 
-def evaluate_compatibility(
+def analyse_factors(
     bride: PersonFacts,
     groom: PersonFacts,
     nakshatras: Sequence[str],
     signs: Sequence[str],
-) -> Dict[str, Any]:
-    factors: List[FactorResult] = [
+) -> List[FactorResult]:
+    """The seven internal kuta results (internal evidence, never serialized)."""
+    return [
         tara.evaluate(bride, groom, nakshatras),
         gana.evaluate(bride, groom),
         nadi.evaluate(bride, groom),
@@ -34,6 +35,15 @@ def evaluate_compatibility(
         vasya.evaluate(bride, groom),
         yoni.evaluate(bride, groom),
     ]
+
+
+def evaluate_compatibility(
+    bride: PersonFacts,
+    groom: PersonFacts,
+    nakshatras: Sequence[str],
+    signs: Sequence[str],
+) -> Dict[str, Any]:
+    factors: List[FactorResult] = analyse_factors(bride, groom, nakshatras, signs)
 
     return {
         "label": "COMPATIBILITY FACTORS ANALYZED",

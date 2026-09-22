@@ -38,10 +38,18 @@ interface Factor {
 }
 
 interface Report {
-  label: string;
-  factors: Factor[];
-  summary: string;
-  disclaimer: string;
+  /** Interpreted report (current). */
+  overall?: { state: string; summary: string };
+  atAGlance?: Array<{ category: string; status: string; interpretation: string }>;
+  strengths?: string[];
+  attentionAreas?: string[];
+  inDepth?: Array<{ category: string; interpretation: string }>;
+  kavachView?: string;
+  /** Legacy V1 shape (older saved reports): rendered safely, never recalculated. */
+  factors?: Array<{ label: string; subtitle: string; status: string; summary: string }>;
+  label?: string;
+  summary?: string;
+  disclaimer?: string;
 }
 
 interface PersonView {
@@ -264,37 +272,13 @@ export function CompatibilityExperience() {
                 {people.find((p) => p.role === 'bride')?.name} <span className="text-[#A62A34]">×</span>{' '}
                 {people.find((p) => p.role === 'groom')?.name}
               </h2>
-              <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
-                {report.label}
-              </p>
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {report.factors.map((factor, index) => (
-                <article key={index} className={PANEL}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className={LABEL}>{factor.label}</div>
-                      <div className="mt-0.5 text-[13px] text-[#EEE9DF]/55">{factor.subtitle}</div>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
-                        STATUS_STYLE[factor.status] ?? STATUS_STYLE.Mixed
-                      }`}
-                    >
-                      {factor.status}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-[13px] leading-relaxed text-[#EEE9DF]/80">{factor.summary}</p>
-                </article>
-              ))}
-            </div>
-
-            <div className="mt-6 rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70 p-5">
-              <div className={LABEL}>Summary</div>
-              <p className="mt-2 text-[14px] leading-relaxed text-[#EEE9DF]/80">{report.summary}</p>
-              <p className="mt-3 text-[11px] leading-relaxed text-[#EEE9DF]/45">{report.disclaimer}</p>
-            </div>
+            {report.overall ? (
+              <InterpretedReport report={report} />
+            ) : report.factors ? (
+              <LegacyReport report={report} />
+            ) : null}
 
             {notice && <p className="mt-3 text-[12px] text-[#D6BE85]">{notice}</p>}
 
@@ -327,6 +311,137 @@ export function CompatibilityExperience() {
     </main>
   );
 }
+
+/** The interpreted, customer-facing report. No technique is ever shown. */
+function InterpretedReport({ report }: { report: Report }) {
+  return (
+    <div className="mt-6 space-y-10">
+      <section className="rounded-xl border border-[#B39250]/30 bg-gradient-to-b from-[#2B0C11]/80 to-[#090909] p-6 text-center sm:p-8">
+        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
+          Overall assessment
+        </div>
+        <div className="mt-3 text-2xl font-semibold tracking-[0.06em] text-[#F7F5F0] sm:text-3xl">
+          {report.overall?.state}
+        </div>
+        <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-relaxed text-[#EEE9DF]/80">
+          {report.overall?.summary}
+        </p>
+      </section>
+
+      <section>
+        <h3 className={SECTION}>Your compatibility at a glance</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {report.atAGlance?.map((entry, index) => (
+            <div key={index} className="rounded-lg border border-[#A62A34]/20 bg-[#160A0C]/60 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-[13px] font-medium text-[#F7F5F0]">{entry.category}</div>
+                <span
+                  className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                    STATUS_STYLE[entry.status] ?? STATUS_STYLE.Mixed
+                  }`}
+                >
+                  {entry.status}
+                </span>
+              </div>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-[#EEE9DF]/65">
+                {entry.interpretation}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {report.strengths && report.strengths.length > 0 && (
+        <section>
+          <h3 className={SECTION}>What works well</h3>
+          <ul className="mt-4 space-y-2">
+            {report.strengths.map((item) => (
+              <li key={item} className="flex items-start gap-3 text-[14px] text-[#EEE9DF]/80">
+                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rotate-45 border border-[#B39250]/70 bg-[#7B1D26]/60" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h3 className={SECTION}>What needs attention</h3>
+        {report.attentionAreas && report.attentionAreas.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {report.attentionAreas.map((item) => (
+              <li key={item} className="flex items-start gap-3 text-[14px] text-[#EEE9DF]/80">
+                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rotate-45 border border-[#A62A34]/70 bg-[#A62A34]/40" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-[14px] text-[#EEE9DF]/60">
+            Nothing here stands out as needing particular attention.
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h3 className={SECTION}>In-depth compatibility</h3>
+        <div className="mt-4 space-y-6">
+          {report.inDepth?.map((entry, index) => (
+            <article key={index} className="border-l border-[#A62A34]/30 pl-4 sm:pl-5">
+              <h4 className="text-[13px] font-medium uppercase tracking-[0.12em] text-[#D6BE85]">
+                {entry.category}
+              </h4>
+              <p className="mt-2 text-[14px] leading-relaxed text-[#EEE9DF]/80">
+                {entry.interpretation}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[#A62A34]/30 bg-[#160A0C]/70 p-6 sm:p-7">
+        <h3 className={SECTION}>Kavach view</h3>
+        <p className="mt-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">{report.kavachView}</p>
+      </section>
+    </div>
+  );
+}
+
+/** Safe renderer for older saved reports that stored the V1 factor list. */
+function LegacyReport({ report }: { report: Report }) {
+  return (
+    <div className="mt-6">
+      <p className="text-center font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
+        {report.label}
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {report.factors?.map((factor, index) => (
+          <div key={index} className="rounded-lg border border-[#A62A34]/20 bg-[#160A0C]/60 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-medium text-[#F7F5F0]">{factor.label}</div>
+                <div className="mt-0.5 text-[12px] text-[#EEE9DF]/55">{factor.subtitle}</div>
+              </div>
+              <span
+                className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                  STATUS_STYLE[factor.status] ?? STATUS_STYLE.Mixed
+                }`}
+              >
+                {factor.status}
+              </span>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[#EEE9DF]/75">{factor.summary}</p>
+          </div>
+        ))}
+      </div>
+      {report.summary && (
+        <p className="mt-5 text-[14px] leading-relaxed text-[#EEE9DF]/80">{report.summary}</p>
+      )}
+    </div>
+  );
+}
+
+const SECTION = 'font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]';
 
 function ProfileCard({
   title,

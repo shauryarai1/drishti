@@ -387,14 +387,16 @@ def test_endpoint_requires_both_names_and_birth_details():
     assert client.post("/api/compatibility", json=bad2).json()["status"] == "invalid"
 
 
-def test_endpoint_returns_the_qualitative_factors():
+def test_endpoint_returns_the_interpreted_report():
     body = TestClient(main.app).post("/api/compatibility", json=_payload()).json()
     assert body["status"] == "ok"
     assert [p["role"] for p in body["people"]] == ["bride", "groom"]
-    assert body["report"]["label"] == "COMPATIBILITY FACTORS ANALYZED"
-    assert len(body["report"]["factors"]) == 7
+    report = body["report"]
+    assert set(report) >= {"overall", "atAGlance", "strengths", "attentionAreas",
+                           "inDepth", "kavachView"}
+    assert len(report["atAGlance"]) == 11
     blob = str(body).lower()
-    for banned in ("yoni", "36", "score", "planet", "nakshatra lord"):
+    for banned in ("yoni", "36", "score", "planet", "nakshatra"):
         assert banned not in blob, banned
 
 
@@ -403,8 +405,8 @@ def test_endpoint_preserves_the_birth_details_for_both_people():
     names = {p["role"]: p["name"] for p in body["people"]}
     assert names == {"bride": "Aarav", "groom": "Meera"}
     for person in body["people"]:
-        assert person["moonSign"] in RASHIS
-        assert person["moonNakshatra"] in NAKSHATRAS
+        # Public people data is role + name only: no chart information.
+        assert set(person) == {"role", "name"}
 
 
 def test_existing_kundli_tests_are_unaffected():
