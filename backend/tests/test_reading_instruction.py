@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 import chat.gemini as gemini
+
+
+@pytest.fixture(autouse=True)
+def _pin_primary_provider_off(monkeypatch):
+    """These tests assert the Gemini request contract; keep the primary provider out of the way."""
+    monkeypatch.setattr(
+        "chat.nvidia.generate_reply_detailed",
+        lambda *args, **kwargs: {"text": None, "model": None, "preferred": None, "attempts": []},
+    )
 
 ASK = {"timestamp": "2026-09-26T13:00:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata", "location_label": "New Delhi"}

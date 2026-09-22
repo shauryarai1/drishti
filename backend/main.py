@@ -420,12 +420,29 @@ async def ask_endpoint(payload: ChatRequest):
     detail = {}
     answer = None
     safe_error = None
+
+    # Primary provider: NVIDIA NIM router (multiple approved models, bounded attempts).
     try:
-        detail = generate_reply_detailed(question, history, private_context=private)
+        from chat.nvidia import generate_reply_detailed as nvidia_reply
+
+        detail = nvidia_reply(question, history, private_context=private)
         answer = detail.get("text")
     except Exception as exc:
         safe_error = type(exc).__name__
-        logger.error("Ask KAVACH model call failed: %s", safe_error)
+        logger.error("Ask KAVACH NVIDIA provider failed: %s", safe_error)
+
+    # Emergency fallback: the existing Gemini implementation, unchanged.
+    if not answer:
+        try:
+            fallback = generate_reply_detailed(question, history, private_context=private)
+            if fallback.get("text"):
+                detail = fallback
+                answer = fallback.get("text")
+            elif not detail:
+                detail = fallback
+        except Exception as exc:
+            safe_error = safe_error or type(exc).__name__
+            logger.error("Ask KAVACH fallback provider failed: %s", type(exc).__name__)
 
     def safe_trace(status: str, raw, public) -> None:
         """Dev tracing is optional: never let it affect the answer."""

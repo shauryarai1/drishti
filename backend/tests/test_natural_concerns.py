@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 import chat.gemini as gemini
 import chat.session as session
 import chat.trace as trace
+
+
+@pytest.fixture(autouse=True)
+def _pin_primary_provider_off(monkeypatch):
+    """These tests assert the Gemini contract; keep the primary provider out of the way."""
+    monkeypatch.setattr(
+        "chat.nvidia.generate_reply_detailed",
+        lambda *args, **kwargs: {"text": None, "model": None, "preferred": None, "attempts": []},
+    )
 
 REPLY = "That sounds draining, and there are a few likely reasons this is happening."
 

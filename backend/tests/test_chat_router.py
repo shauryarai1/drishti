@@ -20,6 +20,16 @@ import chat.router as router
 import chat.session as session
 import chat.trace as trace
 
+
+@pytest.fixture(autouse=True)
+def _pin_primary_provider_off(monkeypatch):
+    """These tests assert the Gemini request contract, so the primary provider is pinned off."""
+    monkeypatch.setattr(
+        "chat.nvidia.generate_reply_detailed",
+        lambda *args, **kwargs: {"text": None, "model": None, "preferred": None, "attempts": []},
+    )
+
+
 REPLY = "Here is a natural conversational reply."
 
 ASK = {"timestamp": "2026-09-26T10:00:00+05:30", "latitude": 28.6139, "longitude": 77.209,

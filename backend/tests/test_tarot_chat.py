@@ -5,12 +5,22 @@ from __future__ import annotations
 import inspect
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 import chat.gemini as gemini
 import chat.session as session
 from chat.reading import build_reading, is_new_question, private_context
 from tarot.engine import draw_cards
+
+
+@pytest.fixture(autouse=True)
+def _pin_primary_provider_off(monkeypatch):
+    """These tests assert the Gemini contract; keep the primary provider out of the way."""
+    monkeypatch.setattr(
+        "chat.nvidia.generate_reply_detailed",
+        lambda *args, **kwargs: {"text": None, "model": None, "preferred": None, "attempts": []},
+    )
 
 BASE = {"timestamp": "2026-09-20T14:15:00+05:30", "latitude": 28.6139, "longitude": 77.209,
         "timezone": "Asia/Kolkata", "location_label": "New Delhi"}
