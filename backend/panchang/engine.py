@@ -212,6 +212,15 @@ def _chaitra_pratipada(year: int) -> Optional[float]:
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+def _now(tz: ZoneInfo) -> datetime:
+    """Current local time at the selected location.
+
+    Single source of "now" for the engine: the current Hora card must follow the
+    live local clock, and tests freeze this instead of patching datetime.
+    """
+    return datetime.now(tz)
+
+
 def compute_panchang(request: PanchangRequest) -> dict:
     tz = ZoneInfo(request.timezone_name)
     lat, lon = request.latitude, request.longitude
@@ -334,11 +343,50 @@ def compute_panchang(request: PanchangRequest) -> dict:
                 }
             )
 
-    reference_moment = (
-        datetime.combine(request.on_date, request.at_time, tzinfo=tz)
-        if request.at_time
-        else sunrise
-    )
+    # The "current" Hora must track the LIVE local clock of the selected location,
+    # never the selected day's sunrise. Only the selected date that is actually
+    # today has a current Hora; a past/future day has none.
+    now_local = _now(tz)
+    if request.at_time:
+        reference_moment = datetime.combine(request.on_date, request.at_time, tzinfo=tz)
+        reference_is_live = False
+    elif request.on_date == now_local.date():
+        reference_moment = now_local
+        reference_is_live = True
+    else:
+        reference_moment = None
+        reference_is_live = False
+
+    def _current_hora_from_previous_day():
+        """The night Hora still running when "now" is after midnight but before sunrise.
+
+        Night Horas cross the calendar boundary, so just-after-midnight the Hora in
+        progress belongs to the PREVIOUS Panchang day (its sunset -> today's
+        sunrise). Same astronomy, same sequence - no second implementation.
+        """
+        if not (reference_is_live and reference_moment and reference_moment < sunrise):
+            return None
+        try:
+            from datetime import timedelta
+
+            previous_date = request.on_date - timedelta(days=1)
+            previous_midnight = datetime.combine(previous_date, time(0, 0), tzinfo=tz)
+            previous_sunrise = astro.rise_or_set(previous_midnight, lat, lon, body=astro.SUN, rising=True)
+            if previous_sunrise is None:
+                return None
+            previous_sunset = astro.rise_or_set(previous_sunrise, lat, lon, body=astro.SUN, rising=False)
+            if previous_sunset is None or not (previous_sunset <= reference_moment < sunrise):
+                return None
+            previous = compute_horas(
+                previous_sunrise,
+                previous_sunset,
+                sunrise,
+                previous_sunrise.astimezone(tz).weekday(),
+                reference_moment,
+            )
+            return previous.get("current")
+        except Exception:
+            return None
 
     def _as_dt(value):
         if isinstance(value, datetime):
@@ -363,7 +411,7 @@ def compute_panchang(request: PanchangRequest) -> dict:
                     local_key: _clock(start_dt, tz),
                     local_key.replace("local_start", "local_end"): _clock(end_dt, tz),
                     "note": period.get("note", ""),
-                    "active": start_dt <= reference_moment < end_dt,
+                    "active": bool(reference_moment and start_dt <= reference_moment < end_dt),
                 }
             )
         return out
@@ -378,7 +426,11 @@ def compute_panchang(request: PanchangRequest) -> dict:
 
     # --- Hora --------------------------------------------------------------
     hora = compute_horas(sunrise, sunset, next_sunrise, weekday, reference_moment)
+    preceding = _current_hora_from_previous_day()
+    if preceding is not None:
+        hora["current"] = preceding
     hora = _serialise_hora(hora, tz)
+    hora["current_is_live"] = reference_is_live
 
     # --- Chandrabalam / Tarabalam ------------------------------------------
     moon_nakshatra_index = nakshatra["index"]
@@ -415,7 +467,8 @@ def compute_panchang(request: PanchangRequest) -> dict:
             "date": request.on_date.isoformat(),
             "timezone": request.timezone_name,
             "at_time": request.at_time.isoformat() if request.at_time else None,
-            "reference": _stamp(reference_moment, tz),
+            "reference": _stamp(reference_moment, tz) if reference_moment else None,
+            "reference_is_live": reference_is_live,
         },
         "location": {
             "label": request.label,
@@ -427,7 +480,7 @@ def compute_panchang(request: PanchangRequest) -> dict:
             "weekday": VARA_ENGLISH[weekday],
             "vara": VARA_NAMES[weekday],
             "weekday_index": weekday,
-            "is_reference_before_sunrise": reference_moment < sunrise,
+            "is_reference_before_sunrise": bool(reference_moment and reference_moment < sunrise),
         },
         "sun_moon": {
             "sunrise": _stamp(sunrise, tz),

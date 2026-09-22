@@ -4,8 +4,9 @@ DAILY MOON is the Lahiri sidereal Moon rashi AT LOCAL SUNRISE for the selected
 Panchang day, and it stays fixed for that day even if the live Moon changes
 rashi later.
 
-Natal Moon sign becomes house 1; the remaining signs follow sequentially; the
-DAILY MOON rashi identifies the active house for each Moon sign.
+The transit Moon rashi is house 1 and the twelve signs follow the zodiac in
+order from it, so each card's house counts FORWARD from the transit Moon (Moon
+in Capricorn: Capricorn H1, Aquarius H2, Pisces H3, ... Sagittarius H12).
 
 Deterministic only: no AI, no Ascendant, no proprietary Mars logic.
 """
@@ -52,29 +53,51 @@ def get_natal_moon_sign(payload: Dict[str, Any]) -> str:
 
 def get_sunrise(payload: Dict[str, Any], on_date: date_type) -> datetime:
     """Local sunrise from the PRODUCTION Panchang engine (no new astronomy)."""
-    panchang = compute_panchang(PanchangRequest(
+    return datetime.fromisoformat(_panchang_for_day(payload, on_date)["sun_moon"]["sunrise"])
+
+
+def _panchang_for_day(payload: Dict[str, Any], on_date: date_type) -> Dict[str, Any]:
+    """The single authoritative Panchang calculation for the selected day/location.
+
+    Sunrise, sunset, the Moon rashi and the Hora schedule all come from this one
+    calculation, so Daily Prediction can never disagree with the Panchang page.
+    """
+    return compute_panchang(PanchangRequest(
         on_date=on_date,
         latitude=float(payload["latitude"]),
         longitude=float(payload["longitude"]),
         timezone_name=payload.get("timezone") or "Asia/Kolkata",
         label=payload.get("place") or "",
     ))
-    return datetime.fromisoformat(panchang["sun_moon"]["sunrise"])
 
 
 def get_daily_moon_rashi(payload: Dict[str, Any], on_date: Optional[date_type] = None) -> Dict[str, Any]:
-    """Daily Moon rashi = Moon rashi at local sunrise, fixed for that day."""
+    """Daily Moon rashi = the authoritative Panchang Moon rashi at local sunrise.
+
+    Taken directly from the same Panchang payload that supplies the sunrise, so
+    the 12 daily cards are anchored to the identical value the Panchang page uses.
+    """
     timezone_name = payload.get("timezone") or "Asia/Kolkata"
     tz = ZoneInfo(timezone_name)
     selected = on_date or datetime.now(tz).date()
-    sunrise = get_sunrise(payload, selected)
-    longitude = _moon_longitude(sunrise)
+    panchang = _panchang_for_day(payload, selected)
+    sunrise = datetime.fromisoformat(panchang["sun_moon"]["sunrise"])
+
+    moon_block = (panchang.get("sun_moon_rashi") or {}).get("moon") or {}
+    index = moon_block.get("index")
+    if isinstance(index, int) and 0 <= index < len(RASHIS):
+        rashi = RASHIS[index]  # authoritative: same index the Panchang page reports
+        longitude = float(moon_block.get("longitude") or _moon_longitude(sunrise))
+    else:  # defensive only: the engine always provides the index
+        longitude = _moon_longitude(sunrise)
+        rashi = _rashi_of(longitude)
+
     return {
         "date": selected.isoformat(),
         "sunrise": sunrise.isoformat(),
         "sunriseLocal": sunrise.strftime("%H:%M"),
         "longitude": round(longitude, 6),
-        "rashi": _rashi_of(longitude),
+        "rashi": rashi,
     }
 
 
@@ -93,8 +116,14 @@ def get_current_transit_moon_sign(moment: datetime) -> str:
 
 
 def calculate_active_house(natal_moon: str, daily_moon: str) -> int:
-    """House of the DAILY Moon rashi in the chart built from the natal Moon."""
-    return ((rashi_number(daily_moon) - rashi_number(natal_moon) + 12) % 12) + 1
+    """House of this sign counted FORWARD through the zodiac from the transit Moon.
+
+    The transit (daily) Moon rashi is house 1 and the remaining signs follow the
+    zodiac in order: Moon in Capricorn gives Capricorn H1, Aquarius H2, Pisces H3,
+    Aries H4, ... Sagittarius H12. Parameter names are kept for compatibility;
+    `daily_moon` is the transit anchor.
+    """
+    return ((rashi_number(natal_moon) - rashi_number(daily_moon) + 12) % 12) + 1
 
 
 def get_best_colour(natal_moon_sign: Optional[str], daily_moon_rashi: Optional[str]) -> Optional[str]:
@@ -157,5 +186,5 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
         "currentMoon": current,
         "natalMoon": natal_moon,
         "signs": cards,
-        "basis": "daily_moon_rashi_at_local_sunrise_with_natal_moon_as_house_1",
+        "basis": "daily_moon_rashi_at_local_sunrise_with_transit_moon_as_house_1",
     }

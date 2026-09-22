@@ -6,12 +6,19 @@ Auth: x-goog-api-key header. api_version is a required query parameter.
 
 The API key is read from the server environment, or from backend/.env when the
 process environment does not define it. It is never logged or returned.
+
+This is the EMERGENCY fallback behind the NVIDIA router. It is deliberately
+latency-bounded: a short per-attempt timeout, a total budget for the tier, and a
+cooldown for models that are rate-limited (429), retired (404) or unsupported.
+Without that bound, dead or limited models made a single Ask request take 40s+
+and the user saw the friendly "having trouble" message.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +28,15 @@ logger = logging.getLogger("kavach.chat")
 
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 TIMEOUT_SECONDS = 45.0
+
+# Emergency-fallback latency budget. Gemini is the LAST resort, so it must be
+# bounded: a short per-attempt cap, a total budget for the whole Gemini tier, and
+# a cooldown for models that are rate-limited (429) or retired (404). Without
+# this, dead/limited models made the fallback take 40s+ and the user saw the
+# friendly "having trouble" message.
+PER_ATTEMPT_TIMEOUT = 12.0
+TOTAL_BUDGET_SECONDS = 24.0
+MODEL_COOLDOWN_SECONDS = 120.0
 
 # Preferred first, then lighter models. Only models this key can access.
 MODEL_PRIORITY = (
@@ -139,6 +155,53 @@ def _fallback_reason(status: int, body: str) -> Optional[str]:
     return None
 
 
+# --- lightweight per-model health for the emergency tier ---------------------
+_MODEL_HEALTH: Dict[str, Dict[str, float]] = {}
+
+
+def _ordered_models() -> List[str]:
+    """Healthy models first, then by recent failures/latency (deterministic)."""
+    now = time.monotonic()
+
+    def rank(model: str):
+        health = _MODEL_HEALTH.get(model) or {}
+        return (
+            0 if health.get("cooldown_until", 0.0) <= now else 1,
+            health.get("failures", 0.0),
+            health.get("latency", 0.0),
+        )
+
+    return sorted(MODEL_PRIORITY, key=rank)
+
+
+def _note_model(model: str, *, ok: bool, latency: float = 0.0, cooldown: float = 0.0) -> None:
+    health = _MODEL_HEALTH.setdefault(model, {"failures": 0.0, "latency": 0.0, "cooldown_until": 0.0})
+    if ok:
+        health["latency"] = latency
+        health["cooldown_until"] = 0.0
+    else:
+        health["failures"] = health.get("failures", 0.0) + 1
+        if cooldown > 0:
+            health["cooldown_until"] = time.monotonic() + cooldown
+
+
+def reset_health() -> None:
+    _MODEL_HEALTH.clear()
+
+
+def model_health() -> Dict[str, Dict[str, float]]:
+    """Operational snapshot for tests/diagnostics (never contains secrets)."""
+    now = time.monotonic()
+    return {
+        model: {
+            "failures": health.get("failures", 0.0),
+            "latency": round(health.get("latency", 0.0), 3),
+            "cooldown_for": max(0.0, round(health.get("cooldown_until", 0.0) - now, 1)),
+        }
+        for model, health in _MODEL_HEALTH.items()
+    }
+
+
 def generate_reply(message: str, history: List[Dict[str, str]],
                    private_context: str = "") -> Optional[str]:
     """Try each model once (no loops). Returns None when unavailable."""
@@ -194,9 +257,14 @@ def generate_reply(message: str, history: List[Dict[str, str]],
 
 def generate_reply_detailed(message: str, history: List[Dict[str, str]],
                             private_context: str = "") -> Dict[str, Any]:
-    """DEV/audit variant: identical policy, plus model and fallback metadata."""
+    """Emergency-fallback variant: bounded in time, health-aware, safe metadata.
+
+    Same contract as before (text/model/preferred/attempts) so the caller and the
+    dev inspector are unaffected, plus a `provider` marker.
+    """
     result: Dict[str, Any] = {"text": None, "model": None,
-                              "preferred": MODEL_PRIORITY[0], "attempts": []}
+                              "preferred": MODEL_PRIORITY[0], "attempts": [],
+                              "provider": "gemini"}
     key = api_key()
     if not key:
         result["attempts"].append({"model": MODEL_PRIORITY[0], "reason": "no_api_key"})
@@ -207,38 +275,75 @@ def generate_reply_detailed(message: str, history: List[Dict[str, str]],
         prompt = f"{private_context}\n\n{prompt}"
     payload = {"input": prompt, "system_instruction": _system_instruction_for(private_context)}
 
-    for model in MODEL_PRIORITY:
+    deadline = time.monotonic() + TOTAL_BUDGET_SECONDS
+
+    for model in _ordered_models():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.5:
+            result["attempts"].append({"model": model, "reason": "budget_exhausted"})
+            break
+
+        attempt_started = time.monotonic()
         try:
             response = httpx.post(
                 ENDPOINT,
                 params={"api_version": "v1beta"},
                 headers={"x-goog-api-key": key, "Content-Type": "application/json"},
                 json={**payload, "model": model},
-                timeout=TIMEOUT_SECONDS,
+                timeout=min(PER_ATTEMPT_TIMEOUT, remaining),
             )
+        except httpx.TimeoutException:
+            _note_model(model, ok=False, cooldown=MODEL_COOLDOWN_SECONDS)
+            result["attempts"].append({"model": model, "reason": "timeout"})
+            logger.info(
+                "ask_kavach provider=gemini model=%s outcome=timeout elapsed_ms=%d cooldown=true",
+                model, int((time.monotonic() - attempt_started) * 1000),
+            )
+            continue
         except httpx.HTTPError:
-            result["attempts"].append({"model": model, "reason": "network"})
-            return result
+            _note_model(model, ok=False, cooldown=MODEL_COOLDOWN_SECONDS)
+            result["attempts"].append({"model": model, "reason": "connection"})
+            logger.info(
+                "ask_kavach provider=gemini model=%s outcome=connection elapsed_ms=%d cooldown=true",
+                model, int((time.monotonic() - attempt_started) * 1000),
+            )
+            continue
+
+        latency = time.monotonic() - attempt_started
 
         if response.status_code == 200:
             try:
                 data = response.json()
             except ValueError:
+                _note_model(model, ok=False)
                 result["attempts"].append({"model": model, "reason": "malformed"})
-                return result
+                continue
             if isinstance(data, list):
                 data = data[0] if data else {}
             text = _extract_text(data)
             if text:
+                _note_model(model, ok=True, latency=latency)
                 result["text"] = text
                 result["model"] = model
+                logger.info(
+                    "ask_kavach provider=gemini model=%s outcome=success elapsed_ms=%d",
+                    model, int(latency * 1000),
+                )
                 return result
+            _note_model(model, ok=False)
             result["attempts"].append({"model": model, "reason": "empty"})
-            return result
+            continue
 
         reason = _fallback_reason(response.status_code, response.text[:400])
+        _note_model(model, ok=False,
+                    cooldown=MODEL_COOLDOWN_SECONDS if reason in ("quota", "unavailable", "unsupported") else 0.0)
         result["attempts"].append({"model": model, "reason": reason or f"status_{response.status_code}"})
+        logger.info(
+            "ask_kavach provider=gemini model=%s outcome=%s elapsed_ms=%d cooldown=%s",
+            model, reason or f"status_{response.status_code}", int(latency * 1000),
+            "true" if reason in ("quota", "unavailable", "unsupported") else "false",
+        )
         if not reason:
-            return result
+            break
 
     return result

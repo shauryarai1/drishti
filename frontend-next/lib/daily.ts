@@ -70,17 +70,24 @@ export const MOON_SIGNS = [
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
 ] as const;
 
-/** Reuses the city already chosen elsewhere in KAVACH (Panchang storage key). */
+/**
+ * Reuses the city already chosen elsewhere in KAVACH (Panchang storage key).
+ *
+ * Each city carries its own IANA timezone: the Daily Moon rashi is the Moon at
+ * LOCAL sunrise for that location, so the timezone must match the coordinates.
+ * A single hardcoded zone anchored the wrong calendar day / Moon for every
+ * non-Indian city.
+ */
 export const DAILY_CITIES = [
-  { label: 'New Delhi, India', latitude: 28.6139, longitude: 77.209 },
-  { label: 'Mumbai, India', latitude: 19.076, longitude: 72.8777 },
-  { label: 'Bengaluru, India', latitude: 12.9716, longitude: 77.5946 },
-  { label: 'Chennai, India', latitude: 13.0827, longitude: 80.2707 },
-  { label: 'Kolkata, India', latitude: 22.5726, longitude: 88.3639 },
-  { label: 'Hyderabad, India', latitude: 17.385, longitude: 78.4867 },
-  { label: 'London, United Kingdom', latitude: 51.5074, longitude: -0.1278 },
-  { label: 'New York, United States', latitude: 40.7128, longitude: -74.006 },
-  { label: 'Dubai, UAE', latitude: 25.2048, longitude: 55.2708 },
-  { label: 'Singapore', latitude: 1.3521, longitude: 103.8198 },
-  { label: 'Sydney, Australia', latitude: -33.8688, longitude: 151.2093 },
+  { label: 'New Delhi, India', latitude: 28.6139, longitude: 77.209, timezone: 'Asia/Kolkata' },
+  { label: 'Mumbai, India', latitude: 19.076, longitude: 72.8777, timezone: 'Asia/Kolkata' },
+  { label: 'Bengaluru, India', latitude: 12.9716, longitude: 77.5946, timezone: 'Asia/Kolkata' },
+  { label: 'Chennai, India', latitude: 13.0827, longitude: 80.2707, timezone: 'Asia/Kolkata' },
+  { label: 'Kolkata, India', latitude: 22.5726, longitude: 88.3639, timezone: 'Asia/Kolkata' },
+  { label: 'Hyderabad, India', latitude: 17.385, longitude: 78.4867, timezone: 'Asia/Kolkata' },
+  { label: 'London, United Kingdom', latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London' },
+  { label: 'New York, United States', latitude: 40.7128, longitude: -74.006, timezone: 'America/New_York' },
+  { label: 'Dubai, UAE', latitude: 25.2048, longitude: 55.2708, timezone: 'Asia/Dubai' },
+  { label: 'Singapore', latitude: 1.3521, longitude: 103.8198, timezone: 'Asia/Singapore' },
+  { label: 'Sydney, Australia', latitude: -33.8688, longitude: 151.2093, timezone: 'Australia/Sydney' },
 ];

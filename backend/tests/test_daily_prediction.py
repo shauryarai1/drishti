@@ -25,11 +25,15 @@ TZ = ZoneInfo("Asia/Kolkata")
 
 # --- the specified reference cases ---------------------------------------
 @pytest.mark.parametrize("natal,transit,house", [
-    ("Pisces", "Sagittarius", 10),
-    ("Aries", "Sagittarius", 9),
-    ("Taurus", "Sagittarius", 8),
+    # Forward through the zodiac from the transit Moon (transit Moon = H1).
+    ("Pisces", "Sagittarius", 4),
+    ("Aries", "Sagittarius", 5),
+    ("Taurus", "Sagittarius", 6),
     ("Sagittarius", "Sagittarius", 1),
-    ("Capricorn", "Sagittarius", 12),
+    ("Capricorn", "Sagittarius", 2),
+    ("Aries", "Aries", 1),
+    ("Pisces", "Aries", 12),
+    ("Sagittarius", "Capricorn", 12),
 ])
 def test_reference_cases(natal, transit, house):
     assert calculate_active_house(natal, transit) == house
@@ -140,9 +144,9 @@ def test_daily_moon_is_the_sunrise_rashi_not_the_live_moon():
 
 
 SAGITTARIUS_MAPPING = {
-    "Aries": 9, "Taurus": 8, "Gemini": 7, "Cancer": 6, "Leo": 5, "Virgo": 4,
-    "Libra": 3, "Scorpio": 2, "Sagittarius": 1, "Capricorn": 12, "Aquarius": 11,
-    "Pisces": 10,
+    "Aries": 5, "Taurus": 6, "Gemini": 7, "Cancer": 8, "Leo": 9, "Virgo": 10,
+    "Libra": 11, "Scorpio": 12, "Sagittarius": 1, "Capricorn": 2, "Aquarius": 3,
+    "Pisces": 4,
 }
 
 
@@ -152,12 +156,16 @@ def test_full_sagittarius_daily_mapping():
     assert actual == SAGITTARIUS_MAPPING
 
 
-def test_pisces_gets_h10_not_h11_when_daily_moon_is_sagittarius():
-    payload = _daily("2026-09-21T14:00:00+05:30")   # live moon already Capricorn
+def test_pisces_counts_forward_from_the_daily_moon():
+    payload = _daily("2026-09-21T14:00:00+05:30")   # daily moon is Sagittarius
     pisces = next(card for card in payload["signs"] if card["sign"] == "Pisces")
-    assert pisces["activeHouse"] == 10
-    assert pisces["title"] == "Career, responsibility and achievement"
-    assert pisces["title"] != "Friends, networks and gains"
+    anchor = payload["dailyMoon"]["rashi"]
+    assert anchor == "Sagittarius"
+
+    # Forward direction: Sagittarius H1, Capricorn H2, Aquarius H3, Pisces H4.
+    assert pisces["activeHouse"] == 4
+    assert pisces["title"] == get_daily_house_pattern(4)["theme"]
+    assert pisces["title"] != get_daily_house_pattern(10)["theme"]
 
 
 def test_no_transition_history_is_returned_at_all():

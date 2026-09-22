@@ -60,11 +60,13 @@ export default function DailyPage() {
     setBusy(true);
     setError('');
     try {
-      setData(await fetchDaily({
-        latitude: found.latitude,
-        longitude: found.longitude,
-        timezone: 'Asia/Kolkata',
-      }));
+        setData(await fetchDaily({
+          latitude: found.latitude,
+          longitude: found.longitude,
+          // The daily Moon is the Moon at LOCAL sunrise, so the request must use
+          // the selected city's own timezone (not a single hardcoded zone).
+          timezone: found.timezone,
+        }));
     } catch {
       setData(null);
       setError("Today's prediction is temporarily unavailable. Please try again.");
