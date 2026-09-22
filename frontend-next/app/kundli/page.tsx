@@ -7,6 +7,7 @@ import { SectionLabel } from '../../components/SectionLabel';
 import { Kundli } from '../../components/Kundli';
 import { BirthDetailsFlow } from '../../components/BirthDetails';
 import { ResultGate } from '../../components/ResultGate';
+import { RetrogradePlanets } from '../../components/RetrogradePlanets';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import type { BirthDetails as BirthDetailsType } from '../../lib/types';
 import { BnnConnections } from '../../components/kundli/BnnConnections';
@@ -365,6 +366,10 @@ export default function KundliPage() {
                   ))}
                 </div>
               </section>
+            )}
+
+            {tab === 'OVERVIEW' && (
+              <RetrogradePlanets planets={kundli.planets} className="mt-4" />
             )}
 
             {tab === 'CHARTS' && (
