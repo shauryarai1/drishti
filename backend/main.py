@@ -29,6 +29,27 @@ from prediction.panchang_natal import (
 )
 
 logger = logging.getLogger("drishti")
+
+
+# Render captures stdout/stderr. The KAVACH loggers previously had no handler, so
+# provider routing diagnostics were silently dropped; give the "kavach" logger tree
+# a handler so Ask KAVACH operational logs actually appear in application logs.
+# Only model ids, outcome categories and timings are ever logged - never keys,
+# headers, prompts, user messages, private context or response text.
+def _configure_kavach_logging() -> None:
+    import os as _os
+
+    kavach_logger = logging.getLogger("kavach")
+    if kavach_logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    kavach_logger.addHandler(handler)
+    kavach_logger.setLevel(_os.environ.get("KAVACH_LOG_LEVEL", "INFO").upper())
+    kavach_logger.propagate = False
+
+
+_configure_kavach_logging()
 _geo_search = Nominatim(user_agent="drishti-reading-platform-v1.0.0 (+https://drishti-5j3u.onrender.com)")
 
 # Simple in-memory cache for place searches: {normalized_query: (results, timestamp)}
@@ -421,6 +442,30 @@ async def ask_endpoint(payload: ChatRequest):
     answer = None
     safe_error = None
 
+    # Operational logging: model ids, outcome categories and timings only.
+    # Never keys, headers, prompts, user messages, private context or response text.
+    import logging as _logging
+    import time as _time
+
+    chat_log = _logging.getLogger("kavach.chat")
+
+    def _gemini_category(detail_map: dict) -> str:
+        attempts = detail_map.get("attempts") or []
+        if not attempts:
+            return "other"
+        reason = str(attempts[-1].get("reason") or "other")
+        if reason == "quota":
+            return "429"
+        if reason in ("unavailable", "not_found"):
+            return "404"
+        if reason == "network":
+            return "connection"
+        if reason in ("malformed", "empty"):
+            return reason
+        if reason.startswith("status_5"):
+            return "5xx"
+        return "other"
+
     # Primary provider: NVIDIA NIM router (multiple approved models, bounded attempts).
     try:
         from chat.nvidia import generate_reply_detailed as nvidia_reply
@@ -433,16 +478,42 @@ async def ask_endpoint(payload: ChatRequest):
 
     # Emergency fallback: the existing Gemini implementation, unchanged.
     if not answer:
+        gemini_started = _time.monotonic()
         try:
             fallback = generate_reply_detailed(question, history, private_context=private)
+            gemini_ms = int((_time.monotonic() - gemini_started) * 1000)
             if fallback.get("text"):
-                detail = fallback
+                # A different provider answered after NVIDIA failed.
+                detail = {**fallback, "provider": "gemini", "fallback": True}
                 answer = fallback.get("text")
-            elif not detail:
-                detail = fallback
+                chat_log.info(
+                    "ask_kavach provider=gemini success=true model=%s elapsed_ms=%d outcome=success",
+                    fallback.get("model") or "unknown", gemini_ms,
+                )
+            else:
+                if not detail:
+                    detail = {**fallback, "provider": "gemini", "fallback": True}
+                chat_log.info(
+                    "ask_kavach provider=gemini success=false elapsed_ms=%d outcome=%s",
+                    gemini_ms, _gemini_category(fallback),
+                )
         except Exception as exc:
             safe_error = safe_error or type(exc).__name__
+            chat_log.info(
+                "ask_kavach provider=gemini success=false elapsed_ms=%d outcome=other",
+                int((_time.monotonic() - gemini_started) * 1000),
+            )
             logger.error("Ask KAVACH fallback provider failed: %s", type(exc).__name__)
+
+    if answer:
+        chat_log.info(
+            "ask_kavach answered=true provider=%s model=%s fallback=%s",
+            detail.get("provider") or "unknown",
+            detail.get("model") or "unknown",
+            "true" if detail.get("fallback") else "false",
+        )
+    else:
+        chat_log.info("ask_kavach answered=false provider=none fallback=true")
 
     def safe_trace(status: str, raw, public) -> None:
         """Dev tracing is optional: never let it affect the answer."""

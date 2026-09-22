@@ -41,7 +41,7 @@ interface TraceEvent {
   cards: TraceCard[];
   private_context: string | null;
   model: { called: boolean; status: string; preferred?: string | null; actual?: string | null;
-    attempts: Array<{ model: string; reason: string }> };
+    attempts: Array<{ model: string; reason: string }>; fallback?: boolean };
   response: { raw: string | null; public: string | null; sanitised: boolean };
 }
 
@@ -69,7 +69,7 @@ function DevInspector({ event, onClose }: { event: TraceEvent; onClose: () => vo
   }
   if ((event.context?.domain ?? 'general') === 'general') warnings.push('Context classified as general');
   if (event.response?.sanitised) warnings.push('Sanitiser modified the model response');
-  if ((event.model?.attempts?.length ?? 0) > 0) warnings.push('Model fallback occurred');
+  if (event.model?.fallback === true) warnings.push('Model fallback occurred');
 
   return (
     <div className="mt-2 rounded-lg border border-[#B39250]/40 bg-[#120A0B] p-3 text-left">

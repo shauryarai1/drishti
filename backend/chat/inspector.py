@@ -164,6 +164,9 @@ def inspect(conversation_id: str, question: str, mode: str = "local",
             "preferred": detail.get("preferred", MODEL_PRIORITY[0]),
             "actual": detail.get("model"),
             "attempts": detail.get("attempts", []),
+            # Mirrors the same rule as the public pipeline: true only when the
+            # preferred model did not answer on its first attempt.
+            "fallback": bool(detail.get("fallback")),
         }
         payload["response"] = {
             "raw": raw,

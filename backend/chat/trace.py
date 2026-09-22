@@ -53,6 +53,9 @@ def record_event(conversation_id: str, question: str, reading: Dict[str, Any],
                 "preferred": detail.get("preferred"),
                 "actual": detail.get("model"),
                 "attempts": detail.get("attempts", []),
+                # True only when a real fallback happened (another NVIDIA model
+                # answered, or Gemini answered after NVIDIA failed).
+                "fallback": bool(detail.get("fallback")),
             },
             "response": {
                 "raw": raw,

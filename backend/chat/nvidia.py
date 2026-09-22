@@ -262,6 +262,40 @@ def _classify(status: int, body: str) -> Tuple[str, bool]:
     return f"request_{status}", False
 
 
+# Stable, low-cardinality vocabulary for operational logs. Never user data.
+def _log_outcome(reason: str) -> str:
+    if reason == "ok":
+        return "success"
+    if reason in ("timeout", "connection", "auth", "malformed", "empty", "budget_exhausted"):
+        return reason
+    if reason.startswith("transient_"):
+        status = reason.split("_", 1)[1]
+        if status == "429":
+            return "429"
+        if status.startswith("5"):
+            return "5xx"
+        return "other"
+    if reason.startswith("model_"):
+        status = reason.split("_", 1)[1]
+        return status if status in ("404", "410") else "other"
+    return "other"
+
+
+def _fallback_occurred(result: Dict[str, Any]) -> bool:
+    """True only when the preferred model did not answer on its first attempt."""
+    attempts = result.get("attempts") or []
+    actual = result.get("model")
+    preferred = result.get("preferred")
+    if not attempts or actual is None:
+        return True
+    first = attempts[0]
+    return not (
+        first.get("model") == preferred
+        and first.get("reason") == "ok"
+        and actual == preferred
+    )
+
+
 def _call_model(
     model_id: str, timeout: float, messages: List[Dict[str, str]], key: str
 ) -> Tuple[Optional[str], str, Optional[float]]:
@@ -274,8 +308,11 @@ def _call_model(
             json={"model": model_id, "messages": messages, "temperature": 0.6, "max_tokens": 900},
             timeout=timeout,
         )
-    except (httpx.TimeoutException, httpx.HTTPError):
+    except httpx.TimeoutException:
         return None, "timeout", time.monotonic() - started
+    except httpx.HTTPError:
+        # Connection refused/reset, DNS and other transport failures.
+        return None, "connection", time.monotonic() - started
     latency = time.monotonic() - started
 
     if response.status_code == 200:
@@ -304,9 +341,18 @@ def generate_reply_detailed(
         "attempts": [],
     }
 
+    started_all = time.monotonic()
     key = api_key()
     if not key:
         result["attempts"].append({"model": preferred, "reason": "no_api_key"})
+        result["fallback"] = True
+        logger.info(
+            "ask_kavach provider=nvidia model=%s attempt=1/%d outcome=other elapsed_ms=0 cooldown=false",
+            preferred, MAX_ATTEMPTS,
+        )
+        logger.info(
+            "ask_kavach provider=nvidia nvidia_success=false attempts=0 elapsed_ms=0 gemini_fallback=true"
+        )
         return result
 
     messages = _build_messages(history, message, private_context)
@@ -320,6 +366,10 @@ def generate_reply_detailed(
         remaining = deadline - time.monotonic()
         if remaining <= 0.5:
             result["attempts"].append({"model": model_id, "reason": "budget_exhausted"})
+            logger.info(
+                "ask_kavach provider=nvidia model=%s attempt=%d/%d outcome=budget_exhausted elapsed_ms=0 cooldown=false",
+                model_id, attempts + 1, MAX_ATTEMPTS,
+            )
             break
 
         attempts += 1
@@ -327,31 +377,50 @@ def generate_reply_detailed(
         # model would otherwise hang until its own timeout.
         text, reason, latency = _call_model(model_id, min(timeout, remaining), messages, key)
         result["attempts"].append({"model": model_id, "reason": reason})
+        elapsed_ms = int((latency or 0.0) * 1000)
 
         if text:
             _note_success(model_id, latency or 0.0)
             result["text"] = text
             result["model"] = model_id
-            result["latency_ms"] = int((latency or 0.0) * 1000)
-            logger.info("Ask KAVACH provider=nvidia model=%s ok", model_id)
+            result["latency_ms"] = elapsed_ms
+            result["fallback"] = _fallback_occurred(result)
+            logger.info(
+                "ask_kavach provider=nvidia model=%s attempt=%d/%d outcome=success elapsed_ms=%d cooldown=false",
+                model_id, attempts, MAX_ATTEMPTS, elapsed_ms,
+            )
+            logger.info(
+                "ask_kavach provider=nvidia nvidia_success=true attempts=%d elapsed_ms=%d gemini_fallback=false",
+                attempts, int((time.monotonic() - started_all) * 1000),
+            )
             return result
 
         if reason.startswith("model_") or reason == "unsupported":
             # Account-specific unavailability or a dead model id: park it for a
             # long time so later users do not keep burning attempts on it.
-            _note_failure(model_id, cooldown=UNAVAILABLE_COOLDOWN_SECONDS)
-        elif reason.startswith("transient") or reason in ("timeout", "empty", "malformed"):
-            _note_failure(model_id, cooldown=COOLDOWN_SECONDS)
+            cooldown = UNAVAILABLE_COOLDOWN_SECONDS
+        elif reason.startswith("transient") or reason in ("timeout", "connection", "empty", "malformed"):
+            cooldown = COOLDOWN_SECONDS
         else:
-            _note_failure(model_id, cooldown=0.0)
+            cooldown = 0.0
+        _note_failure(model_id, cooldown=cooldown)
 
-        logger.info("Ask KAVACH provider=nvidia model=%s reason=%s", model_id, reason)
+        logger.info(
+            "ask_kavach provider=nvidia model=%s attempt=%d/%d outcome=%s elapsed_ms=%d cooldown=%s",
+            model_id, attempts, MAX_ATTEMPTS, _log_outcome(reason), elapsed_ms,
+            "true" if cooldown > 0 else "false",
+        )
 
         if reason == "auth" or reason.startswith("request_"):
             # Provider-level auth failure, or a problem with our own request:
             # another model cannot improve the outcome, so stop immediately.
             break
 
+    result["fallback"] = True
+    logger.info(
+        "ask_kavach provider=nvidia nvidia_success=false attempts=%d elapsed_ms=%d gemini_fallback=true",
+        attempts, int((time.monotonic() - started_all) * 1000),
+    )
     return result
 
 

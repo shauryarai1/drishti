@@ -562,3 +562,172 @@ def test_reasoning_privacy_survives_the_new_configuration(monkeypatch, ask_env):
     assert REASONING not in json.dumps(body)
     assert REASONING not in json.dumps(ask_env.rows)
     assert FAKE_KEY not in json.dumps(body)
+
+
+# --- observability: fallback indicator and operational logs ------------------
+def _capture_kavach_logs():
+    """Attach a capture handler to the kavach.chat logger (propagate is off in prod)."""
+    import logging
+
+    records: list = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    logger = logging.getLogger("kavach.chat")
+    handler = Capture()
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    return logger, handler, records
+
+
+def _release_kavach_logs(logger, handler):
+    logger.removeHandler(handler)
+
+
+def test_primary_success_reports_no_fallback(monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(nvidia.httpx, "post",
+                        scripted(calls, {PRIMARY: FakeResponse(200, reply_payload("Direct answer."))}))
+
+    detail = nvidia.generate_reply_detailed("hello", [])
+
+    assert detail["model"] == PRIMARY
+    assert detail["attempts"] == [{"model": PRIMARY, "reason": "ok"}]
+    assert detail["fallback"] is False, "a first-attempt primary success is not a fallback"
+
+
+def test_second_model_success_reports_fallback(monkeypatch):
+    calls: list = []
+    second = nvidia.MODEL_REGISTRY[1][0]
+    script = {PRIMARY: FakeResponse(503, text="overloaded"),
+              second: FakeResponse(200, reply_payload("Fallback model answered."))}
+    monkeypatch.setattr(nvidia.httpx, "post", scripted(calls, script))
+
+    detail = nvidia.generate_reply_detailed("hello", [])
+
+    assert detail["model"] == second
+    assert detail["fallback"] is True
+
+
+def test_trace_reports_no_fallback_when_the_primary_model_answers(monkeypatch, ask_env):
+    import chat.trace as trace
+
+    calls: list = []
+    monkeypatch.setattr(nvidia.httpx, "post",
+                        scripted(calls, {PRIMARY: FakeResponse(200, reply_payload("Answered directly."))}))
+
+    ask(TestClient(main.app))
+
+    event = trace.get_event("router-test")
+    assert event is not None
+    assert event["model"]["preferred"] == PRIMARY
+    assert event["model"]["actual"] == PRIMARY
+    assert event["model"]["fallback"] is False
+
+
+def test_gemini_after_nvidia_failure_reports_fallback(monkeypatch, ask_env):
+    import chat.trace as trace
+
+    calls: list = []
+    monkeypatch.setattr(nvidia.httpx, "post", scripted(calls, unusable_for_everyone(503)))
+    monkeypatch.setattr("chat.gemini.generate_reply_detailed",
+                        lambda *a, **k: {"text": "Gemini answered.", "model": "gemini-3.6-flash",
+                                         "preferred": "gemini-3.6-flash", "attempts": []})
+
+    body = ask(TestClient(main.app)).json()
+
+    assert body["answer"] == "Gemini answered."
+    event = trace.get_event("router-test")
+    assert event is not None
+    assert event["model"]["fallback"] is True
+
+
+def test_trace_reports_fallback_when_a_second_nvidia_model_answers(monkeypatch, ask_env):
+    import chat.trace as trace
+
+    calls: list = []
+    second = nvidia.MODEL_REGISTRY[1][0]
+    monkeypatch.setattr(nvidia.httpx, "post",
+                        scripted(calls, {PRIMARY: FakeResponse(429, text="rate limited"),
+                                         second: FakeResponse(200, reply_payload("Second model."))}))
+
+    ask(TestClient(main.app))
+
+    event = trace.get_event("router-test")
+    assert event is not None
+    assert event["model"]["actual"] == second
+    assert event["model"]["fallback"] is True
+
+
+def test_provider_logs_contain_model_outcome_and_timing(monkeypatch):
+    logger, handler, records = _capture_kavach_logs()
+    try:
+        calls: list = []
+        monkeypatch.setattr(nvidia.httpx, "post",
+                            scripted(calls, {PRIMARY: FakeResponse(200, reply_payload("ok"))}))
+        nvidia.generate_reply_detailed("hello", [])
+    finally:
+        _release_kavach_logs(logger, handler)
+
+    joined = "\n".join(records)
+    assert "provider=nvidia" in joined
+    assert PRIMARY in joined
+    assert "outcome=success" in joined
+    assert "elapsed_ms=" in joined
+    assert "nvidia_success=true" in joined
+    assert "gemini_fallback=false" in joined
+
+
+def test_failure_logs_use_the_outcome_vocabulary(monkeypatch):
+    logger, handler, records = _capture_kavach_logs()
+    try:
+        calls: list = []
+        monkeypatch.setattr(nvidia.httpx, "post",
+                            scripted(calls, {PRIMARY: FakeResponse(429, text="rate limited"),
+                                             nvidia.MODEL_REGISTRY[1][0]: httpx.TimeoutException("slow")}))
+        nvidia.generate_reply_detailed("hello", [])
+    finally:
+        _release_kavach_logs(logger, handler)
+
+    joined = "\n".join(records)
+    assert "attempt=1/2 outcome=429" in joined
+    assert "cooldown=true" in joined
+    assert "outcome=timeout" in joined
+    assert "nvidia_success=false" in joined
+    assert "gemini_fallback=true" in joined
+
+
+def test_account_unavailable_logs_404_category(monkeypatch):
+    logger, handler, records = _capture_kavach_logs()
+    try:
+        calls: list = []
+        monkeypatch.setattr(nvidia.httpx, "post", scripted(calls, unusable_for_everyone(404)))
+        nvidia.generate_reply_detailed("hello", [])
+    finally:
+        _release_kavach_logs(logger, handler)
+
+    assert "outcome=404" in "\n".join(records)
+
+
+def test_logs_never_contain_secrets_prompts_or_response_content(monkeypatch, ask_env):
+    logger, handler, records = _capture_kavach_logs()
+    question = "SECRET-QUESTION-MARKER what about my Mars?"
+    try:
+        calls: list = []
+        payload = reply_payload("SECRET-ANSWER-MARKER final text.", reasoning=REASONING)
+        monkeypatch.setattr(nvidia.httpx, "post", scripted(calls, {PRIMARY: FakeResponse(200, payload)}))
+        response = TestClient(main.app).post(
+            "/api/ask",
+            json={"question": question, "timestamp": "2026-09-21T22:40:00+05:30",
+                  "conversation_id": "log-privacy"},
+        )
+    finally:
+        _release_kavach_logs(logger, handler)
+
+    joined = "\n".join(records)
+    assert "provider=nvidia" in joined, "logs should still be present"
+    for forbidden in (FAKE_KEY, question, "SECRET-ANSWER-MARKER", REASONING, "Bearer", "Authorization"):
+        assert forbidden not in joined, forbidden
+    assert response.status_code == 200
