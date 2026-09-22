@@ -430,27 +430,30 @@ def test_yes_no_page_uses_its_own_button_label():
     assert "Ask KAVACH" not in ui, "the Yes/No button must not reuse the Ask KAVACH name"
 
 
-def test_sanket_and_services_are_in_the_navbar():
+def test_yes_no_and_services_are_in_the_navbar():
     header = (FRONTEND / "components" / "Header.tsx").read_text(encoding="utf-8")
 
-    assert "'SANKET'" in header and "'/yes-no'" in header
+    assert "'YES / NO'" in header and "'/yes-no'" in header
     assert "'Services'" in header and "'/services'" in header, "the Services link must remain"
-    assert "'YES / NO'" not in header, "the public feature name is now SANKET"
+    assert "SANKET" not in header, "the public feature name is YES / NO"
 
 
-def test_sanket_public_branding_and_methodology_privacy():
+def test_yes_no_public_branding_and_methodology_privacy():
     """The public copy names the feature and never explains how it is derived."""
     ui = YES_NO_UI.read_text(encoding="utf-8")
     page = YES_NO_PAGE.read_text(encoding="utf-8")
 
-    assert "ASK THE MOMENT" in ui
-    assert "KAVACH SANKET" in ui
-    assert "KAVACH reads the moment and gives you a simple indication." in ui
-    assert "Focus on one question before revealing your Sanket." in ui
+    assert 'label="YES / NO"' in ui
+    assert "YES / NO" in ui
+    assert "Ask one clear question and receive a simple indication." in ui
+    assert "Focus on one question before revealing your answer." in ui
     assert "REVEAL ANSWER" in ui
+    assert "sanket" not in ui.lower(), "the Sanket branding was reverted"
+    assert "ASK THE MOMENT" not in ui
 
-    assert "KAVACH Sanket | Ask the Moment" in page
-    assert "Ask one clear question and receive a simple indication from KAVACH Sanket." in page
+    assert "KAVACH Yes / No" in page
+    assert "Ask one clear question and receive a simple indication." in page
+    assert "sanket" not in page.lower()
 
     for banned in ("hour", "minute", "planet", "planetary", "friendship", "matrix", "reduced"):
         assert banned not in ui.lower(), f"the UI copy must not describe {banned}"

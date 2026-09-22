@@ -30,7 +30,7 @@ function verdictSize(verdict: string | null): string {
 }
 
 /**
- * KAVACH SANKET experience.
+ * KAVACH YES / NO experience.
  *
  * The verdict comes entirely from the deterministic backend, computed from the
  * exact local time the question is submitted. This component only displays the
@@ -96,12 +96,12 @@ export function YesNoExperience() {
       <div className="architectural-grid border-b border-[#A62A34]/20 bg-[#160A0C]">
         <Container size="md" className="py-12 sm:py-16">
           <div className="text-center">
-            <SectionLabel label="ASK THE MOMENT" tone="brass" className="justify-center" />
+            <SectionLabel label="YES / NO" tone="brass" className="justify-center" />
             <h1 className="mt-6 text-2xl font-semibold tracking-[0.08em] text-[#F7F5F0] sm:text-3xl md:text-4xl">
-              KAVACH SANKET
+              YES / NO
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-[#EEE9DF]/70 sm:text-base">
-              Ask one clear question. KAVACH reads the moment and gives you a simple indication.
+              Ask one clear question and receive a simple indication.
             </p>
           </div>
 
@@ -113,7 +113,7 @@ export function YesNoExperience() {
           Your question
         </label>
         <p className="mt-2 text-[11px] text-[#EEE9DF]/45">
-          Focus on one question before revealing your Sanket.
+          Focus on one question before revealing your answer.
         </p>
         <textarea
           id="yesno-question"
