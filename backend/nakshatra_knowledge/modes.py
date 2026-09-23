@@ -50,20 +50,6 @@ def transit_mode_line(nakshatra: str) -> str:
     return f"Today's lunar pattern supports {_join(profile['mode'])}."
 
 
-def nakshatra_expression(nakshatra: str) -> str:
-    """Short deterministic HOW clause from the approved Nakshatra profile."""
-    profile = profile_for(nakshatra)
-    return f"Today's lunar pattern favours {_join(profile['mode'])}."
-
-
-def compose_category(house_reason: str, nakshatra: str) -> str:
-    """Compose one category's text from the house status (WHERE) and the transit
-    Nakshatra mode (HOW). The house reading is modified, never replaced."""
-    if not nakshatra:
-        return house_reason
-    return f"{house_reason} {nakshatra_expression(nakshatra)}"
-
-
 def navtara_tone(tara: Optional[str]) -> Optional[Mapping[str, str]]:
     """Presentation tone for a Navtara result (None when unknown)."""
     if not tara:

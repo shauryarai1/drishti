@@ -273,9 +273,6 @@ function DailyContent() {
                   </div>
                   <div className={`${LABEL} mt-3`}>Today&apos;s Pattern</div>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#EEE9DF]/75">{card.pattern}</p>
-                  {card.nakshatraGuidance && (
-                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#D6BE85]/80">{card.nakshatraGuidance}</p>
-                  )}
 
                   <div className="mt-4 space-y-2.5">
                     <CategoryRow label="Love" status={card.categories.love.status} reason={card.categories.love.reason} />

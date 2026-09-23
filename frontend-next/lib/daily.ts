@@ -13,9 +13,8 @@ export interface DailyCategory {
 export interface DailyCard {
   sign: string;
   activeHouse: number;
-  /** House context modified by today's Nakshatra mode (additive). */
-  nakshatraGuidance?: string;
   title: string;
+  /** ONE integrated house x transit-Nakshatra prediction. */
   pattern: string;
   categories: { love: DailyCategory; health: DailyCategory; career: DailyCategory };
   bestColour: string | null;

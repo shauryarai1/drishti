@@ -150,12 +150,14 @@ def get_daily_house_pattern(active_house: int) -> Dict[str, Any]:
 
 
 def get_daily_category_status(active_house: int, nakshatra: str = "") -> Dict[str, Any]:
-    from nakshatra_knowledge.modes import compose_category
+    from .compose import compose_daily_category
 
     result: Dict[str, Any] = {}
     for category in ("love", "health", "career"):
-        level, reason = status(active_house, category)
-        result[category] = {"status": level, "reason": compose_category(reason, nakshatra)}
+        level, house_reason = status(active_house, category)
+        reason = (compose_daily_category(active_house, nakshatra, category)
+                  if nakshatra else house_reason)
+        result[category] = {"status": level, "reason": reason}
     return result
 
 
@@ -175,7 +177,7 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     # the existing sunrise Moon longitude via the shared nakshatra helper, so no
     # new astronomy is introduced.
     from kundli.nakshatra import nakshatra_of
-    from nakshatra_knowledge.modes import compose_guidance, navtara_tone, transit_mode_line
+    from nakshatra_knowledge.modes import navtara_tone, transit_mode_line
     transit_nakshatra = ""
     try:
         transit_nakshatra = str(nakshatra_of(_moon_longitude(datetime.fromisoformat(daily["sunrise"])))["name"])
@@ -204,6 +206,8 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
         })
 
     cards: List[Dict[str, Any]] = []
+    from .compose import compose_daily_pattern
+
     for sign in RASHIS:
         active_house = calculate_active_house(sign, daily_moon)
         pattern = get_daily_house_pattern(active_house)
@@ -211,12 +215,13 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
             "sign": sign,
             "activeHouse": active_house,
             "title": pattern["theme"],
-            # House context (WHERE) modified by today's Nakshatra mode (HOW).
-            "nakshatraGuidance": (
-                compose_guidance(str(pattern["theme"]), transit_nakshatra, navtara_tara or None)
-                if transit_nakshatra else ""
+            # ONE integrated prediction: the house theme (WHERE) expressed
+            # through today's transit Nakshatra (HOW). Never house text plus an
+            # appended Nakshatra sentence.
+            "pattern": (
+                compose_daily_pattern(active_house, transit_nakshatra)
+                if transit_nakshatra else pattern["pattern"]
             ),
-            "pattern": pattern["pattern"],
             "categories": get_daily_category_status(active_house, transit_nakshatra),
             "bestColour": get_best_colour(sign, daily_moon),
             "isPersonal": sign == natal_moon,

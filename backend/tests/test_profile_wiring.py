@@ -174,8 +174,8 @@ def test_daily_keeps_city_latest_wins_and_renders_the_transit_nakshatra():
     page = _read(APP / "daily" / "page.tsx")
     assert "requestIdRef" in page
     assert "if (requestId !== requestIdRef.current) return;" in page
-    # The transit Nakshatra is rendered per sign.
-    assert "card.nakshatraGuidance" in page
+    # The integrated transit-Nakshatra prediction is rendered per sign.
+    assert "card.pattern" in page
     assert "data.nakshatra?.name" in page
 
 
