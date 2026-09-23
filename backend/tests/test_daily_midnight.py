@@ -107,3 +107,13 @@ def test_frontend_refreshes_across_midnight():
     assert "visibilitychange" in page
     assert "dayRef" in page
     assert "if (dayRef.current && current !== dayRef.current)" in page
+
+
+def test_frontend_daily_is_latest_wins_and_uncached():
+    """A slow response for a previous city must never overwrite the current one."""
+    page = PAGE.read_text(encoding="utf-8")
+    lib = LIB.read_text(encoding="utf-8")
+    assert "requestIdRef" in page
+    assert "if (requestId !== requestIdRef.current) return;" in page
+    # The reading must never be served from a cache.
+    assert "cache: 'no-store'" in lib

@@ -58,6 +58,9 @@ export async function fetchDaily(payload: DailyRequest): Promise<DailyResponse> 
   const response = await fetch(`${API_BASE}/daily`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    // The reading is date/time-sensitive: never let a cached response serve a
+    // previous day's reading.
+    cache: 'no-store',
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));

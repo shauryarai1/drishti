@@ -70,16 +70,21 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const dayRef = useRef<string>('');
+  // Latest-wins guard: a slow response for a previously selected city must never
+  // overwrite the reading for the city the user is looking at now.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async (label: string) => {
     const found = DAILY_CITIES.find((item) => item.label === label) ?? DAILY_CITIES[0];
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setCity(found);
     setBusy(true);
     setError('');
     try {
         const localDate = localCalendarDate(found.timezone);
         dayRef.current = localDate;
-        setData(await fetchDaily({
+        const result = await fetchDaily({
           latitude: found.latitude,
           longitude: found.longitude,
           // The daily Moon is the Moon at LOCAL sunrise, so the request must use
@@ -89,12 +94,15 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
           // midnight. Sending it makes the requested day authoritative instead
           // of relying on the server's clock.
           date: localDate,
-        }));
+        });
+        if (requestId !== requestIdRef.current) return;   // a newer request won
+        setData(result);
     } catch {
+      if (requestId !== requestIdRef.current) return;     // a newer request won
       setData(null);
       setError("Today's prediction is temporarily unavailable. Please try again.");
     } finally {
-      setBusy(false);
+      if (requestId === requestIdRef.current) setBusy(false);
     }
   }, []);
 
