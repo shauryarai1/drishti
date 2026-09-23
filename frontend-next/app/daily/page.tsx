@@ -4,11 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
 import { RequireProfile } from '../../components/RequireProfile';
-import { PersonSelector } from '../../components/PersonSelector';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
-import { useAuth } from '../../lib/auth';
-import { deriveNatal } from '../../lib/natal';
-import { listProfiles, type BirthProfile } from '../../lib/profiles';
 import {
   DAILY_CITIES,
   MOON_SIGNS,
@@ -70,22 +66,11 @@ function localCalendarDate(timeZone: string): string {
 }
 
 function DailyContent() {
-  const { user } = useAuth();
-  const [profiles, setProfiles] = useState<BirthProfile[]>([]);
-  const [selectedId, setSelectedId] = useState('');
-  // Natal values are derived from the selected profile's birth facts and are
-  // never stored. `natalRef` keeps them out of the load() dependency list.
-  const natalRef = useRef<{ moonRashi: string; janmaNakshatra: string } | null>(null);
-  const natalRequestIdRef = useRef(0);
-  const bootstrappedRef = useRef(false);
   const [city, setCity] = useState(DAILY_CITIES[0]);
   const [data, setData] = useState<DailyResponse | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  // A profile/natal failure is surfaced with a retry. Daily never falls back to
-  // another person, a saved reading or fabricated natal data.
-  const [profileError, setProfileError] = useState('');
   const dayRef = useRef<string>('');
   // Latest-wins guard: a slow response for a previously selected city must never
   // overwrite the reading for the city the user is looking at now.
@@ -111,12 +96,6 @@ function DailyContent() {
           // midnight. Sending it makes the requested day authoritative instead
           // of relying on the server's clock.
           date: localDate,
-          // Personal layer: the selected profile's natal Moon Rashi and Janma
-          // Nakshatra (derived from its birth facts by the authoritative engine).
-          ...(natalRef.current
-            ? { natal_moon: natalRef.current.moonRashi,
-                natal_nakshatra: natalRef.current.janmaNakshatra }
-            : {}),
         });
         if (requestId !== requestIdRef.current) return;   // a newer request won
         setData(result);
@@ -162,90 +141,10 @@ function DailyContent() {
     void load(storedCity);
   }, [load]);
 
-  // The Daily location is kept in a ref so the profile bootstrap below never
-  // depends on it (which would re-run the effect).
-  const cityRef = useRef(city.label);
-  cityRef.current = city.label;
-
-  // Default to the account's PRIMARY profile. A fresh visit always starts with
-  // Primary; an explicit selection is local to this visit only.
-  const bootstrap = useCallback(async () => {
-    if (!user) return;
-    setProfileError('');
-    try {
-      const list = await listProfiles(user.id);
-      setProfiles(list);
-      const primary = list.find((profile) => profile.is_primary);
-      if (!primary) {
-        // Never fall back to the first other person: the account owner needs a
-        // Primary Profile before a personal Daily can be shown.
-        setProfileError('We could not find your Primary Profile. Please set it up to see your personal Daily.');
-        return;
-      }
-      setSelectedId(primary.id);
-      const requestId = natalRequestIdRef.current + 1;
-      natalRequestIdRef.current = requestId;
-      let natal: { moonRashi: string; janmaNakshatra: string } | null = null;
-      try {
-        natal = await deriveNatal(primary);
-      } catch {
-        natal = null;
-      }
-      if (requestId !== natalRequestIdRef.current) return;
-      if (!natal) {
-        // Never fabricate natal data, and never borrow another person's.
-        natalRef.current = null;
-        setProfileError('We could not calculate your personal reading. Please try again.');
-        return;
-      }
-      natalRef.current = natal;
-      await load(cityRef.current);
-    } catch {
-      // A profile load failure must never fall back to a saved reading or
-      // another person; the user gets a retry instead.
-      natalRef.current = null;
-      setProfileError('We could not load your birth profile. Please try again.');
-    }
-  }, [user, load]);
-
-  useEffect(() => {
-    if (!user || bootstrappedRef.current) return;
-    bootstrappedRef.current = true;
-    void bootstrap();
-  }, [user, bootstrap]);
-
-  const retryProfile = () => {
-    bootstrappedRef.current = false;
-    void bootstrap();
-  };
-
-  const selectPerson = (id: string) => {
-    const profile = profiles.find((item) => item.id === id);
-    if (!profile || id === selectedId) return;
-    const previousId = selectedId;
-    setSelectedId(id);
-    setProfileError('');
-    const requestId = natalRequestIdRef.current + 1;
-    natalRequestIdRef.current = requestId;
-    void (async () => {
-      let natal: { moonRashi: string; janmaNakshatra: string } | null = null;
-      try {
-        natal = await deriveNatal(profile);
-      } catch {
-        natal = null;
-      }
-      if (requestId !== natalRequestIdRef.current) return;   // latest wins
-      if (!natal) {
-        // Do not leave another person's reading labelled with this name.
-        natalRef.current = null;
-        setSelectedId(previousId);
-        setProfileError('We could not calculate that person\u2019s reading. Please try again.');
-        return;
-      }
-      natalRef.current = natal;
-      await load(cityRef.current);
-    })();
-  };
+  // The Daily location is kept in a ref so the rollover check never depends on
+  // it. The current Daily is TRANSIT-ONLY: no birth profile, natal Moon Rashi,
+  // Janma Nakshatra or Navtara personal tone feeds today's prediction. The
+  // natal/Navtara code is preserved elsewhere for possible future use.
 
   const chooseSign = (sign: string) => {
     setSelected(sign);
@@ -281,18 +180,6 @@ function DailyContent() {
           </p>
         </MaskedReveal>
 
-        {profileError && (
-          <section className={`${PANEL} mt-5 p-4`}>
-            <div className="text-[13px] text-[#EEE9DF]/80">{profileError}</div>
-            <button
-              onClick={retryProfile}
-              className="mt-3 rounded bg-[#7B1D26] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#F7F5F0] hover:bg-[#A62A34]"
-            >
-              Retry
-            </button>
-          </section>
-        )}
-
         <section className={`${PANEL} mt-5 p-4`}>
           {busy && !data ? (
             <div className="text-[13px] text-[#EEE9DF]/55">Reading today&apos;s Moon pattern&hellip;</div>
@@ -304,14 +191,9 @@ function DailyContent() {
                 <div className="mt-0.5 text-[11px] text-[#EEE9DF]/40">at local sunrise</div>
               </div>
               <div>
-              {profiles.length > 0 && (
-              <div className="mb-5">
-                <PersonSelector profiles={profiles} selectedId={selectedId} onChange={selectPerson} />
-              </div>
-            )}
-              <div className={LABEL}>Date</div>
+                <div className={LABEL}>Date</div>
                 <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.dailyMoon.date}</div>
-              {data.nakshatra?.name && (
+                {data.nakshatra?.name && (
                 <div className="mt-3">
                   <div className={LABEL}>Moon Nakshatra</div>
                   <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.nakshatra.name}</div>
@@ -391,6 +273,9 @@ function DailyContent() {
                   </div>
                   <div className={`${LABEL} mt-3`}>Today&apos;s Pattern</div>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#EEE9DF]/75">{card.pattern}</p>
+                  {card.nakshatraGuidance && (
+                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#D6BE85]/80">{card.nakshatraGuidance}</p>
+                  )}
 
                   <div className="mt-4 space-y-2.5">
                     <CategoryRow label="Love" status={card.categories.love.status} reason={card.categories.love.reason} />

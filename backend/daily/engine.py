@@ -149,11 +149,13 @@ def get_daily_house_pattern(active_house: int) -> Dict[str, Any]:
     return {"activeHouse": active_house, "theme": entry["theme"], "pattern": entry["pattern"]}
 
 
-def get_daily_category_status(active_house: int) -> Dict[str, Any]:
+def get_daily_category_status(active_house: int, nakshatra: str = "") -> Dict[str, Any]:
+    from nakshatra_knowledge.modes import compose_category
+
     result: Dict[str, Any] = {}
     for category in ("love", "health", "career"):
         level, reason = status(active_house, category)
-        result[category] = {"status": level, "reason": reason}
+        result[category] = {"status": level, "reason": compose_category(reason, nakshatra)}
     return result
 
 
@@ -174,7 +176,6 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     # new astronomy is introduced.
     from kundli.nakshatra import nakshatra_of
     from nakshatra_knowledge.modes import compose_guidance, navtara_tone, transit_mode_line
-
     transit_nakshatra = ""
     try:
         transit_nakshatra = str(nakshatra_of(_moon_longitude(datetime.fromisoformat(daily["sunrise"])))["name"])
@@ -216,7 +217,7 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
                 if transit_nakshatra else ""
             ),
             "pattern": pattern["pattern"],
-            "categories": get_daily_category_status(active_house),
+            "categories": get_daily_category_status(active_house, transit_nakshatra),
             "bestColour": get_best_colour(sign, daily_moon),
             "isPersonal": sign == natal_moon,
         })

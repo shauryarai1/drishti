@@ -122,21 +122,22 @@ def test_primary_edit_cannot_change_primary_status():
 
 
 # --- Daily wiring ------------------------------------------------------------
-def test_daily_defaults_to_primary_and_offers_every_profile():
+def test_daily_is_transit_only_and_has_no_person_selector():
     page = _read(APP / "daily" / "page.tsx")
-    assert "listProfiles" in page
-    assert "find((profile) => profile.is_primary)" in page
-    assert "PersonSelector" in page
-    assert "profiles={profiles}" in page
+    # Transit-only: no natal derivation, no profile list, no person selector.
+    assert "deriveNatal" not in page
+    assert "listProfiles" not in page
+    assert "PersonSelector" not in page
+    assert "natalRef" not in page
+    assert "RequireProfile" in page  # the login/profile gate may remain
 
 
-def test_daily_derives_real_natal_values_and_sends_them():
+def test_daily_never_sends_natal_values():
     page = _read(APP / "daily" / "page.tsx")
-    assert "deriveNatal(" in page
-    assert "natal_moon: natalRef.current.moonRashi" in page
-    assert "natal_nakshatra: natalRef.current.janmaNakshatra" in page
-    # Never fabricate natal data when derivation fails.
-    assert "natalRef.current = null" in page
+    assert "natal_moon" not in page
+    assert "natal_nakshatra" not in page
+    # It still sends the selected city and the local calendar date.
+    assert "date: localDate" in page
 
 
 def test_natal_values_come_from_the_existing_authoritative_engine():
@@ -169,13 +170,13 @@ def test_auth_session_resolution_is_bounded():
     assert "clearTimeout(settle)" in auth
 
 
-def test_daily_switching_is_latest_wins_and_keeps_its_location_separate():
+def test_daily_keeps_city_latest_wins_and_renders_the_transit_nakshatra():
     page = _read(APP / "daily" / "page.tsx")
-    assert "natalRequestIdRef" in page
-    assert "if (requestId !== natalRequestIdRef.current) return;" in page
-    # The selected Daily city is never replaced by the birth place.
-    assert "cityRef" in page
-    assert "birth_place_name" not in page
+    assert "requestIdRef" in page
+    assert "if (requestId !== requestIdRef.current) return;" in page
+    # The transit Nakshatra is rendered per sign.
+    assert "card.nakshatraGuidance" in page
+    assert "data.nakshatra?.name" in page
 
 
 def test_daily_keeps_midnight_rollover():
@@ -184,25 +185,22 @@ def test_daily_keeps_midnight_rollover():
 
 
 # --- Daily personalisation acceptance (11A-11I) ------------------------------
-def test_daily_never_falls_back_to_another_person_or_a_saved_reading():
+def test_daily_never_falls_back_to_a_saved_reading():
     page = _read(APP / "daily" / "page.tsx")
-    # The Primary is required: no `?? list[0]` (first other person) fallback.
-    assert "?? list[0]" not in page
-    assert "list.find((profile) => profile.is_primary)" in page
     # No fallback to a saved Kundli / reading / cached person anywhere.
     for banned in ("getSavedKundli", "latestKundli", "savedReading", "getHistory", "listReadings"):
         assert banned not in page, banned
-    # A missing primary, a load failure and a derivation failure all surface a
-    # retry instead of borrowing someone else's data.
-    assert "setProfileError(" in page
-    assert "profileError" in page
-    assert "retryProfile" in page
+    # And no natal/personal retry state remains in the current Daily flow.
+    assert "profileError" not in page
+    assert "personal reading" not in page
 
 
-def test_daily_reverts_the_selector_when_a_switch_cannot_be_calculated():
+def test_daily_requires_login_and_creates_no_anonymous_profile():
     page = _read(APP / "daily" / "page.tsx")
-    assert "const previousId = selectedId;" in page
-    assert "setSelectedId(previousId);" in page
+    assert "<RequireProfile>" in page
+    assert "createPrimaryProfile" not in page
+    assert "createOtherPerson" not in page
+    assert "sessionStorage" not in page
 
 
 def test_daily_is_login_only_and_never_creates_an_anonymous_profile():
@@ -215,30 +213,29 @@ def test_daily_is_login_only_and_never_creates_an_anonymous_profile():
     assert "birth_profiles" not in page
 
 
-def test_daily_sends_both_natal_values_and_no_manual_nakshatra_input():
+def test_daily_location_stays_separate_from_birth_place():
     page = _read(APP / "daily" / "page.tsx")
-    assert "natal_moon: natalRef.current.moonRashi" in page
-    assert "natal_nakshatra: natalRef.current.janmaNakshatra" in page
-    # Nothing asks the user to type a Rashi / Nakshatra / Lagna.
-    lowered = page.lower()
-    assert "janma nakshatra" not in lowered or "input" not in lowered
-    assert "rashi</label>" not in lowered
     # The birth place is never sent as the Daily location.
     assert "birth_place_name" not in page
+    assert "localCalendarDate" in page
+    # Nothing asks the user to type a Rashi / Nakshatra / Lagna.
+    lowered = page.lower()
+    assert "rashi</label>" not in lowered
 
 
-def test_daily_defaults_to_primary_every_fresh_visit():
+def test_personal_natal_code_is_preserved_but_unused_by_daily():
+    # The natal/Navtara code is kept for possible future use...
+    natal = LIB / "natal.ts"
+    assert natal.exists()
+    assert "deriveNatal" in _read(natal)
+    # ...but the current Daily page does not import or call it.
+    assert "lib/natal" not in _read(APP / "daily" / "page.tsx")
+
+
+def test_daily_has_no_person_switch_logic():
     page = _read(APP / "daily" / "page.tsx")
-    # Selection is component state only - never persisted as a default.
-    assert "setSelectedId(primary.id)" in page
-    for banned in ("kavach_daily_person", "kavach_daily_profile", "kavach_primary"):
-        assert banned not in page, banned
-
-
-def test_other_person_uses_the_same_natal_pipeline_as_primary():
-    page = _read(APP / "daily" / "page.tsx")
-    # One derivation path used by both bootstrap and selection.
-    assert page.count("await deriveNatal(") == 2
+    assert "selectPerson" not in page
+    assert "selectedId" not in page
 
 
 # --- account profile management ---------------------------------------------

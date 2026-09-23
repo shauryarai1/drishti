@@ -227,7 +227,7 @@ def test_no_ascendant_can_affect_the_result():
     # influence it, and no module imports Ascendant/Lagna data.
     assert list(inspect.signature(calculate_active_house).parameters) == ["natal_moon", "daily_moon"]
     assert list(inspect.signature(get_daily_house_pattern).parameters) == ["active_house"]
-    assert list(inspect.signature(get_daily_category_status).parameters) == ["active_house"]
+    assert list(inspect.signature(get_daily_category_status).parameters) == ["active_house", "nakshatra"]
 
     root = pathlib.Path(__file__).resolve().parents[1] / "daily"
     for path in root.glob("*.py"):
