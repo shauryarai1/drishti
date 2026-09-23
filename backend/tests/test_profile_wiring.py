@@ -162,6 +162,64 @@ def test_daily_keeps_midnight_rollover():
     assert "localCalendarDate" in page and "dayRef" in page
 
 
+# --- Daily personalisation acceptance (11A-11I) ------------------------------
+def test_daily_never_falls_back_to_another_person_or_a_saved_reading():
+    page = _read(APP / "daily" / "page.tsx")
+    # The Primary is required: no `?? list[0]` (first other person) fallback.
+    assert "?? list[0]" not in page
+    assert "list.find((profile) => profile.is_primary)" in page
+    # No fallback to a saved Kundli / reading / cached person anywhere.
+    for banned in ("getSavedKundli", "latestKundli", "savedReading", "getHistory", "listReadings"):
+        assert banned not in page, banned
+    # A missing primary, a load failure and a derivation failure all surface a
+    # retry instead of borrowing someone else's data.
+    assert "setProfileError(" in page
+    assert "profileError" in page
+    assert "retryProfile" in page
+
+
+def test_daily_reverts_the_selector_when_a_switch_cannot_be_calculated():
+    page = _read(APP / "daily" / "page.tsx")
+    assert "const previousId = selectedId;" in page
+    assert "setSelectedId(previousId);" in page
+
+
+def test_daily_is_login_only_and_never_creates_an_anonymous_profile():
+    page = _read(APP / "daily" / "page.tsx")
+    assert "<RequireProfile>" in page
+    # No session-only birth profile: Daily never writes or creates a profile.
+    assert "createPrimaryProfile" not in page
+    assert "createOtherPerson" not in page
+    assert "sessionStorage" not in page
+    assert "birth_profiles" not in page
+
+
+def test_daily_sends_both_natal_values_and_no_manual_nakshatra_input():
+    page = _read(APP / "daily" / "page.tsx")
+    assert "natal_moon: natalRef.current.moonRashi" in page
+    assert "natal_nakshatra: natalRef.current.janmaNakshatra" in page
+    # Nothing asks the user to type a Rashi / Nakshatra / Lagna.
+    lowered = page.lower()
+    assert "janma nakshatra" not in lowered or "input" not in lowered
+    assert "rashi</label>" not in lowered
+    # The birth place is never sent as the Daily location.
+    assert "birth_place_name" not in page
+
+
+def test_daily_defaults_to_primary_every_fresh_visit():
+    page = _read(APP / "daily" / "page.tsx")
+    # Selection is component state only - never persisted as a default.
+    assert "setSelectedId(primary.id)" in page
+    for banned in ("localStorage.setItem('kavach_daily_person", "selectedId").setItem"):
+        assert banned not in page, banned
+
+
+def test_other_person_uses_the_same_natal_pipeline_as_primary():
+    page = _read(APP / "daily" / "page.tsx")
+    # One derivation path used by both bootstrap and selection.
+    assert page.count("await deriveNatal(") == 2
+
+
 # --- account profile management ---------------------------------------------
 def test_account_page_mounts_the_profiles_manager():
     account = _read(APP / "account" / "page.tsx")

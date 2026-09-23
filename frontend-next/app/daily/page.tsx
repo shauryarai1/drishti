@@ -83,6 +83,9 @@ function DailyContent() {
   const [selected, setSelected] = useState<string>('');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  // A profile/natal failure is surfaced with a retry. Daily never falls back to
+  // another person, a saved reading or fabricated natal data.
+  const [profileError, setProfileError] = useState('');
   const dayRef = useRef<string>('');
   // Latest-wins guard: a slow response for a previously selected city must never
   // overwrite the reading for the city the user is looking at now.
@@ -166,49 +169,80 @@ function DailyContent() {
 
   // Default to the account's PRIMARY profile. A fresh visit always starts with
   // Primary; an explicit selection is local to this visit only.
+  const bootstrap = useCallback(async () => {
+    if (!user) return;
+    setProfileError('');
+    try {
+      const list = await listProfiles(user.id);
+      setProfiles(list);
+      const primary = list.find((profile) => profile.is_primary);
+      if (!primary) {
+        // Never fall back to the first other person: the account owner needs a
+        // Primary Profile before a personal Daily can be shown.
+        setProfileError('We could not find your Primary Profile. Please set it up to see your personal Daily.');
+        return;
+      }
+      setSelectedId(primary.id);
+      const requestId = natalRequestIdRef.current + 1;
+      natalRequestIdRef.current = requestId;
+      let natal: { moonRashi: string; janmaNakshatra: string } | null = null;
+      try {
+        natal = await deriveNatal(primary);
+      } catch {
+        natal = null;
+      }
+      if (requestId !== natalRequestIdRef.current) return;
+      if (!natal) {
+        // Never fabricate natal data, and never borrow another person's.
+        natalRef.current = null;
+        setProfileError('We could not calculate your personal reading. Please try again.');
+        return;
+      }
+      natalRef.current = natal;
+      await load(cityRef.current);
+    } catch {
+      // A profile load failure must never fall back to a saved reading or
+      // another person; the user gets a retry instead.
+      natalRef.current = null;
+      setProfileError('We could not load your birth profile. Please try again.');
+    }
+  }, [user, load]);
+
   useEffect(() => {
     if (!user || bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    void (async () => {
-      try {
-        const list = await listProfiles(user.id);
-        if (list.length === 0) return;
-        const primary = list.find((profile) => profile.is_primary) ?? list[0];
-        setProfiles(list);
-        setSelectedId(primary.id);
-        const requestId = natalRequestIdRef.current + 1;
-        natalRequestIdRef.current = requestId;
-        try {
-          const natal = await deriveNatal(primary);
-          if (requestId !== natalRequestIdRef.current) return;
-          natalRef.current = natal;
-        } catch {
-          if (requestId !== natalRequestIdRef.current) return;
-          // Never fabricate natal data: fall back to the generic reading.
-          natalRef.current = null;
-        }
-        await load(cityRef.current);
-      } catch {
-        /* profile load failure: the generic Daily still renders */
-      }
-    })();
-  }, [user, load]);
+    void bootstrap();
+  }, [user, bootstrap]);
+
+  const retryProfile = () => {
+    bootstrappedRef.current = false;
+    void bootstrap();
+  };
 
   const selectPerson = (id: string) => {
     const profile = profiles.find((item) => item.id === id);
-    if (!profile) return;
+    if (!profile || id === selectedId) return;
+    const previousId = selectedId;
     setSelectedId(id);
+    setProfileError('');
     const requestId = natalRequestIdRef.current + 1;
     natalRequestIdRef.current = requestId;
     void (async () => {
+      let natal: { moonRashi: string; janmaNakshatra: string } | null = null;
       try {
-        const natal = await deriveNatal(profile);
-        if (requestId !== natalRequestIdRef.current) return;   // latest wins
-        natalRef.current = natal;
+        natal = await deriveNatal(profile);
       } catch {
-        if (requestId !== natalRequestIdRef.current) return;
-        natalRef.current = null;
+        natal = null;
       }
+      if (requestId !== natalRequestIdRef.current) return;   // latest wins
+      if (!natal) {
+        // Do not leave another person's reading labelled with this name.
+        natalRef.current = null;
+        setSelectedId(previousId);
+        setProfileError('We could not calculate that person\u2019s reading. Please try again.');
+        return;
+      }
+      natalRef.current = natal;
       await load(cityRef.current);
     })();
   };
@@ -246,6 +280,18 @@ function DailyContent() {
             See how today&apos;s Moon movement shapes the pattern of the day for each Moon sign.
           </p>
         </MaskedReveal>
+
+        {profileError && (
+          <section className={`${PANEL} mt-5 p-4`}>
+            <div className="text-[13px] text-[#EEE9DF]/80">{profileError}</div>
+            <button
+              onClick={retryProfile}
+              className="mt-3 rounded bg-[#7B1D26] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#F7F5F0] hover:bg-[#A62A34]"
+            >
+              Retry
+            </button>
+          </section>
+        )}
 
         <section className={`${PANEL} mt-5 p-4`}>
           {busy && !data ? (
