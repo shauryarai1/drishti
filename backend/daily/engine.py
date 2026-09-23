@@ -79,7 +79,16 @@ def get_daily_moon_rashi(payload: Dict[str, Any], on_date: Optional[date_type] =
     """
     timezone_name = payload.get("timezone") or "Asia/Kolkata"
     tz = ZoneInfo(timezone_name)
-    selected = on_date or datetime.now(tz).date()
+    # The DAILY DAY boundary is local midnight. An explicitly requested date is
+    # authoritative: the caller's calendar date must never be replaced by the
+    # server clock, and sunrise/Moonrise must never move the day boundary.
+    requested = payload.get("date")
+    if on_date is not None:
+        selected = on_date
+    elif requested:
+        selected = date_type.fromisoformat(str(requested))
+    else:
+        selected = datetime.now(tz).date()
     panchang = _panchang_for_day(payload, selected)
     sunrise = datetime.fromisoformat(panchang["sun_moon"]["sunrise"])
 

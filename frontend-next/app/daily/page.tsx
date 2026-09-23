@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
@@ -47,12 +47,29 @@ function CategoryRow({ label, status, reason }: { label: string; status: DailySt
   );
 }
 
-export default function DailyPage() {
-  const [city, setCity] = useState(DAILY_CITIES[0]);
+/**
+ * The user's LOCAL calendar date for a timezone: the Daily reading day runs
+ * midnight to midnight in that zone, so the server must never fall back to its
+ * own clock (or UTC).
+ */
+function localCalendarDate(timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  } catch {
+    // Unknown zone: fall back to the device's own local date.
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+}
+
+export default function DailyPage() {  const [city, setCity] = useState(DAILY_CITIES[0]);
   const [data, setData] = useState<DailyResponse | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const dayRef = useRef<string>('');
 
   const load = useCallback(async (label: string) => {
     const found = DAILY_CITIES.find((item) => item.label === label) ?? DAILY_CITIES[0];
@@ -60,12 +77,18 @@ export default function DailyPage() {
     setBusy(true);
     setError('');
     try {
+        const localDate = localCalendarDate(found.timezone);
+        dayRef.current = localDate;
         setData(await fetchDaily({
           latitude: found.latitude,
           longitude: found.longitude,
           // The daily Moon is the Moon at LOCAL sunrise, so the request must use
           // the selected city's own timezone (not a single hardcoded zone).
           timezone: found.timezone,
+          // The reading day is the user's LOCAL calendar date: midnight to
+          // midnight. Sending it makes the requested day authoritative instead
+          // of relying on the server's clock.
+          date: localDate,
         }));
     } catch {
       setData(null);
@@ -74,6 +97,26 @@ export default function DailyPage() {
       setBusy(false);
     }
   }, []);
+
+  // The Daily reading must roll over exactly at LOCAL midnight, even in a tab
+  // that is left open. Re-check the local calendar date periodically and on
+  // return to the tab; only refetch when the day actually changed.
+  useEffect(() => {
+    const check = () => {
+      const current = localCalendarDate(city.timezone);
+      if (dayRef.current && current !== dayRef.current) {
+        void load(city.label);
+      }
+    };
+    const timer = setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
+  }, [city.timezone, city.label, load]);
 
   useEffect(() => {
     let storedCity = DAILY_CITIES[0].label;

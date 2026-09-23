@@ -49,6 +49,8 @@ export interface DailyRequest {
   latitude: number;
   longitude: number;
   timezone: string;
+  /** The user's LOCAL calendar date (YYYY-MM-DD). Authoritative for the day. */
+  date?: string;
   natal_moon?: string;
 }
 
@@ -65,8 +67,7 @@ export async function fetchDaily(payload: DailyRequest): Promise<DailyResponse> 
   return body as DailyResponse;
 }
 
-export const MOON_SIGNS = [
-  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+export const MOON_SIGNS = [  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
 ] as const;
 
