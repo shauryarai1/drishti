@@ -177,7 +177,7 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     # the existing sunrise Moon longitude via the shared nakshatra helper, so no
     # new astronomy is introduced.
     from kundli.nakshatra import nakshatra_of
-    from nakshatra_knowledge.modes import navtara_tone, transit_mode_line
+    from nakshatra_knowledge.modes import navtara_tone
     transit_nakshatra = ""
     try:
         transit_nakshatra = str(nakshatra_of(_moon_longitude(datetime.fromisoformat(daily["sunrise"])))["name"])
@@ -239,7 +239,9 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
         # available, the personal Navtara tone (presentation only).
         "nakshatra": {
             "name": transit_nakshatra,
-            "mode": transit_mode_line(transit_nakshatra) if transit_nakshatra else "",
+            # No raw Nakshatra keyword line is exposed: the Nakshatra is
+            # interpreted through each house in the composed cards instead.
+            "mode": "",
             "navtara": navtara_tara,
             "navtaraTone": dict(navtara_tone(navtara_tara) or {}) if navtara_tara else {},
         },

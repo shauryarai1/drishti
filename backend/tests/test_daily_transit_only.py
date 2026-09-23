@@ -86,11 +86,21 @@ def test_all_twelve_signs_are_integrated_house_x_nakshatra():
     name = result["nakshatra"]["name"]
     assert name
     assert len(result["signs"]) == 12
+    patterns = [card["pattern"] for card in result["signs"]]
+    assert len(set(patterns)) == 12, "each sign must read differently"
     for card in result["signs"]:
-        assert name in card["pattern"], card["sign"]
-        assert str(HOUSE_PATTERNS[card["activeHouse"]]["theme"]) in card["pattern"], card["sign"]
+        # The rendered pattern is exactly the composed house x Nakshatra text.
+        assert card["pattern"] == compose_daily_pattern(card["activeHouse"], name), card["sign"]
         for category in CATEGORIES:
-            assert name in card["categories"][category]["reason"], (card["sign"], category)
+            assert (card["categories"][category]["reason"]
+                    == compose_daily_category(card["activeHouse"], name, category)), (card["sign"], category)
+
+
+def test_raw_nakshatra_keywords_are_never_printed():
+    raw = json.dumps(_result())
+    for leaked in ("this area expresses through", "listen, learn and communicate",
+                   "Today's lunar pattern favours", "practical route forward", "help it land"):
+        assert leaked not in raw, leaked
 
 
 def test_the_generic_appended_construction_is_gone():

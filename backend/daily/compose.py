@@ -1,76 +1,104 @@
-"""Daily composition: HOUSE THEME (WHERE) x transit NAKSHATRA (HOW) x category.
+"""Daily composition: HOUSE (Nakshatra-agnostic) x CURRENT Nakshatra semantics.
 
-Produces ONE integrated interpretation per field. It is never a house sentence
-followed by an appended Nakshatra sentence: the transit Nakshatra modifies how
-the house theme expresses.
-
-Deterministic templates only - no LLM, no new astrology rules, and no 12x27
-hand-written table. The house content comes from the existing HOUSE_PATTERNS and
-the Nakshatra content from the existing approved profiles.
+The house establishes its life area, its generic NEEDS (concept relevance) and
+its generic CONTEXT (active / relational / reflective / ...). The Nakshatra
+supplies its own approved concepts from profiles.py. The concept's generic
+behaviour is then expressed in the house context. Deterministic only.
 """
 
 from __future__ import annotations
 
-from typing import Sequence
+import re
 
-from nakshatra_knowledge.profiles import profile_for
+from .house_semantics import HOUSE_SEMANTICS
+from .nakshatra_semantics import behaviour_selection, role_phrase
 
-from .config import HOUSE_PATTERNS, status
+# Neutral predicates used when the concept and the predicate would repeat the
+# same idea (e.g. "patient" + "patience"). Language only, never per-Nakshatra.
+NEUTRAL_PREDICATES = (
+    "will help you handle things more smoothly.",
+    "should make the day easier to manage.",
+    "will keep things on an even keel.",
+)
+
+_SUFFIXES = ("ingly", "ation", "ness", "ment", "ity", "ion", "ive", "ous",
+             "ance", "ence", "ing", "ly", "ed", "es", "e", "y")
+
+# Function words carry no semantic idea, so they must never trigger the guard.
+_STOPWORDS = {
+    "through", "is", "are", "was", "were", "be", "been", "being", "what", "which", "who",
+    "you", "your", "them", "they", "the", "a", "an", "and", "or", "of", "to", "in", "on",
+    "at", "by", "as", "for", "with", "this", "that", "these", "those", "it", "its",
+    "today", "here", "there", "more", "than", "then", "so", "not", "no", "will", "would",
+    "can", "could", "may", "might", "should", "do", "does", "did", "help", "helps",
+    "things", "really", "going", "keep", "keeps", "make", "makes", "worth", "day", "days",
+}
 
 
-def _join(items: Sequence[str]) -> str:
-    values = [str(item) for item in items if str(item).strip()]
-    if not values:
-        return ""
-    if len(values) == 1:
-        return values[0]
-    return ", ".join(values[:-1]) + " and " + values[-1]
+def _stem(word: str) -> str:
+    text = "".join(ch for ch in word.lower() if ch.isalpha())
+    for suffix in _SUFFIXES:
+        if len(text) > len(suffix) + 3 and text.endswith(suffix):
+            return text[: -len(suffix)]
+    return text
 
 
-def _theme(active_house: int) -> str:
-    entry = HOUSE_PATTERNS.get(active_house) or HOUSE_PATTERNS[1]
-    return str(entry["theme"])
+def _stems(text: str) -> set:
+    return {_stem(word) for word in re.findall(r"[a-zA-Z]+", text)
+            if word.lower() not in _STOPWORDS}
+
+
+def _collision(first: str, second: str) -> bool:
+    """True when the two fragments share a closely related word stem."""
+    for a in _stems(first):
+        for b in _stems(second):
+            common = 0
+            for char_a, char_b in zip(a, b):
+                if char_a != char_b:
+                    break
+                common += 1
+            if common >= 3 and max(len(a), len(b)) >= 5:
+                return True
+    return False
+
+
+def _house(active_house: int) -> dict:
+    return HOUSE_SEMANTICS.get(active_house, HOUSE_SEMANTICS[1])
+
+
+def _cap(text: str) -> str:
+    return text[:1].upper() + text[1:] if text else text
+
+
+def _stable(text: str) -> int:
+    """Deterministic (not random) index key from the selected concept."""
+    return sum(ord(char) for char in text)
+
+
+def _fill(template: str, nakshatra: str, house: dict) -> str:
+    needs = house.get("needs", set())
+    focus = role_phrase(nakshatra, "focus", needs)
+    gift = role_phrase(nakshatra, "gift", needs)
+    caution = role_phrase(nakshatra, "caution", needs)
+    return template.format(
+        focus=focus, Focus_cap=_cap(focus),
+        gift=gift, Gift_cap=_cap(gift),
+        caution=caution, Caution_cap=_cap(caution),
+    )
 
 
 def compose_daily_pattern(active_house: int, nakshatra: str) -> str:
-    """ONE integrated Today's Pattern: the active house read THROUGH the Nakshatra."""
-    profile = profile_for(nakshatra)
-    mode = _join(profile["mode"])
-    focus = _join(profile["focus"])
-    caution = _join(profile["caution"])
-    return (
-        f"{_theme(active_house)} are the day's active area. "
-        f"With the Moon in {nakshatra}, this area expresses through {mode}: "
-        f"{focus} are favoured, and {caution} is what to watch. "
-        f"Let today's choices here follow that tone rather than habit."
-    )
+    house = _house(active_house)
+    needs = house.get("needs", set())
+    _, picked, behaviour = behaviour_selection(nakshatra, needs, house.get("context", "active"))
+    key = picked[0] if picked else house["area"]
+    predicates = house["predicates"]
+    predicate = predicates[_stable(key) % len(predicates)]
+    if _collision(behaviour, predicate):
+        predicate = NEUTRAL_PREDICATES[_stable(key) % len(NEUTRAL_PREDICATES)]
+    return f"{house['area']}. {_cap(behaviour)} {predicate}"
 
 
 def compose_daily_category(active_house: int, nakshatra: str, category: str) -> str:
-    """ONE integrated category reading: house meaning modified by the Nakshatra.
-
-    Each category draws on a DIFFERENT facet of the Nakshatra profile, so the
-    three are never the same appended clause.
-    """
-    _level, reason = status(active_house, category)
-    profile = profile_for(nakshatra)
-    mode = _join(profile["mode"])
-    focus = _join(profile["focus"])
-    caution = _join(profile["caution"])
-    constructive = _join(profile["constructive"])
-    challenging = _join(profile["challenging"])
-
-    if category == "love":
-        return (
-            f"{reason} The {nakshatra} Moon brings {mode} into closeness today, "
-            f"and {caution} is best set aside."
-        )
-    if category == "health":
-        return (
-            f"{reason} Under the {nakshatra} Moon, {constructive} support your energy, "
-            f"and it is worth not letting {challenging} drain it."
-        )
-    return (
-        f"{reason} With the Moon in {nakshatra}, {focus} are the practical route "
-        f"forward at work, and {constructive} help it land."
-    )
+    house = _house(active_house)
+    return _fill(house[category], nakshatra, house)
