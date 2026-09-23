@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { API_BASE, api } from '../../lib/api';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import { Header } from '../../components/Header';
@@ -27,6 +27,7 @@ interface Summary {
 
 export default function LifeSummaryPage() {
   const { status: authStatus, user } = useAuth();
+  const requestIdRef = useRef(0);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [place, setPlace] = useState('');
@@ -91,6 +92,10 @@ export default function LifeSummaryPage() {
   };
 
   const runSummary = async (payload: Record<string, unknown>) => {
+    // Latest-request-wins: a superseded response must never overwrite the
+    // current result, error or loading state.
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setBusy(true);
     setError('');
     try {
@@ -103,11 +108,13 @@ export default function LifeSummaryPage() {
       });
       const body = await res.json();
       if (body.status === 'error') throw new Error(body.message);
+      if (requestId !== requestIdRef.current) return;
       setSummary(body);
     } catch {
+      if (requestId !== requestIdRef.current) return;
       setError("We couldn't prepare your life summary right now. Please try again.");
     } finally {
-      setBusy(false);
+      if (requestId === requestIdRef.current) setBusy(false);
     }
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
 import { ResultGate } from '../../components/ResultGate';
@@ -172,6 +172,7 @@ function PlaceField({ label, value, onResolve, placeholder }: {
 
 export default function YourWeekPage() {
   const { status: authStatus, user } = useAuth();
+  const requestIdRef = useRef(0);
   const [birthDate, setBirthDate] = useState('1990-05-15');
   const [birthTime, setBirthTime] = useState('14:15');
   const [birthPlace, setBirthPlace] = useState<WeeklyPlace | null>(null);
@@ -228,6 +229,10 @@ export default function YourWeekPage() {
 
   const runWeekly = async () => {
     if (!birthPlace || !forecastPlace) return;
+    // Latest-request-wins: a superseded response must never overwrite the
+    // current result, error or loading state.
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setBusy(true);
     setWeek(null);
     try {
@@ -239,14 +244,16 @@ export default function YourWeekPage() {
                     latitude: forecastPlace.latitude, longitude: forecastPlace.longitude,
                     timezone: forecastPlace.timezone },
       });
+      if (requestId !== requestIdRef.current) return;
       setWeek(result);
       setSelected(0);
     } catch (exc) {
+      if (requestId !== requestIdRef.current) return;
       setError(exc instanceof Error && exc.message
         ? exc.message
         : "We couldn't prepare your week with those details. Check your birth and location information and try again.");
     } finally {
-      setBusy(false);
+      if (requestId === requestIdRef.current) setBusy(false);
     }
   };
 
@@ -278,6 +285,8 @@ export default function YourWeekPage() {
 
     // The pending form is consumed on first use, so this cannot double-generate.
     void (async () => {
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
       setBusy(true);
       setWeek(null);
       try {
@@ -289,12 +298,14 @@ export default function YourWeekPage() {
                       latitude: restoredForecast.latitude, longitude: restoredForecast.longitude,
                       timezone: restoredForecast.timezone },
         });
+        if (requestId !== requestIdRef.current) return;
         setWeek(result);
         setSelected(0);
       } catch {
+        if (requestId !== requestIdRef.current) return;
         setError("We couldn't prepare your week with those details. Check your birth and location information and try again.");
       } finally {
-        setBusy(false);
+        if (requestId === requestIdRef.current) setBusy(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

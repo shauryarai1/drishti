@@ -84,6 +84,9 @@ export default function KundliPage() {
   // One automatic save per generated result (guards rerenders, Strict Mode and
   // the OAuth resume path from inserting duplicates).
   const savedSignatureRef = useRef<string | null>(null);
+  // Latest-request-wins across every async path that applies a chart (a fresh
+  // generate, its transits, or a saved-snapshot load).
+  const loadIdRef = useRef(0);
 
   const birthPayload = (details: BirthDetailsType) => ({
     name: (details as BirthDetailsType & { name?: string }).name ?? '',
@@ -134,15 +137,19 @@ export default function KundliPage() {
     setSnapshotId(null);
     setSnapshotNotice('');
     savedSignatureRef.current = null;
+    const loadId = loadIdRef.current + 1;
+    loadIdRef.current = loadId;
 
     const payload = birthPayload(details);
 
     try {
       const natal = await fetchKundli(payload);
+      if (loadId !== loadIdRef.current) return;
       setKundli(natal);
       setTab('OVERVIEW');
       void autoSave(natal, details);
     } catch (exc) {
+      if (loadId !== loadIdRef.current) return;
       setError(exc instanceof Error ? exc.message : 'We could not generate this Kundli. Please try again.');
       setBusy(false);
       return;
@@ -150,11 +157,14 @@ export default function KundliPage() {
 
     // Transits are secondary: a failure must never discard the natal Kundli.
     try {
-      setTransits(await fetchKundliTransits(payload));
+      const transitData = await fetchKundliTransits(payload);
+      if (loadId !== loadIdRef.current) return;
+      setTransits(transitData);
     } catch (exc) {
+      if (loadId !== loadIdRef.current) return;
       setTransitError(exc instanceof Error ? exc.message : 'Could not calculate current transits.');
     } finally {
-      setBusy(false);
+      if (loadId === loadIdRef.current) setBusy(false);
     }
   };
 
@@ -170,10 +180,12 @@ export default function KundliPage() {
     }
 
     let active = true;
+    const loadId = loadIdRef.current + 1;
+    loadIdRef.current = loadId;
     (async () => {
       try {
         const reading = await getReading(user.id, savedId);
-        if (!active) return;
+        if (!active || loadId !== loadIdRef.current) return;
         if (!reading || reading.type !== 'kundli' || !reading.result_data) {
           setSnapshotNotice('That saved Kundli could not be found.');
           return;
@@ -184,7 +196,7 @@ export default function KundliPage() {
         setTab('OVERVIEW');
         setSnapshotNotice('');
       } catch (exc) {
-        if (!active) return;
+        if (!active || loadId !== loadIdRef.current) return;
         setSnapshotNotice(exc instanceof Error ? exc.message : 'We could not open that saved Kundli.');
       }
     })();
