@@ -1,20 +1,7 @@
-import type { Metadata } from 'next';
+import React from 'react';
+import { GuardedLayout } from '../../components/GuardedLayout';
 
-export const metadata: Metadata = {
-  title: 'Ask KAVACH | KAVACH',
-  description: 'Ask KAVACH a question and receive a natural, conversational response.',
-  openGraph: {
-    title: 'Ask KAVACH | KAVACH',
-    description: 'Ask KAVACH a question and receive a natural, conversational response.',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Ask KAVACH | KAVACH',
-    description: 'Ask KAVACH a question and receive a natural, conversational response.',
-  },
-};
-
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return children;
+/** Login only: Ask KAVACH does not use a birth profile. */
+export default function AskLayout({ children }: { children: React.ReactNode }) {
+  return <GuardedLayout requireProfile={false}>{children}</GuardedLayout>;
 }

@@ -26,7 +26,7 @@ const LABEL = 'font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]
 
 /**
  * One-time account-owner setup. This page must NEVER require a Primary Profile
- * (it creates it), so it is not wrapped in RequireProfile.
+ * (it creates it), so it is not wrapped in the shared profile guard.
  */
 export default function ProfileSetupPage() {
   const router = useRouter();
