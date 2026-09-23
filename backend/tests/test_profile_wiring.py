@@ -162,6 +162,32 @@ def test_daily_keeps_midnight_rollover():
     assert "localCalendarDate" in page and "dayRef" in page
 
 
+# --- account profile management ---------------------------------------------
+def test_account_page_mounts_the_profiles_manager():
+    account = _read(APP / "account" / "page.tsx")
+    assert "BirthProfilesManager" in account
+    assert "userId={user.id}" in account
+
+
+def test_profiles_manager_can_edit_primary_and_crud_other_people():
+    manager = _read(COMPONENTS / "BirthProfilesManager.tsx")
+    assert "updateProfile(" in manager, "Primary edit uses the shared update path"
+    assert "createOtherPerson(" in manager, "Add uses the non-primary creator"
+    assert "deleteOtherPerson(" in manager, "Delete uses the other-person-only deleter"
+    # Edit is offered for the Primary too, but it is never deletable/promotable.
+    assert "openEdit(primary)" in manager
+    assert "profile.is_primary) return;" in manager, "delete refuses the Primary"
+    assert "makePrimary" not in manager
+    assert "is_primary:" not in manager, "the manager never sets primary status"
+
+
+def test_profiles_manager_does_not_persist_birth_data_in_the_browser():
+    manager = _read(COMPONENTS / "BirthProfilesManager.tsx")
+    for banned in ("localStorage", "sessionStorage", "URLSearchParams", "console.",
+                   "trackEvent", "dataLayer"):
+        assert banned not in manager, banned
+
+
 # --- privacy -----------------------------------------------------------------
 def test_birth_profiles_are_not_persisted_in_the_browser_or_urls():
     for name in ("profiles.ts", "natal.ts"):

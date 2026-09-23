@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
+import { BirthProfilesManager } from '../../components/BirthProfilesManager';
 import { useAuth } from '../../lib/auth';
 
 function createdDate(value: string | undefined): string {
@@ -75,6 +76,8 @@ export default function AccountPage() {
                 <div className="mt-4 font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]">Account created</div>
                 <div className="mt-1 text-[14px] text-[#EEE9DF]/80">{createdDate(user.created_at)}</div>
               </div>
+
+              <BirthProfilesManager userId={user.id} />
 
               <a
                 href="/history"
