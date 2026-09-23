@@ -210,7 +210,7 @@ def test_daily_defaults_to_primary_every_fresh_visit():
     page = _read(APP / "daily" / "page.tsx")
     # Selection is component state only - never persisted as a default.
     assert "setSelectedId(primary.id)" in page
-    for banned in ("localStorage.setItem('kavach_daily_person", "selectedId").setItem"):
+    for banned in ("kavach_daily_person", "kavach_daily_profile", "kavach_primary"):
         assert banned not in page, banned
 
 
