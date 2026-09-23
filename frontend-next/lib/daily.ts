@@ -13,6 +13,8 @@ export interface DailyCategory {
 export interface DailyCard {
   sign: string;
   activeHouse: number;
+  /** House context modified by today's Nakshatra mode (additive). */
+  nakshatraGuidance?: string;
   title: string;
   pattern: string;
   categories: { love: DailyCategory; health: DailyCategory; career: DailyCategory };
@@ -43,6 +45,13 @@ export interface DailyResponse {
   natalMoon: string | null;
   signs: DailyCard[];
   basis: string;
+  /** ADDITIVE Nakshatra layer: HOW today's lunar influence expresses. */
+  nakshatra?: {
+    name: string;
+    mode: string;
+    navtara: string;
+    navtaraTone: { tone?: string; guidance?: string };
+  };
 }
 
 export interface DailyRequest {

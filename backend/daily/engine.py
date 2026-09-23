@@ -166,6 +166,34 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     current = get_current_moon_rashi(payload, payload.get("at") or None)
     daily_moon = daily["rashi"]
 
+    # ADDITIVE Nakshatra layer (owner-approved): the transit Nakshatra at the
+    # same sunrise anchor supplies HOW the day expresses, while the existing
+    # active-house calculation supplies WHERE. The house methodology is
+    # untouched; this only adds interpretation. The transit Nakshatra comes from
+    # the existing sunrise Moon longitude via the shared nakshatra helper, so no
+    # new astronomy is introduced.
+    from kundli.nakshatra import nakshatra_of
+    from nakshatra_knowledge.modes import compose_guidance, navtara_tone, transit_mode_line
+
+    transit_nakshatra = ""
+    try:
+        transit_nakshatra = str(nakshatra_of(_moon_longitude(datetime.fromisoformat(daily["sunrise"])))["name"])
+    except Exception:  # a Nakshatra failure must never break the Daily reading
+        transit_nakshatra = ""
+
+    # Personal tone only when a REAL Janma Nakshatra is supplied. `natal_moon`
+    # is a Moon Rashi and is never treated as a Nakshatra.
+    navtara_tara = ""
+    natal_nakshatra = str(payload.get("natal_nakshatra") or "").strip()
+    if natal_nakshatra and transit_nakshatra:
+        try:
+            from navtara.engine import classify_transit_nakshatra
+
+            classified = classify_transit_nakshatra(natal_nakshatra, transit_nakshatra)
+            navtara_tara = str((classified or {}).get("tara") or "") if classified else ""
+        except Exception:
+            navtara_tara = ""
+
     natal_moon: Optional[str] = payload.get("natal_moon") or None
     if not natal_moon and payload.get("birth_date") and payload.get("birth_time"):
         natal_moon = get_natal_moon_sign({
@@ -182,6 +210,11 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
             "sign": sign,
             "activeHouse": active_house,
             "title": pattern["theme"],
+            # House context (WHERE) modified by today's Nakshatra mode (HOW).
+            "nakshatraGuidance": (
+                compose_guidance(str(pattern["theme"]), transit_nakshatra, navtara_tara or None)
+                if transit_nakshatra else ""
+            ),
             "pattern": pattern["pattern"],
             "categories": get_daily_category_status(active_house),
             "bestColour": get_best_colour(sign, daily_moon),
@@ -196,4 +229,12 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
         "natalMoon": natal_moon,
         "signs": cards,
         "basis": "daily_moon_rashi_at_local_sunrise_with_transit_moon_as_house_1",
+        # Layer 2: today's transit Nakshatra and, when a real Janma Nakshatra is
+        # available, the personal Navtara tone (presentation only).
+        "nakshatra": {
+            "name": transit_nakshatra,
+            "mode": transit_mode_line(transit_nakshatra) if transit_nakshatra else "",
+            "navtara": navtara_tara,
+            "navtaraTone": dict(navtara_tone(navtara_tara) or {}) if navtara_tara else {},
+        },
     }

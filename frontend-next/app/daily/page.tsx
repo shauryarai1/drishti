@@ -185,6 +185,17 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
               <div>
                 <div className={LABEL}>Date</div>
                 <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.dailyMoon.date}</div>
+              {data.nakshatra?.name && (
+                <div className="mt-3">
+                  <div className={LABEL}>Moon Nakshatra</div>
+                  <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.nakshatra.name}</div>
+                  {data.nakshatra.mode && (
+                    <p className="mt-1 text-[12px] leading-relaxed text-[#EEE9DF]/55">
+                      {data.nakshatra.mode}
+                    </p>
+                  )}
+                </div>
+              )}
               </div>
               <div>
                 <div className={LABEL}>Updated</div>
