@@ -43,25 +43,29 @@ def evaluate(bride: PersonFacts, groom: PersonFacts, signs: Sequence[str]) -> Fa
     cancelled = same_ruler or rulers_friendly
 
     points = None
-    if position == 1:
-        status = "Mixed"
-        summary = (
-            "Both Moons fall in the same sign. The source treats this as a mixed "
-            "placement and looks at the nakshatra order for the finer reading."
-        )
+    if cancelled:
+        # Owner rule: a successful mitigation is a MATCH. This covers the
+        # same-sign case (position 1, which always shares a ruler) as well as
+        # adverse positions whose rulers are the same or friends.
+        status = "Supportive"
+        points = POINTS_ON_CANCELLATION
+        if position == 1:
+            summary = (
+                "Both Moons fall in the same sign, and the shared ruler means the "
+                "traditional mitigation applies: the source treats this as a "
+                "supportive placement."
+            )
+        else:
+            summary = (
+                "The position is one the source treats as adverse, but the traditional "
+                "mitigation applies because the two Moon signs are ruled by the same "
+                "planet or by rulers who are friends."
+            )
     elif 2 <= position <= 7:
         status = "Supportive"
         summary = (
             "The bride's Moon sign falls in one of the traditionally supportive "
             "positions relative to the groom's Moon sign."
-        )
-    elif cancelled:
-        status = "Supportive"
-        points = POINTS_ON_CANCELLATION
-        summary = (
-            "The position is one the source treats as adverse, but the traditional "
-            "mitigation applies because the two Moon signs are ruled by the same "
-            "planet or by rulers who are friends."
         )
     else:
         status = "Needs attention"

@@ -56,8 +56,13 @@ def evaluate(bride: PersonFacts, groom: PersonFacts) -> FactorResult:
     bride_view = relation(bride.moon_ruler, groom.moon_ruler)
     groom_view = relation(groom.moon_ruler, bride.moon_ruler)
 
+    same_ruler = bride.moon_ruler == groom.moon_ruler
     points: Optional[int]
-    if bride_view == FRIEND and groom_view == FRIEND:
+    if same_ruler:
+        # Owner rule: the same Moon-sign ruler is a full MATCH.
+        status, points = "Strong alignment", 5
+        summary = "Both Moon signs share the same ruler, which the source treats as a strongly supportive match."
+    elif bride_view == FRIEND and groom_view == FRIEND:
         status, points = "Strong alignment", 5
         summary = "Both Moon-sign rulers regard each other as friends, which the source treats as strongly supportive."
     elif bride_view == NEUTRAL and groom_view == NEUTRAL:
@@ -82,6 +87,7 @@ def evaluate(bride: PersonFacts, groom: PersonFacts) -> FactorResult:
         facts={
             "brideMoonRuler": bride.moon_ruler,
             "groomMoonRuler": groom.moon_ruler,
+            "sameRuler": same_ruler,
             "brideViewOfGroom": _LABEL[bride_view],
             "groomViewOfBride": _LABEL[groom_view],
         },

@@ -236,11 +236,13 @@ def test_rashi_direction_is_preserved_and_swapping_changes_the_result():
     assert reverse.status == "Needs attention"
 
 
-def test_rashi_same_sign_is_mixed():
+def test_rashi_same_sign_is_a_mitigated_match():
     result = rashi.evaluate(person("A", "bride", "Aries", "Ashwini"),
                             person("B", "groom", "Aries", "Bharani"), RASHIS)
     assert result.facts["positionFromGroom"] == 1
-    assert result.status == "Mixed"
+    assert result.facts["sameRuler"] is True
+    assert result.facts["mitigationApplied"] is True
+    assert result.status == "Supportive"
 
 
 def test_rashi_mitigation_by_same_ruler_and_by_friendship():

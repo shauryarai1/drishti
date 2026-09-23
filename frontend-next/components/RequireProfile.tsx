@@ -78,7 +78,11 @@ export function RequireProfile({ children, requireProfile = true }: RequireProfi
     return <Notice title="Accounts are not available here yet" body="Please try again later." />;
   }
 
-  if (status === 'loading' || state === 'idle' || state === 'loading') {
+  // Only an unresolved AUTH state is "checking your session". A resolved
+  // signed-out state must fall through to the sign-in notice below (the old
+  // `state === 'idle'` clause here pinned signed-out users on this screen
+  // forever, because 'idle' never changes once the session resolves).
+  if (status === 'loading') {
     return <Notice title="Loading" body="Checking your session…" />;
   }
 

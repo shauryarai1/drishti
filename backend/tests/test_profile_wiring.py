@@ -141,11 +141,32 @@ def test_daily_derives_real_natal_values_and_sends_them():
 
 def test_natal_values_come_from_the_existing_authoritative_engine():
     natal = _read(LIB / "natal.ts")
-    assert "api.getInterpretation" in natal, "reuse the existing chart path"
-    assert "moonRashi" in natal and "janmaNakshatra" in natal
-    # No new astronomy and no Rashi -> Nakshatra lookup.
+    # The authoritative /kundli chart is used, because /interpretation hides
+    # planets and nakshatras (that mismatch was the personal-Daily failure).
+    assert "fetchKundli" in natal, "reuse the existing authoritative chart path"
+    assert "api.getInterpretation" not in natal, "the interpretation payload has no nakshatra"
+    assert "row.planet === 'Moon'" in natal
+    assert "moon?.rashi" in natal and "moon?.nakshatra" in natal
     for banned in ("swisseph", "swe.", "RASHI_NAKSHATRA", "rashiToNakshatra"):
         assert banned not in natal, banned
+
+
+def test_require_profile_signed_out_resolves_to_the_sign_in_notice():
+    guard = _read(COMPONENTS / "RequireProfile.tsx")
+    # The session-loading branch must depend on the AUTH status only. Treating a
+    # resolved signed-out state ('idle') as loading pinned users forever.
+    assert "if (status === 'loading') {" in guard
+    assert "state === 'idle'" not in guard.split("if (status === 'loading')")[1].split("}")[0]
+    assert "SIGN IN" in guard
+    assert "signin" not in guard.lower() or "loginHref" in guard
+
+
+def test_auth_session_resolution_is_bounded():
+    auth = _read(LIB / "auth.tsx")
+    # A hung session lookup must not leave the app loading forever.
+    assert "setTimeout" in auth
+    assert "current === 'loading' ? 'signedOut' : current" in auth
+    assert "clearTimeout(settle)" in auth
 
 
 def test_daily_switching_is_latest_wins_and_keeps_its_location_separate():

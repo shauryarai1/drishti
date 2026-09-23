@@ -106,15 +106,15 @@ def evaluate(bride: PersonFacts, groom: PersonFacts) -> FactorResult:
             "A natural, instinctive pull between the two, with a comfortable "
             "physical and emotional rhythm."
         )
-    elif score >= 2:
+    elif score == 3:
         status, summary = "Supportive", (
-            "An easy attraction and instinctive comfort, though not without the "
-            "occasional difference in pace."
+            "A supportive instinctive match, with enough natural comfort to carry "
+            "the occasional difference in pace."
         )
-    elif score == 1:
+    elif score == 2:
         status, summary = "Mixed", (
-            "Attraction is present but the instinctive styles differ enough that "
-            "each may need to meet the other halfway."
+            "Some attraction is present, but the instinctive styles differ enough "
+            "that each may need to meet the other halfway."
         )
     else:
         status, summary = "Needs attention", (

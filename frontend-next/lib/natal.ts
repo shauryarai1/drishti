@@ -1,4 +1,4 @@
-import { api } from './api';
+import { fetchKundli } from './kundli';
 import type { BirthDetails } from './types';
 import type { BirthProfile } from './profiles';
 
@@ -27,11 +27,24 @@ export function birthDetailsForProfile(profile: BirthProfile): BirthDetails {
 }
 
 export async function deriveNatal(profile: BirthProfile): Promise<NatalValues> {
-  const reading = await api.getInterpretation(birthDetailsForProfile(profile));
-  const chart = (reading as { chart?: { planets?: Array<{ planet?: string; name?: string; rashi?: string; nakshatra?: string }> } }).chart;
-  const moon = (chart?.planets ?? []).find(
-    (row) => (row.planet ?? row.name) === 'Moon',
-  );
+  if (profile.latitude == null || profile.longitude == null) {
+    // Never fabricate coordinates: a profile without a resolved birth place
+    // cannot be charted.
+    throw new Error('This profile has no saved birth coordinates.');
+  }
+  // The EXISTING authoritative Kundli engine - the same `build_kundli` path the
+  // /kundli page and the compatibility report use. The /interpretation endpoint
+  // deliberately hides planets and nakshatras, so it can never be used here.
+  const chart = await fetchKundli({
+    name: profile.name,
+    date: profile.birth_date,
+    time: profile.birth_time,
+    place: profile.birth_place_name,
+    latitude: profile.latitude,
+    longitude: profile.longitude,
+    timezone: profile.timezone || 'Asia/Kolkata',
+  });
+  const moon = (chart.planets ?? []).find((row) => row.planet === 'Moon');
   const moonRashi = moon?.rashi ?? '';
   const janmaNakshatra = moon?.nakshatra ?? '';
   if (!moonRashi || !janmaNakshatra) {

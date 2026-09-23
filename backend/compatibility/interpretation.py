@@ -126,14 +126,16 @@ BINARY_SCORING: Dict[str, Dict[str, Any]] = {
     "graha_maitri": {"maximum": 5, "match": ("Strong alignment",)},
     # source: "Vasya Kuta (2 points)"
     "vasya": {"maximum": 2, "match": ("Supportive",)},
+    # source: "Yoni Kuta" matrix; owner rule: a matrix score of 3 or 4 is a MATCH
+    # (full 4), 0-2 is no match. The asymmetric MALE-row/FEMALE-column matrix is
+    # unchanged - only the binary award threshold is defined here.
+    "yoni": {"maximum": 4, "match": ("Strong alignment", "Supportive")},
 }
 
 # Factors with NO safely establishable binary rule. They keep their working and
 # their qualitative state, but award no points.
 UNSCORED_FACTORS: Dict[str, str] = {
     "nadi": "The supplied deck assigns no points to Nadi, so no maximum exists.",
-    "yoni": ("The deck supplies a matrix but does not define which values count as a "
-             "match under a binary award, so no points are awarded pending the owner's rule."),
 }
 
 

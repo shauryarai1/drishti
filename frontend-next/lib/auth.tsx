@@ -91,6 +91,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let active = true;
 
+    // Safety net: a hung session lookup must never leave the whole app on
+    // "Checking your session…" forever. If the initial resolve has not landed in
+    // time, fall back to the guest state; a late real session still corrects it
+    // through the subscription below.
+    const settle = setTimeout(() => {
+      if (!active) return;
+      setStatus((current) => (current === 'loading' ? 'signedOut' : current));
+    }, 8000);
+
     // Local session first so the navbar resolves without a network round trip.
     supabase.auth
       .getSession()
@@ -114,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
+      clearTimeout(settle);
       subscription.subscription.unsubscribe();
     };
   }, []);
