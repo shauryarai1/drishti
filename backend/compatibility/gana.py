@@ -37,6 +37,21 @@ GANA_BY_NAKSHATRA: Dict[str, str] = {
 _RANK = {DEVA: 3, MANUSHYA: 2, RAKSHASA: 1}
 
 
+def is_match(bride_gana: str, groom_gana: str) -> bool:
+    """Owner's authoritative Gana rule (binary).
+
+    Same Gana is always a match. When the Ganas differ, the FEMALE (bride) must
+    be of the better temperament than the MALE (groom):
+    Deva > Manushya > Rakshasa.
+
+    Female Deva + Male Manushya/Rakshasa -> match
+    Female Manushya + Male Rakshasa      -> match
+    Female Manushya + Male Deva          -> no match
+    Female Rakshasa + Male Manushya/Deva -> no match
+    """
+    return bride_gana == groom_gana or _RANK[bride_gana] > _RANK[groom_gana]
+
+
 def gana_of(nakshatra: str) -> str:
     return GANA_BY_NAKSHATRA[nakshatra]
 
@@ -51,7 +66,7 @@ def evaluate(bride: PersonFacts, groom: PersonFacts) -> FactorResult:
             "Both charts share the same traditional temperament category, which "
             "the source treats as the most comfortable arrangement."
         )
-    elif _RANK[bride_gana] > _RANK[groom_gana]:
+    elif is_match(bride_gana, groom_gana):
         status = "Supportive"
         summary = (
             "The temperaments differ, but the traditional reading treats this "
