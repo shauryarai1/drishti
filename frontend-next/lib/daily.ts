@@ -60,7 +60,10 @@ export interface DailyRequest {
   timezone: string;
   /** The user's LOCAL calendar date (YYYY-MM-DD). Authoritative for the day. */
   date?: string;
+  /** Natal Moon Rashi (from the selected birth profile). Not a Nakshatra. */
   natal_moon?: string;
+  /** Janma Nakshatra, derived from the selected profile's birth facts. */
+  natal_nakshatra?: string;
 }
 
 export async function fetchDaily(payload: DailyRequest): Promise<DailyResponse> {

@@ -3,7 +3,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
+import { RequireProfile } from '../../components/RequireProfile';
+import { PersonSelector } from '../../components/PersonSelector';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
+import { useAuth } from '../../lib/auth';
+import { deriveNatal } from '../../lib/natal';
+import { listProfiles, type BirthProfile } from '../../lib/profiles';
 import {
   DAILY_CITIES,
   MOON_SIGNS,
@@ -64,7 +69,16 @@ function localCalendarDate(timeZone: string): string {
   }
 }
 
-export default function DailyPage() {  const [city, setCity] = useState(DAILY_CITIES[0]);
+function DailyContent() {
+  const { user } = useAuth();
+  const [profiles, setProfiles] = useState<BirthProfile[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  // Natal values are derived from the selected profile's birth facts and are
+  // never stored. `natalRef` keeps them out of the load() dependency list.
+  const natalRef = useRef<{ moonRashi: string; janmaNakshatra: string } | null>(null);
+  const natalRequestIdRef = useRef(0);
+  const bootstrappedRef = useRef(false);
+  const [city, setCity] = useState(DAILY_CITIES[0]);
   const [data, setData] = useState<DailyResponse | null>(null);
   const [selected, setSelected] = useState<string>('');
   const [busy, setBusy] = useState(true);
@@ -94,6 +108,12 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
           // midnight. Sending it makes the requested day authoritative instead
           // of relying on the server's clock.
           date: localDate,
+          // Personal layer: the selected profile's natal Moon Rashi and Janma
+          // Nakshatra (derived from its birth facts by the authoritative engine).
+          ...(natalRef.current
+            ? { natal_moon: natalRef.current.moonRashi,
+                natal_nakshatra: natalRef.current.janmaNakshatra }
+            : {}),
         });
         if (requestId !== requestIdRef.current) return;   // a newer request won
         setData(result);
@@ -139,6 +159,60 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
     void load(storedCity);
   }, [load]);
 
+  // The Daily location is kept in a ref so the profile bootstrap below never
+  // depends on it (which would re-run the effect).
+  const cityRef = useRef(city.label);
+  cityRef.current = city.label;
+
+  // Default to the account's PRIMARY profile. A fresh visit always starts with
+  // Primary; an explicit selection is local to this visit only.
+  useEffect(() => {
+    if (!user || bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+    void (async () => {
+      try {
+        const list = await listProfiles(user.id);
+        if (list.length === 0) return;
+        const primary = list.find((profile) => profile.is_primary) ?? list[0];
+        setProfiles(list);
+        setSelectedId(primary.id);
+        const requestId = natalRequestIdRef.current + 1;
+        natalRequestIdRef.current = requestId;
+        try {
+          const natal = await deriveNatal(primary);
+          if (requestId !== natalRequestIdRef.current) return;
+          natalRef.current = natal;
+        } catch {
+          if (requestId !== natalRequestIdRef.current) return;
+          // Never fabricate natal data: fall back to the generic reading.
+          natalRef.current = null;
+        }
+        await load(cityRef.current);
+      } catch {
+        /* profile load failure: the generic Daily still renders */
+      }
+    })();
+  }, [user, load]);
+
+  const selectPerson = (id: string) => {
+    const profile = profiles.find((item) => item.id === id);
+    if (!profile) return;
+    setSelectedId(id);
+    const requestId = natalRequestIdRef.current + 1;
+    natalRequestIdRef.current = requestId;
+    void (async () => {
+      try {
+        const natal = await deriveNatal(profile);
+        if (requestId !== natalRequestIdRef.current) return;   // latest wins
+        natalRef.current = natal;
+      } catch {
+        if (requestId !== natalRequestIdRef.current) return;
+        natalRef.current = null;
+      }
+      await load(cityRef.current);
+    })();
+  };
+
   const chooseSign = (sign: string) => {
     setSelected(sign);
     try {
@@ -159,6 +233,7 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
   const cards: DailyCard[] = data?.signs ?? [];
 
   return (
+    <RequireProfile>
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF] architectural-grid">
       <Header onStartReading={() => { window.location.href = '/'; }} />
       <Container size="xl" className="py-8 sm:py-12">
@@ -183,7 +258,12 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
                 <div className="mt-0.5 text-[11px] text-[#EEE9DF]/40">at local sunrise</div>
               </div>
               <div>
-                <div className={LABEL}>Date</div>
+              {profiles.length > 0 && (
+              <div className="mb-5">
+                <PersonSelector profiles={profiles} selectedId={selectedId} onChange={selectPerson} />
+              </div>
+            )}
+              <div className={LABEL}>Date</div>
                 <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.dailyMoon.date}</div>
               {data.nakshatra?.name && (
                 <div className="mt-3">
@@ -289,5 +369,10 @@ export default function DailyPage() {  const [city, setCity] = useState(DAILY_CI
         </p>
       </Container>
     </main>
+    </RequireProfile>
   );
+}
+
+export default function DailyPage() {
+  return <DailyContent />;
 }
