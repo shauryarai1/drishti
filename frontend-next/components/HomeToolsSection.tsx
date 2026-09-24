@@ -44,8 +44,8 @@ const PRIMARY_TOOLS: Tool[] = [
   },
   {
     href: '/compatibility',
-    title: 'Marriage Compatibility',
-    description: 'Check traditional compatibility between two charts.',
+    title: 'Matchmaking',
+    description: 'Compare two charts through traditional Kuta matching and deeper relationship analysis.',
     cta: 'CHECK COMPATIBILITY',
   },
 ];

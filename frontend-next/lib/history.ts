@@ -20,7 +20,7 @@ export const READING_TYPE_LABELS: Record<ReadingType, string> = {
   life_summary: 'Life Summary',
   dasha: 'Dasha Reading',
   ask: 'Ask KAVACH',
-  compatibility: 'Marriage Compatibility',
+  compatibility: 'Matchmaking',
 };
 
 /** Metadata only: the heavy result payload is fetched on open. */
@@ -150,7 +150,7 @@ export interface CompatibilityHistoryInput {
 export function buildCompatibilityTitle(bride: string, groom: string): string {
   const a = (bride ?? '').trim() || 'Person 1';
   const b = (groom ?? '').trim() || 'Person 2';
-  return `${a} & ${b} — Compatibility`;
+  return `${a} & ${b} — Matchmaking`;
 }
 
 export async function saveCompatibilityReading(

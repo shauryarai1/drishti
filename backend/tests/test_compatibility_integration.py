@@ -251,10 +251,10 @@ def test_save_uses_the_authenticated_account_with_duplicate_protection():
 def test_history_supports_compatibility_and_reopens_without_recalculation():
     history = _read(HISTORY)
     assert "'compatibility'" in history
-    assert "Marriage Compatibility" in history
+    assert "Matchmaking" in history
     assert "buildCompatibilityTitle" in history
     assert "saveCompatibilityReading" in history
-    assert "— Compatibility" in history
+    assert "— Matchmaking" in history
 
     ui = _read(EXPERIENCE)
     assert "getReading(user.id, savedId)" in ui
@@ -272,7 +272,7 @@ def test_navigation_includes_compatibility():
     footer = _read(FRONTEND / "components" / "Footer.tsx")
     assert 'href="/compatibility"' in footer
     tools = _read(FRONTEND / "components" / "HomeToolsSection.tsx")
-    assert "/compatibility" in tools and "Marriage Compatibility" in tools
+    assert "/compatibility" in tools and "Matchmaking" in tools
 
 
 def test_safety_language_absent_from_the_public_frontend():

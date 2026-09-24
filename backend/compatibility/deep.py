@@ -352,14 +352,28 @@ def overall_state(statuses: Sequence[str]) -> Dict[str, Any]:
 
 
 STATE_SUMMARY = {
-    "STRONG POTENTIAL": "This match shows a strong, workable foundation with support "
-                        "across most of the areas examined.",
-    "GENERALLY SUPPORTIVE": "This match shows a workable foundation with several supportive "
-                            "areas, though a few differences may require patience and "
-                            "conscious effort.",
-    "MIXED COMPATIBILITY": "There is meaningful potential here, but the relationship may "
-                           "require consistent effort in a few important areas.",
-    "SIGNIFICANT CHALLENGES": "Several areas here may need real patience and deliberate "
-                              "work, so the relationship would benefit from honest, "
-                              "conscious effort.",
+    "STRONG POTENTIAL": "The traditional matching factors show a high level of compatibility "
+                        "in this comparison.",
+    "GENERALLY SUPPORTIVE": "The traditional matching factors are supportive overall, with "
+                            "some areas carrying more weight than others.",
+    "MIXED COMPATIBILITY": "The matching factors are mixed, with both supportive areas and "
+                           "points that deserve closer consideration.",
+    "SIGNIFICANT CHALLENGES": "The traditional matching factors show several areas of difference "
+                              "that deserve closer consideration.",
 }
+
+# Owner-approved score bands. The PRIMARY overall status is driven by the Kuta
+# Match Score ratio, not by the deep-analysis vote counts.
+SCORE_BANDS = ((0.75, "STRONG POTENTIAL"), (0.55, "GENERALLY SUPPORTIVE"),
+               (0.35, "MIXED COMPATIBILITY"))
+
+
+def score_state(awarded: int, maximum: int) -> str:
+    """Deterministic overall state from the actual Kuta score ratio."""
+    if maximum <= 0:
+        return "MIXED COMPATIBILITY"
+    ratio = awarded / maximum
+    for threshold, state in SCORE_BANDS:
+        if ratio >= threshold:
+            return state
+    return "SIGNIFICANT CHALLENGES"

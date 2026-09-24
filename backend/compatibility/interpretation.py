@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Sequence
 
 from .deep import (
-    CHALLENGING, CONTEXTUAL, MIXED, SUPPORTIVE, STATE_SUMMARY, overall_state,
+    CHALLENGING, CONTEXTUAL, MIXED, SUPPORTIVE, STATE_SUMMARY, overall_state, score_state,
 )
 
 # Public themes. Several internal rules are synthesised into one theme so the
@@ -215,9 +215,14 @@ def build_interpreted(
         elif state in (MIXED, CHALLENGING):
             attention.append(_ATTENTION[label])
 
-    # Overall classification uses only the verdict-eligible statuses.
+    # PRIMARY overall status is driven by the Kuta Match Score ratio. The deep
+    # analysis stays SECONDARY/contextual and never overwrites this status; its
+    # vote counts are still reported for transparency.
+    total = build_total_score(kuta_results)
+    state = score_state(total["awarded"], total["maximum"])
     eligible = [status_by_key.get(key) for key in _eligible_keys()]
-    overall = overall_state([s for s in eligible if s])
+    deep = overall_state([s for s in eligible if s])
+    overall = {"state": state, "counts": deep["counts"], "net": deep["net"], "total": deep["total"]}
 
     kavach_view = _kavach_view(overall["state"], len(strengths), len(attention))
 
@@ -233,7 +238,7 @@ def build_interpreted(
         # results the engine already produced - never recalculated here.
         "technicalAnalysis": build_technical_analysis(kuta_results, deep_results),
         "overallWorking": build_overall_working(kuta_results, deep_results, overall),
-        "totalScore": build_total_score(kuta_results),
+        "totalScore": total,
     }
 
 

@@ -75,7 +75,7 @@ export function Footer({ onStartReading, onNavigateSection }: FooterProps) {
                   href="/compatibility"
                   className="hover:text-[#F7F5F0] transition-colors"
                 >
-                  Compatibility
+                  Matchmaking
                 </Link>
               </li>
               <li>

@@ -168,13 +168,13 @@ export function CompatibilityExperience() {
       });
       const body = await response.json();
       if (!response.ok || body.status !== 'ok') {
-        throw new Error(body.message || "We couldn't prepare this compatibility report.");
+        throw new Error(body.message || "We couldn't prepare this matchmaking report.");
       }
       setPeople(body.people as PersonView[]);
       setReport(body.report as Report);
       void autoSave(body.people as PersonView[], body.report as Report);
     } catch (exc) {
-      setError(exc instanceof Error ? exc.message : "We couldn't prepare this compatibility report.");
+      setError(exc instanceof Error ? exc.message : "We couldn't prepare this matchmaking report.");
     } finally {
       setBusy(false);
       submittingRef.current = false;
@@ -205,7 +205,7 @@ export function CompatibilityExperience() {
         const reading = await getReading(user.id, savedId);
         const stored = reading?.result_data as { people?: PersonView[]; report?: Report } | undefined;
         if (reading?.type !== 'compatibility' || !stored?.report) {
-          setError('That saved compatibility report could not be found.');
+          setError('That saved matchmaking report could not be found.');
           return;
         }
         setPeople(stored.people ?? []);
@@ -222,12 +222,12 @@ export function CompatibilityExperience() {
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF] architectural-grid">
       <Header onStartReading={() => { window.location.href = '/'; }} />
       <Container size="lg" className="py-10 sm:py-14">
-        <SectionLabel label="KAVACH · Compatibility" tone="brass" />
+        <SectionLabel label="KAVACH · Matchmaking" tone="brass" />
         <h1 className="mt-3 text-2xl font-semibold tracking-[0.06em] text-[#F7F5F0] sm:text-4xl">
-          MARRIAGE COMPATIBILITY
+          MATCHMAKING
         </h1>
         <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-[#EEE9DF]/55">
-          Traditional compatibility across the factors supported by the KAVACH method. Some rules are
+          Traditional compatibility analysis built around Kuta matching. Some rules are
           directional, so both matching roles are entered separately.
         </p>
 
@@ -246,7 +246,7 @@ export function CompatibilityExperience() {
               disabled={busy}
               className="inline-flex h-11 items-center justify-center rounded bg-[#7B1D26] px-8 font-mono text-[11px] uppercase tracking-[0.18em] text-[#F7F5F0] transition-colors hover:bg-[#A62A34] disabled:opacity-50"
             >
-              {busy ? 'Preparing…' : 'Check compatibility'}
+              {busy ? 'Preparing…' : 'Check match'}
             </button>
             <span className="text-[11px] text-[#EEE9DF]/40">
               Guest-friendly: you can fill both profiles before signing in.
@@ -302,20 +302,87 @@ export function CompatibilityExperience() {
 function InterpretedReport({ report }: { report: Report }) {
   return (
     <div className="mt-6 space-y-10">
-      <section className="rounded-xl border border-[#B39250]/30 bg-gradient-to-b from-[#2B0C11]/80 to-[#090909] p-6 text-center sm:p-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
-          Overall assessment
-        </div>
-        <div className="mt-3 text-2xl font-semibold tracking-[0.06em] text-[#F7F5F0] sm:text-3xl">
+      {/* HERO: the Kuta Match Score is the primary product. */}
+      <section className="rounded-xl border border-[#B39250]/35 bg-gradient-to-b from-[#2B0C11]/85 to-[#090909] p-6 text-center sm:p-9">
+        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">Match Score</div>
+        {report.totalScore ? (
+          <div className="mt-4 flex items-end justify-center gap-2">
+            <span className="text-5xl font-semibold tracking-[0.02em] text-[#F7F5F0] sm:text-6xl">
+              {report.totalScore.awarded}
+            </span>
+            <span className="pb-1 font-mono text-[15px] text-[#EEE9DF]/55 sm:pb-2">
+              / {report.totalScore.maximum}
+            </span>
+          </div>
+        ) : (
+          <div className="mt-4 text-3xl font-semibold tracking-[0.06em] text-[#F7F5F0]">
+            {report.overall?.state}
+          </div>
+        )}
+        <div className="mt-4 text-xl font-semibold tracking-[0.06em] text-[#D6BE85] sm:text-2xl">
           {report.overall?.state}
         </div>
         <p className="mx-auto mt-3 max-w-2xl text-[14px] leading-relaxed text-[#EEE9DF]/80">
           {report.overall?.summary}
         </p>
+        <p className="mx-auto mt-3 max-w-2xl text-[12px] leading-relaxed text-[#EEE9DF]/50">
+          KAVACH compares the traditional matching factors individually and combines the scored
+          factors into the Match Score. This is traditional guidance, not a decision.
+        </p>
       </section>
 
+      {/* KUTA MATCHING TABLE: directly under the score. */}
+      {report.totalScore && (
+        <section>
+          <h3 className={SECTION}>Kuta matching</h3>
+          <div className="mt-4 overflow-hidden rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/70">
+            <div className="flex items-center justify-between gap-3 border-b border-[#A62A34]/20 px-4 py-2.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[#B39250]">
+              <span>Factor</span>
+              <span className="flex shrink-0 gap-4">
+                <span className="w-16 text-right">Result</span>
+                <span className="w-14 text-right">Score</span>
+              </span>
+            </div>
+            <ul>
+              {report.totalScore.factors.map((row) => (
+                <li
+                  key={row.factor}
+                  className="flex items-center justify-between gap-3 border-b border-[#A62A34]/10 px-4 py-3 last:border-b-0"
+                >
+                  <span className="min-w-0 text-[13.5px] text-[#F7F5F0]">{row.factor}</span>
+                  <span className="flex shrink-0 gap-4">
+                    <span
+                      className={`w-16 text-right font-mono text-[10px] uppercase tracking-[0.1em] ${
+                        row.matched ? 'text-[#9BE0AB]' : 'text-[#EEE9DF]/55'
+                      }`}
+                    >
+                      {row.matched ? 'Match' : 'No Match'}
+                    </span>
+                    <span className="w-14 text-right font-mono text-[12px] text-[#D6BE85]">
+                      {row.points} / {row.maximum}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between gap-3 bg-[#090909]/60 px-4 py-3.5">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#B39250]">Total</span>
+              <span className="font-mono text-[16px] text-[#F7F5F0]">
+                {report.totalScore.awarded} / {report.totalScore.maximum}
+              </span>
+            </div>
+          </div>
+          {report.totalScore.unscored.length > 0 && (
+            <p className="mt-2 text-[11.5px] leading-relaxed text-[#EEE9DF]/45">
+              Each factor is either a full match or no match — there are no partial points.{' '}
+              Not scored: {report.totalScore.unscored.map((row) => row.factor).join(', ')}.
+            </p>
+          )}
+        </section>
+      )}
+
       <section>
-        <h3 className={SECTION}>Your compatibility at a glance</h3>
+        <h3 className={SECTION}>Deeper match analysis</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {report.atAGlance?.map((entry, index) => (
             <div key={index} className="rounded-lg border border-[#A62A34]/20 bg-[#160A0C]/60 p-4">
@@ -370,7 +437,7 @@ function InterpretedReport({ report }: { report: Report }) {
       </section>
 
       <section>
-        <h3 className={SECTION}>In-depth compatibility</h3>
+        <h3 className={SECTION}>In-depth match analysis</h3>
         <div className="mt-4 space-y-6">
           {report.inDepth?.map((entry, index) => (
             <article key={index} className="border-l border-[#A62A34]/30 pl-4 sm:pl-5">

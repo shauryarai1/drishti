@@ -2,9 +2,9 @@ import React from 'react';
 import { CompatibilityExperience } from '../../components/CompatibilityExperience';
 
 export const metadata = {
-  title: 'KAVACH Marriage Compatibility',
+  title: 'KAVACH Matchmaking',
   description:
-    'Traditional compatibility for two charts, presented across the factors supported by the KAVACH method.',
+    'Traditional compatibility analysis built around Kuta matching, with deeper relationship analysis.',
 };
 
 export default function CompatibilityPage() {
