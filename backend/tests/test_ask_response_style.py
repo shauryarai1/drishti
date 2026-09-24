@@ -223,7 +223,7 @@ def mock_env(monkeypatch):
 
 def test_out_of_scope_questions_get_no_context_and_no_geocoder(mock_env):
     client = TestClient(main.app)
-    for index, question in enumerate(("What is gravity?", "How do I make pasta?",
+    for index, question in enumerate(("What is gravity?", "How do I cook pasta?",
                                       "Write a Python script", "Explain photosynthesis",
                                       "Will it rain tomorrow?", "Who won the match?")):
         body = client.post("/api/ask", json={**ASK, "question": question,

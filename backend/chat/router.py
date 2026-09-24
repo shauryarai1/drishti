@@ -1,24 +1,32 @@
 """Message router for Ask KAVACH.
 
-Ask KAVACH is an ASTROLOGY / KAVACH ADVISORY assistant, not a general-purpose
-assistant. Four conceptual modes:
+Ask KAVACH behaves like a capable conversational assistant: ANSWER BY DEFAULT,
+filter only when there is a real reason to filter. The router decides which
+internal capability/context is needed - it never replaces a valid answer with
+a scope message just because classification confidence is low. Modes:
 
-    CASUAL           greetings, thanks, lightweight conversation.
+    CASUAL           normal conversation: greetings, follow-ups, short
+                     fragments and ordinary informational questions, answered
+                     naturally by the assistant with the recent conversation.
     ASTROLOGY        explicit Kundli / chart / planet / rashi / nakshatra /
-                     dasha / transit / Panchang / Hora / KAVACH-reading wording.
+                     dasha / transit / Panchang / Hora / KAVACH-reading wording
+                     (selects the chart context).
     PERSONAL_READING the user's OWN uncertain situation, future or decision
                      (the hidden KAVACH/Tarot reading), plus the user's own
                      life topics (career, money, relationships, studies...).
-    OUT_OF_SCOPE     unrelated knowledge, coding, writing, maths, science,
-                     sport, weather and everything else. Answered with a short
-                     KAVACH scope message, never substantively.
+    OUT_OF_SCOPE     only genuinely unrelated requests (coding, writing, maths,
+                     science, sport, weather...). Answered with a short KAVACH
+                     scope message, never substantively.
 
     READING_FOLLOWUP continues the reading already active.
 
 The distinction that matters most: a personal question does NOT need astrology
 vocabulary ("will I be successful?", "what is blocking my career?"), while a
 general-knowledge question about the same subject ("what is financial
-success?") is out of scope rather than a reading.
+success?") is ordinary conversation rather than a reading. Conversational
+fragments ("why?", "okay", "yes", a bare date, "tell me more") are never
+inherently invalid: they fall through to CASUAL and are resolved by the
+assistant using the recent conversation.
 """
 
 from __future__ import annotations
@@ -29,7 +37,9 @@ PERSONAL_READING = "PERSONAL_READING"
 READING_FOLLOWUP = "READING_FOLLOWUP"
 OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
-# The short, natural scope reply. Never a lecture, never the requested answer.
+# The short, natural scope reply. Used ONLY for genuinely unrelated requests
+# (the OUT_OF_SCOPE_SIGNALS below) - never for low-confidence classification
+# and never for conversational fragments that merely lack astrology keywords.
 SCOPE_MESSAGE = (
     "I'm here for astrology, KAVACH readings and questions about your personal "
     "path. Ask me about your chart, career, relationships, money, timing or "
@@ -236,7 +246,9 @@ def route_message(message: str, has_active_reading: bool = False,
     if astrology:
         return ASTROLOGY
 
-    # 3. Clearly unrelated requests are refused before anything else.
+    # 3. Genuinely unrelated requests are refused before anything else.
+    #    Only the explicit unrelated-domain signals qualify - a message that
+    #    merely lacks astrology keywords is NOT out of scope.
     if out_of_scope:
         return OUT_OF_SCOPE
 
@@ -258,5 +270,7 @@ def route_message(message: str, has_active_reading: bool = False,
     if personal:
         return PERSONAL_READING
 
-    # 7. Everything else is not KAVACH's business.
-    return OUT_OF_SCOPE
+    # 7. Answer by default: ordinary questions, follow-ups, corrections and
+    #    bare fragments are normal conversation. The assistant resolves them
+    #    with the recent conversation instead of a scope message.
+    return CASUAL

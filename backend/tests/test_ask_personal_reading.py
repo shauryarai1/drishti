@@ -29,15 +29,22 @@ ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude
 
 CASUAL_QUESTIONS = ["hi", "hello", "thanks"]
 
+# Genuinely unrelated requests: still refused with the short scope message,
+# with no provider call and no reading.
 OUT_OF_SCOPE_QUESTIONS = [
     "what is gravity?",
-    "what is financial success?",
-    "explain investing",
-    "how can a business improve profitability?",
     "write an email",
     "write a Python script",
     "solve this equation",
     "will it rain tomorrow?",
+]
+
+# Ordinary informational questions: answered naturally as conversation - never
+# refused for lacking astrology keywords, never turned into a reading.
+GENERAL_QUESTIONS = [
+    "what is financial success?",
+    "explain investing",
+    "how can a business improve profitability?",
 ]
 
 PERSONAL_QUESTIONS = [
@@ -138,6 +145,12 @@ def test_out_of_scope_questions_are_refused_not_readings(question):
     assert router.route_message(question, has_active_reading=False) == router.OUT_OF_SCOPE, question
 
 
+@pytest.mark.parametrize("question", GENERAL_QUESTIONS)
+def test_general_questions_are_answered_not_refused(question):
+    """Answer by default: no astrology keyword required, never a scope message."""
+    assert router.route_message(question, has_active_reading=False) == router.CASUAL, question
+
+
 @pytest.mark.parametrize("question", PERSONAL_QUESTIONS)
 def test_personal_questions_route_to_a_reading(question):
     assert router.route_message(question, has_active_reading=False) == router.PERSONAL_READING, question
@@ -150,9 +163,10 @@ def test_astrology_questions_stay_astrology(question):
 
 
 def test_subject_words_alone_do_not_trigger_a_reading():
+    """A general question about a life subject is conversation, not a reading."""
     for subject in ("financial success", "investing", "business profitability", "money",
                     "career", "relationships"):
-        assert router.route_message(f"what is {subject}?", False) == router.OUT_OF_SCOPE, subject
+        assert router.route_message(f"what is {subject}?", False) == router.CASUAL, subject
 
 
 @pytest.mark.parametrize("question", [
@@ -187,6 +201,19 @@ def test_out_of_scope_questions_never_reach_a_provider(env, client):
     assert env["geocoder"] == 0, "ordinary Ask traffic must not geocode"
 
 
+def test_general_questions_are_answered_without_reading_or_scope(env, client):
+    for index, question in enumerate(GENERAL_QUESTIONS):
+        body = ask(client, question, conversation_id=f"gen-{index}").json()
+        assert body["answered"] is True, question
+        assert body["answer"] != router.SCOPE_MESSAGE, question
+        assert body["answer"] == "Groq answer.", question
+
+    assert env["readings"] == [], "a general question must not draw a reading"
+    assert all(private == "" for private in env["groq"]), "no reading context"
+    assert all(astrology == "" for astrology in env["astrology"]), "no chart context"
+    assert env["geocoder"] == 0, "ordinary Ask traffic must not geocode"
+
+
 def test_astrology_questions_keep_the_astrology_context(env, client):
     ask(client, "what does Saturn mean in my chart?", conversation_id="astro")
     assert env["groq"] == [""], "astrology must NOT carry the private Tarot reading"
@@ -209,11 +236,11 @@ def test_personal_follow_ups_reuse_then_exit_the_reading(env, client):
     assert len(env["readings"]) == 1, "the same reading stays active for relevant follow-ups"
     assert env["groq"][-1] == "PRIVATE READING CONTEXT"
 
-    before = len(env["groq"])
+    before_readings = len(env["readings"])
     body = ask(client, "Explain compound interest.", conversation_id="reuse").json()
-    assert body["answer"] == router.SCOPE_MESSAGE, "an unrelated question is refused"
-    assert len(env["groq"]) == before, "no provider call for an unrelated question"
-    assert len(env["readings"]) == 1, "an unrelated question must not redraw"
+    assert body["answer"] == "Groq answer.", "an ordinary question is answered, not refused"
+    assert len(env["readings"]) == before_readings, "an unrelated question must not redraw"
+    assert env["groq"][-1] == "", "the active reading must not leak into a general answer"
 
 
 def test_personal_reading_never_leaks_into_an_astrology_question(env, client):

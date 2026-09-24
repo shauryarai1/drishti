@@ -1,12 +1,14 @@
-"""Router intent for Ask KAVACH: four conceptual modes.
+"""Router intent for Ask KAVACH: answer by default, filter only when real.
 
-    CASUAL            greetings / thanks / light conversation
+    CASUAL            greetings / thanks / light conversation, follow-ups and
+                      ordinary informational questions (the default)
     ASTROLOGY         explicit chart, planet, rashi, nakshatra, dasha, transit...
     PERSONAL_READING  the user's own uncertain situation, decision or life topic
-    OUT_OF_SCOPE      unrelated knowledge, coding, writing, maths, science...
+    OUT_OF_SCOPE      only genuinely unrelated requests (coding, writing, maths,
+                      science...): refused with a short scope message
 
-Ask KAVACH is an astrology / KAVACH advisory assistant, not a general assistant:
-unrelated questions are refused with a short scope message rather than answered.
+A message is never refused merely because it lacks astrology keywords:
+conversational fragments fall through to CASUAL and are answered naturally.
 """
 
 from __future__ import annotations
@@ -95,11 +97,11 @@ def test_personal_reading_does_not_need_astrology_vocabulary():
 
 
 def test_bare_subject_words_do_not_trigger_a_reading():
-    """A general question about money/career is out of scope, not a personal reading."""
+    """A general question about money/career is ordinary chat, not a reading."""
     for subject in ("financial success", "investing", "business profitability",
                     "marketing", "the stock market"):
         route = route_message(f"what is {subject}?", False)
-        assert route == OUT_OF_SCOPE, subject
+        assert route == CASUAL, subject
         assert is_personal_uncertainty(f"what is {subject}?") is False, subject
 
 
@@ -138,7 +140,9 @@ def test_personal_follow_ups_reuse_the_active_reading():
 def test_reading_does_not_lock_the_conversation():
     assert route_message("Will I be successful financially?", False) == PERSONAL_READING
     assert route_message("What's the biggest obstacle?", True, {}) == READING_FOLLOWUP
-    assert route_message("explain compound interest.", True, {}) == OUT_OF_SCOPE
+    # An ordinary informational question leaves the reading entirely: answered
+    # as normal conversation, never with a scope message, never a redraw.
+    assert route_message("explain compound interest.", True, {}) == CASUAL
     assert route_message("what is gravity?", True, {}) == OUT_OF_SCOPE
     assert route_message("write an email", True, {}) == OUT_OF_SCOPE
     assert route_message("thanks", True, {}) == CASUAL
@@ -168,3 +172,10 @@ def test_scope_message_is_short_and_kavach_specific():
 def test_empty_message_is_casual():
     assert route_message("", False) == CASUAL
     assert route_message("   ", False) == CASUAL
+
+
+def test_conversational_fragments_are_answered_not_refused():
+    """Bare fragments are never invalid just for lacking astrology keywords."""
+    for fragment in ("why?", "okay", "yes", "tell me more", "23.11.2009",
+                     "I don't understand", "what about career?", "continue"):
+        assert route_message(fragment, has_active_reading=False) == CASUAL, fragment
