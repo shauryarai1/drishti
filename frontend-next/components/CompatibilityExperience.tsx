@@ -302,6 +302,74 @@ export function CompatibilityExperience() {
 function InterpretedReport({ report }: { report: Report }) {
   return (
     <div className="mt-6 space-y-10">
+      {report.technicalAnalysis && report.technicalAnalysis.length > 0 && (
+        <details className="rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/50 p-5 sm:p-6">
+          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
+            How Kavach analysed this match
+          </summary>
+          <div className="mt-5 space-y-5">
+            {report.totalScore && (
+              <div className="rounded-lg border border-[#B39250]/30 bg-[#090909]/50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className={SECTION}>Traditional score</span>
+                  <span className="font-mono text-[15px] text-[#D6BE85]">
+                    TOTAL: {report.totalScore.awarded} / {report.totalScore.maximum}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11.5px] leading-relaxed text-[#EEE9DF]/50">
+                  Each factor is either a full match or no match — there are no partial points.
+                  {report.totalScore.unscored.length > 0 && (
+                    <> {' '}Not scored: {report.totalScore.unscored.map((row) => row.factor).join(', ')}.</>
+                  )}
+                </p>
+              </div>
+            )}
+            {report.technicalAnalysis.map((entry, index) => (
+              <article key={index} className="border-l border-[#A62A34]/30 pl-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-[13px] font-semibold tracking-[0.06em] text-[#F7F5F0]">
+                    {entry.factor}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {typeof entry.matched === 'boolean' && (
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#EEE9DF]/55">
+                        {entry.matched ? 'MATCH' : 'NO MATCH'}
+                      </span>
+                    )}
+                    <span
+                      className={`rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                        STATUS_STYLE[entry.result] ?? STATUS_STYLE.Mixed
+                      }`}
+                    >
+                      {entry.result}
+                    </span>
+                  </div>
+                </div>
+                {typeof entry.points === 'number' && (
+                  <div className="mt-1 font-mono text-[11px] text-[#D6BE85]">
+                    Points: {entry.points} / {entry.maximum}
+                  </div>
+                )}
+                <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                  {Object.entries(entry.values).map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-3 text-[12.5px]">
+                      <dt className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#EEE9DF]/45">
+                        {key.replace(/([A-Z])/g, ' $1')}
+                      </dt>
+                      <dd className="text-[#EEE9DF]/85">{String(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 text-[13px] leading-relaxed text-[#EEE9DF]/70">
+                  <span className="text-[#D6BE85]">What this means: </span>
+                  {entry.meaning}
+                </p>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+
       {/* HERO: the Kuta Match Score is the primary product. */}
       <section className="rounded-xl border border-[#B39250]/35 bg-gradient-to-b from-[#2B0C11]/85 to-[#090909] p-6 text-center sm:p-9">
         <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">Match Score</div>
@@ -456,74 +524,6 @@ function InterpretedReport({ report }: { report: Report }) {
         <h3 className={SECTION}>Kavach view</h3>
         <p className="mt-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">{report.kavachView}</p>
       </section>
-
-      {report.technicalAnalysis && report.technicalAnalysis.length > 0 && (
-        <details className="rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/50 p-5 sm:p-6">
-          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.24em] text-[#B39250]">
-            How Kavach analysed this match
-          </summary>
-          <div className="mt-5 space-y-5">
-            {report.totalScore && (
-              <div className="rounded-lg border border-[#B39250]/30 bg-[#090909]/50 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className={SECTION}>Traditional score</span>
-                  <span className="font-mono text-[15px] text-[#D6BE85]">
-                    TOTAL: {report.totalScore.awarded} / {report.totalScore.maximum}
-                  </span>
-                </div>
-                <p className="mt-2 text-[11.5px] leading-relaxed text-[#EEE9DF]/50">
-                  Each factor is either a full match or no match — there are no partial points.
-                  {report.totalScore.unscored.length > 0 && (
-                    <> {' '}Not scored: {report.totalScore.unscored.map((row) => row.factor).join(', ')}.</>
-                  )}
-                </p>
-              </div>
-            )}
-            {report.technicalAnalysis.map((entry, index) => (
-              <article key={index} className="border-l border-[#A62A34]/30 pl-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-[13px] font-semibold tracking-[0.06em] text-[#F7F5F0]">
-                    {entry.factor}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    {typeof entry.matched === 'boolean' && (
-                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#EEE9DF]/55">
-                        {entry.matched ? 'MATCH' : 'NO MATCH'}
-                      </span>
-                    )}
-                    <span
-                      className={`rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
-                        STATUS_STYLE[entry.result] ?? STATUS_STYLE.Mixed
-                      }`}
-                    >
-                      {entry.result}
-                    </span>
-                  </div>
-                </div>
-                {typeof entry.points === 'number' && (
-                  <div className="mt-1 font-mono text-[11px] text-[#D6BE85]">
-                    Points: {entry.points} / {entry.maximum}
-                  </div>
-                )}
-                <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
-                  {Object.entries(entry.values).map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-3 text-[12.5px]">
-                      <dt className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#EEE9DF]/45">
-                        {key.replace(/([A-Z])/g, ' $1')}
-                      </dt>
-                      <dd className="text-[#EEE9DF]/85">{String(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <p className="mt-2 text-[13px] leading-relaxed text-[#EEE9DF]/70">
-                  <span className="text-[#D6BE85]">What this means: </span>
-                  {entry.meaning}
-                </p>
-              </article>
-            ))}
-          </div>
-        </details>
-      )}
 
       {report.overallWorking && (
         <details className="rounded-xl border border-[#A62A34]/25 bg-[#160A0C]/50 p-5 sm:p-6">
