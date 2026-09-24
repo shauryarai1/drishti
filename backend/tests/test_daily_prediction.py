@@ -186,8 +186,8 @@ def test_colour_resolver_accepts_both_dimensions_and_is_pending():
 def test_daily_moon_uses_the_selected_date_and_location():
     from daily.engine import get_daily_moon_rashi
 
-    # Astronomy/date infrastructure remains available even when the selected
-    # date has a node-ruled Nakshatra and Daily interpretation is blocked.
+    # Astronomy/date infrastructure remains available for node-ruled
+    # Nakshatra dates (Daily now proceeds with the owner-approved node rule).
     other = get_daily_moon_rashi({**DAILY_FIXTURE, "date": "2026-09-25"})
     assert other["date"] == "2026-09-25"
     assert other["rashi"] in RASHIS

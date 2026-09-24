@@ -14,7 +14,7 @@ from datetime import date as date_type, datetime
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
-from calculator import BirthData, _sign_from_longitude, generate_chart
+from calculator import BirthData, _sign_from_longitude, calc_planet_longitudes, generate_chart
 from kundli.analysis.signs import RASHIS
 from panchang import PanchangRequest, astronomy, compute_panchang
 
@@ -33,6 +33,15 @@ def _moon_longitude(moment: datetime) -> float:
 def _rashi_of(longitude: float) -> str:
     sign, _index, _degree = _sign_from_longitude(longitude)
     return sign
+
+
+def _node_transit_rashi(moment: datetime, lord: str) -> str:
+    """Mean-node sidereal transit Rashi at the given instant (Lahiri, MEAN_NODE).
+
+    Reuses the production calculator — no second astronomy implementation and
+    no change to the repository-wide mean-node convention.
+    """
+    return _rashi_of(calc_planet_longitudes(astronomy.to_jd(moment))[lord])
 
 
 def get_natal_moon_sign(payload: Dict[str, Any]) -> str:
@@ -242,6 +251,70 @@ def _legacy_build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _build_node_daily_prediction(
+    daily: Dict[str, Any],
+    current: Dict[str, Any],
+    timezone_name: str,
+    transit_nakshatra: str,
+    transit_lord: str,
+) -> Dict[str, Any]:
+    """Node-ruled Nakshatra day: owner rulership PRIMARY + mean-node transit SECONDARY.
+
+    The owner-approved Daily rule (Rahu -> Aquarius, Ketu -> Scorpio) always
+    leads rendering. The node's actual mean-node transit Rashi at the same
+    sunrise anchor supplies the secondary whole-sign house as extra context.
+    """
+    from .rulership import (
+        active_houses_for_nakshatra,
+        compose_node_categories,
+        compose_node_prediction,
+        ruled_rashis,
+        whole_sign_house,
+    )
+
+    sunrise = datetime.fromisoformat(str(daily["sunrise"]))
+    node_rashi = _node_transit_rashi(sunrise, transit_lord)
+
+    cards: List[Dict[str, Any]] = []
+    for sign in RASHIS:
+        primary = active_houses_for_nakshatra(sign, transit_nakshatra)[0]
+        secondary = whole_sign_house(sign, node_rashi)
+        active = [primary] + ([secondary] if secondary != primary else [])
+        cards.append({
+            "sign": sign,
+            "activeHouse": primary,
+            "activeHouses": active,
+            "primaryHouse": primary,
+            "secondaryHouse": secondary,
+            "title": " + ".join(str(HOUSE_PATTERNS[house]["theme"]) for house in active),
+            "pattern": compose_node_prediction(primary, secondary),
+            "categories": compose_node_categories(primary, secondary),
+            "bestColour": None,
+            "isPersonal": False,
+        })
+
+    ruled_signs = ruled_rashis(transit_lord)
+    return {
+        "status": "ok",
+        "asOf": {"timestamp": current["asOf"], "timezone": timezone_name},
+        "dailyMoon": daily,
+        "currentMoon": current,
+        "natalMoon": None,
+        "signs": cards,
+        "basis": "transit_moon_nakshatra_node_rulership_primary_with_mean_node_transit_secondary",
+        "nakshatra": {
+            "name": transit_nakshatra,
+            "lord": transit_lord,
+            "ruledRashis": list(ruled_signs),
+            # Node days only: the actual mean-node transit Rashi (secondary layer).
+            "nodeTransit": {"lord": transit_lord, "rashi": node_rashi},
+            "mode": "",
+            "navtara": "",
+            "navtaraTone": {},
+        },
+    }
+
+
 def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Build all 12 readings from the sunrise Moon Nakshatra lord's rulership."""
     timezone_name = payload.get("timezone") or "Asia/Kolkata"
@@ -256,15 +329,24 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     # No transit position of the lord is calculated or consulted.
     nakshatra_data = nakshatra_of(float(daily["longitude"]))
     transit_nakshatra = str(nakshatra_data["name"])
+    transit_lord = str(nakshatra_data["lord"])
 
     from .rulership import (
         active_houses,
         compose_categories,
         compose_prediction,
+        is_node_lord,
         ruled_rashis,
     )
 
-    transit_lord = str(nakshatra_data["lord"])
+    # Owner Daily node rule: the node branch adds its mean-node transit
+    # SECONDARY house; the classical path below never consults any transit
+    # position of the lord.
+    if is_node_lord(transit_lord):
+        return _build_node_daily_prediction(
+            daily, current, timezone_name, transit_nakshatra, transit_lord
+        )
+
     ruled_signs = ruled_rashis(transit_lord)
 
     cards: List[Dict[str, Any]] = []

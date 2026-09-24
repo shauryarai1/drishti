@@ -199,6 +199,11 @@ function DailyContent() {
                       Nakshatra Lord: {data.nakshatra.lord}
                     </div>
                   )}
+                  {data.nakshatra.nodeTransit && (
+                    <div className="mt-0.5 text-[11px] text-[#EEE9DF]/40">
+                      Node transit: {data.nakshatra.nodeTransit.rashi} (secondary)
+                    </div>
+                  )}
                   {data.nakshatra.mode && (
                     <p className="mt-1 text-[12px] leading-relaxed text-[#EEE9DF]/55">
                       {data.nakshatra.mode}

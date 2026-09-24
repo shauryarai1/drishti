@@ -23,6 +23,10 @@ export interface DailyCard {
   bestColour: string | null;
   earlierTitle?: string;
   isPersonal: boolean;
+  /** Node days only: whole-sign house of the owner-approved node rulership (leads). */
+  primaryHouse?: number;
+  /** Node days only: whole-sign house of the node's actual mean-node transit Rashi. */
+  secondaryHouse?: number;
 }
 
 export interface DailyMoon {
@@ -52,6 +56,8 @@ export interface DailyResponse {
     name: string;
     lord: string;
     ruledRashis: string[];
+    /** Node days only: actual mean-node transit Rashi supplying the secondary house. */
+    nodeTransit?: { lord: string; rashi: string };
     mode: string;
     navtara: string;
     navtaraTone: { tone?: string; guidance?: string };

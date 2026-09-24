@@ -1,9 +1,14 @@
 """Nakshatra-lord rulership engine for KAVACH Daily Prediction.
 
 This module starts after the production astronomy path has established the
-transit Moon Nakshatra.  It never calculates or consults a planet's transit
-position: the Nakshatra lord contributes only its owner-approved sign
-rulership.
+transit Moon Nakshatra. Classical lords contribute only their owner-approved
+sign rulership (no transit position of the lord is consulted for them).
+
+OWNER DAILY NODE RULE (explicitly authorized): for Daily prediction ONLY,
+Rahu rules Aquarius and Ketu rules Scorpio. This lives here only — it is NOT
+added to jyotish.planets.RULERSHIP, whose classical registry deliberately
+excludes the nodes. The node's actual mean-node transit Rashi supplies a
+SECONDARY house in the engine; the rulership house always leads.
 """
 
 from __future__ import annotations
@@ -19,6 +24,15 @@ from .config import CAUTION, GOOD, HOUSE_PATTERNS, NEUTRAL, status
 
 class UnsupportedNakshatraLordError(ValueError):
     """Raised when no owner-approved sign rulership exists for a lord."""
+
+
+NODE_LORDS: Tuple[str, ...] = ("Rahu", "Ketu")
+
+# Owner-approved Daily-only node rulership. Do not merge into jyotish RULERSHIP.
+DAILY_NODE_RULERSHIP: Dict[str, Tuple[str, ...]] = {
+    "Rahu": ("Aquarius",),
+    "Ketu": ("Scorpio",),
+}
 
 
 _NAKSHATRA_SPELLING_ALIASES = {
@@ -37,9 +51,13 @@ def nakshatra_lord(nakshatra: str) -> str:
     return lord
 
 
+def is_node_lord(lord: str) -> bool:
+    return lord in NODE_LORDS
+
+
 def ruled_rashis(lord: str) -> Tuple[str, ...]:
-    """Return approved ruled signs without inventing ownership for the nodes."""
-    signs = tuple(RULERSHIP.get(lord) or ())
+    """Owner-approved ruled signs (Daily node rule first, then classical)."""
+    signs = tuple(DAILY_NODE_RULERSHIP.get(lord) or RULERSHIP.get(lord) or ())
     if not signs:
         raise UnsupportedNakshatraLordError(
             f"No owner-approved sign rulership is defined for Nakshatra lord {lord}."
@@ -58,7 +76,11 @@ def active_houses(native_moon_sign: str, ruled_signs: Iterable[str]) -> Tuple[in
 
 
 def active_houses_for_nakshatra(native_moon_sign: str, nakshatra: str) -> Tuple[int, ...]:
-    """Resolve Nakshatra -> lord -> ruled signs -> whole-sign houses."""
+    """Nakshatra -> lord -> ruled signs -> whole-sign houses (PRIMARY only).
+
+    For node-ruled Nakshatras this returns the rulership (primary) house only;
+    the engine adds the node's actual transit house as the secondary layer.
+    """
     return active_houses(native_moon_sign, ruled_rashis(nakshatra_lord(nakshatra)))
 
 
@@ -136,3 +158,36 @@ def compose_categories(houses: Tuple[int, ...]) -> Dict[str, Dict[str, str]]:
                 )
         result[category] = {"status": level, "reason": reason}
     return result
+
+
+def compose_node_prediction(primary: int, secondary: int) -> str:
+    """One coherent node-day prediction: rulership house LEADS, transit adds context."""
+    if secondary == primary:
+        return f"{_theme(primary)} comes into focus today. Favour {_HOUSE_ACTION[primary]}."
+
+    first_theme = _theme(primary)
+    second_theme = _theme(secondary).lower()
+    variants = (
+        f"{first_theme} leads the day. Favour {_HOUSE_ACTION[primary]}. "
+        f"Alongside it, {second_theme} adds context: {_HOUSE_ACTION[secondary]}.",
+        f"Primary attention belongs to {first_theme.lower()} — {_HOUSE_ACTION[primary]}. "
+        f"{_theme(secondary)} runs as a secondary thread where {_HOUSE_ACTION[secondary]}.",
+        f"{first_theme} takes priority. Favour {_HOUSE_ACTION[primary]}, while "
+        f"{second_theme} shapes the background: {_HOUSE_ACTION[secondary]}.",
+    )
+    return variants[(primary * 13 + secondary) % len(variants)]
+
+
+def compose_node_categories(primary: int, secondary: int) -> Dict[str, Dict[str, str]]:
+    """Category guidance where the rulership (primary) house sets the status."""
+    result: Dict[str, Dict[str, str]] = {}
+    for category in ("love", "health", "career"):
+        level, reason = status(primary, category)
+        if secondary != primary:
+            reason = f"{reason} A secondary pull toward {second_theme_for(primary, secondary)} sits behind it."
+        result[category] = {"status": level, "reason": reason}
+    return result
+
+
+def second_theme_for(primary: int, secondary: int) -> str:
+    return _theme(secondary).lower() if secondary != primary else ""

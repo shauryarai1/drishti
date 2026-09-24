@@ -9,7 +9,6 @@ import pytest
 from daily.config import HOUSE_PATTERNS
 from daily.engine import RASHIS, build_daily_prediction
 from daily.rulership import (
-    UnsupportedNakshatraLordError,
     active_houses,
     active_houses_for_nakshatra,
     nakshatra_lord,
@@ -88,10 +87,14 @@ def test_dhanishtha_all_twelve_signs():
         assert active_houses_for_nakshatra(sign, "Dhanishtha") == expected
 
 
-def test_nodes_have_no_invented_sign_rulership():
-    for lord in ("Rahu", "Ketu"):
-        with pytest.raises(UnsupportedNakshatraLordError, match="owner-approved"):
-            ruled_rashis(lord)
+def test_nodes_use_owner_daily_rulership():
+    # Owner Daily rule (authorized): Rahu -> Aquarius, Ketu -> Scorpio.
+    # The nodes remain absent from jyotish.planets.RULERSHIP (see
+    # test_jyotish_channels); this registry lives only in daily.rulership.
+    assert ruled_rashis("Rahu") == ("Aquarius",)
+    assert ruled_rashis("Ketu") == ("Scorpio",)
+    assert active_houses_for_nakshatra("Aries", "Shatabhisha") == (11,)
+    assert active_houses_for_nakshatra("Aries", "Mula") == (8,)
 
 
 def test_final_daily_response_uses_new_active_house_engine():
