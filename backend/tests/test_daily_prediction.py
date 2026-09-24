@@ -143,29 +143,26 @@ def test_daily_moon_is_the_sunrise_rashi_not_the_live_moon():
         assert early_card["activeHouse"] == late_card["activeHouse"]
 
 
-SAGITTARIUS_MAPPING = {
-    "Aries": 5, "Taurus": 6, "Gemini": 7, "Cancer": 8, "Leo": 9, "Virgo": 10,
-    "Libra": 11, "Scorpio": 12, "Sagittarius": 1, "Capricorn": 2, "Aquarius": 3,
-    "Pisces": 4,
-}
-
-
-def test_full_sagittarius_daily_mapping():
+def test_daily_mapping_comes_from_nakshatra_lord_rulership_not_moon_rashi():
     payload = _daily("2026-09-21T10:00:00+05:30")
-    actual = {card["sign"]: card["activeHouse"] for card in payload["signs"]}
-    assert actual == SAGITTARIUS_MAPPING
+    assert payload["dailyMoon"]["rashi"] == "Sagittarius"
+    assert payload["nakshatra"]["lord"] == "Sun"
+    assert payload["nakshatra"]["ruledRashis"] == ["Leo"]
+    actual = {card["sign"]: card["activeHouses"] for card in payload["signs"]}
+    assert actual["Sagittarius"] == [9]
+    assert actual["Leo"] == [1]
 
 
-def test_pisces_counts_forward_from_the_daily_moon():
-    payload = _daily("2026-09-21T14:00:00+05:30")   # daily moon is Sagittarius
+def test_pisces_counts_forward_to_the_lords_ruled_rashi():
+    payload = _daily("2026-09-21T14:00:00+05:30")
     pisces = next(card for card in payload["signs"] if card["sign"] == "Pisces")
-    anchor = payload["dailyMoon"]["rashi"]
-    assert anchor == "Sagittarius"
+    assert payload["dailyMoon"]["rashi"] == "Sagittarius"
+    assert payload["nakshatra"]["ruledRashis"] == ["Leo"]
 
-    # Forward direction: Sagittarius H1, Capricorn H2, Aquarius H3, Pisces H4.
-    assert pisces["activeHouse"] == 4
-    assert pisces["title"] == get_daily_house_pattern(4)["theme"]
-    assert pisces["title"] != get_daily_house_pattern(10)["theme"]
+    # From Pisces, Leo falls in H6; the transit Moon's Sagittarius Rashi is not
+    # the house anchor in the new methodology.
+    assert pisces["activeHouses"] == [6]
+    assert pisces["title"] == get_daily_house_pattern(6)["theme"]
 
 
 def test_no_transition_history_is_returned_at_all():
@@ -187,18 +184,21 @@ def test_colour_resolver_accepts_both_dimensions_and_is_pending():
 
 
 def test_daily_moon_uses_the_selected_date_and_location():
-    other = build_daily_prediction({**DAILY_FIXTURE, "date": "2026-09-25"})
-    assert other["dailyMoon"]["date"] == "2026-09-25"
-    assert other["dailyMoon"]["rashi"] in RASHIS
-    assert other["dailyMoon"]["sunrise"].startswith("2026-09-25")
+    from daily.engine import get_daily_moon_rashi
+
+    # Astronomy/date infrastructure remains available even when the selected
+    # date has a node-ruled Nakshatra and Daily interpretation is blocked.
+    other = get_daily_moon_rashi({**DAILY_FIXTURE, "date": "2026-09-25"})
+    assert other["date"] == "2026-09-25"
+    assert other["rashi"] in RASHIS
+    assert other["sunrise"].startswith("2026-09-25")
 
 
-def test_personal_highlight_when_natal_moon_is_supplied():
+def test_natal_moon_is_ignored_by_active_daily_methodology():
     payload = build_daily_prediction({"latitude": 28.6139, "longitude": 77.209,
                                       "natal_moon": "Pisces"})
-    personal = [card for card in payload["signs"] if card["isPersonal"]]
-    assert len(personal) == 1 and personal[0]["sign"] == "Pisces"
-    assert personal[0]["activeHouse"] == calculate_active_house("Pisces", payload["dailyMoon"]["rashi"])
+    assert payload["natalMoon"] is None
+    assert all(card["isPersonal"] is False for card in payload["signs"])
 
 
 def test_transit_moon_is_sidereal_and_not_tropical():

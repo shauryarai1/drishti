@@ -221,16 +221,18 @@ def test_known_fixture_moon_rashi_is_capricorn():
     assert RASHIS[index] == "Capricorn"
 
 
-def test_house_one_starts_at_the_calculated_moon_rashi():
+def test_active_houses_start_from_native_sign_and_use_lord_rulership():
     from daily.engine import build_daily_prediction
+    from daily.rulership import active_houses_for_nakshatra
 
     daily = build_daily_prediction({"date": "2026-09-22", "latitude": 28.6139, "longitude": 77.209,
                                     "timezone": "Asia/Kolkata", "place": "Delhi"})
-    anchor = daily["dailyMoon"]["rashi"]
-    card = next(c for c in daily["signs"] if c["sign"] == anchor)
+    native_sign = daily["dailyMoon"]["rashi"]
+    card = next(c for c in daily["signs"] if c["sign"] == native_sign)
+    expected = active_houses_for_nakshatra(native_sign, daily["nakshatra"]["name"])
 
-    assert card["activeHouse"] == 1, "the transit Moon's own rashi must be house 1"
-    assert daily["basis"].endswith("transit_moon_as_house_1")
+    assert tuple(card["activeHouses"]) == expected
+    assert daily["basis"] == "transit_moon_nakshatra_lord_ruled_rashis_whole_sign_from_native_moon"
 
 
 FORWARD_MAPPING = {
@@ -278,20 +280,21 @@ def test_reverse_mapping_is_not_used_any_more():
     assert calculate_active_house("Aries", "Capricorn") == 4, "forward, not 10"
 
 
-def test_moon_rashi_is_not_hardcoded():
-    """A different day whose anchor differs must move house 1 accordingly."""
+def test_nakshatra_lord_rulership_is_not_hardcoded():
+    """Different classical-lord days must derive their own ruled signs/houses."""
     from daily.engine import build_daily_prediction
+    from daily.rulership import active_houses_for_nakshatra
 
-    anchors = set()
-    for offset in range(0, 6):
-        day = date(2026, 9, 22) + timedelta(days=offset)
+    lords = set()
+    for day in (date(2026, 9, 22), date(2026, 9, 24)):
         daily = build_daily_prediction({"date": day.isoformat(), "latitude": 28.6139,
                                         "longitude": 77.209, "timezone": "Asia/Kolkata",
                                         "place": "Delhi"})
-        anchor = daily["dailyMoon"]["rashi"]
-        anchors.add(anchor)
-        assert next(c for c in daily["signs"] if c["sign"] == anchor)["activeHouse"] == 1
-    assert len(anchors) > 1, "the anchor must vary with the date (nothing hardcoded)"
+        lords.add(daily["nakshatra"]["lord"])
+        for card in daily["signs"]:
+            expected = active_houses_for_nakshatra(card["sign"], daily["nakshatra"]["name"])
+            assert tuple(card["activeHouses"]) == expected
+    assert len(lords) > 1, "the Nakshatra lord must vary with the date"
 
 
 def test_daily_respects_the_selected_timezone_for_the_local_date():

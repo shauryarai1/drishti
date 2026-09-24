@@ -1,14 +1,11 @@
 """KAVACH Daily Prediction engine.
 
-DAILY MOON is the Lahiri sidereal Moon rashi AT LOCAL SUNRISE for the selected
-Panchang day, and it stays fixed for that day even if the live Moon changes
-rashi later.
+The production Panchang path establishes the Lahiri sidereal Moon longitude at
+local sunrise and therefore the transit Moon Nakshatra. After that point Daily
+uses only the Nakshatra lord's approved sign rulership: each ruled sign is
+counted as a whole-sign house from each native Moon sign.
 
-The transit Moon rashi is house 1 and the twelve signs follow the zodiac in
-order from it, so each card's house counts FORWARD from the transit Moon (Moon
-in Capricorn: Capricorn H1, Aquarius H2, Pisces H3, ... Sagittarius H12).
-
-Deterministic only: no AI, no Ascendant, no proprietary Mars logic.
+Deterministic only: no AI, natal data, Navtara, Ascendant or planet transits.
 """
 
 from __future__ import annotations
@@ -18,13 +15,10 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from calculator import BirthData, _sign_from_longitude, generate_chart
+from kundli.analysis.signs import RASHIS
 from panchang import PanchangRequest, astronomy, compute_panchang
 
 from .config import HOUSE_PATTERNS, colour_for, status
-
-RASHIS = ("Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-          "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces")
-
 
 def rashi_number(rashi: str) -> int:
     """1 = Aries ... 12 = Pisces."""
@@ -161,7 +155,7 @@ def get_daily_category_status(active_house: int, nakshatra: str = "") -> Dict[st
     return result
 
 
-def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _legacy_build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Today's pattern for all 12 Moon signs, based on the sunrise Daily Moon."""
     timezone_name = payload.get("timezone") or "Asia/Kolkata"
     selected = date_type.fromisoformat(payload["date"]) if payload.get("date") else None
@@ -244,5 +238,67 @@ def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
             "mode": "",
             "navtara": navtara_tara,
             "navtaraTone": dict(navtara_tone(navtara_tara) or {}) if navtara_tara else {},
+        },
+    }
+
+
+def build_daily_prediction(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Build all 12 readings from the sunrise Moon Nakshatra lord's rulership."""
+    timezone_name = payload.get("timezone") or "Asia/Kolkata"
+    selected = date_type.fromisoformat(payload["date"]) if payload.get("date") else None
+
+    daily = get_daily_moon_rashi(payload, selected)
+    current = get_current_moon_rashi(payload, payload.get("at") or None)
+
+    from kundli.nakshatra import nakshatra_of
+
+    # The existing longitude -> Nakshatra -> lord path remains authoritative.
+    # No transit position of the lord is calculated or consulted.
+    nakshatra_data = nakshatra_of(float(daily["longitude"]))
+    transit_nakshatra = str(nakshatra_data["name"])
+
+    from .rulership import (
+        active_houses,
+        compose_categories,
+        compose_prediction,
+        ruled_rashis,
+    )
+
+    transit_lord = str(nakshatra_data["lord"])
+    ruled_signs = ruled_rashis(transit_lord)
+
+    cards: List[Dict[str, Any]] = []
+    for sign in RASHIS:
+        houses = active_houses(sign, ruled_signs)
+        cards.append({
+            "sign": sign,
+            # Kept for backwards-compatible clients; activeHouses is the
+            # authoritative field and contains one or two houses.
+            "activeHouse": houses[0],
+            "activeHouses": list(houses),
+            "title": " + ".join(str(HOUSE_PATTERNS[house]["theme"]) for house in houses),
+            "pattern": compose_prediction(houses),
+            "categories": compose_categories(houses),
+            "bestColour": None,
+            "isPersonal": False,
+        })
+
+    return {
+        "status": "ok",
+        "asOf": {"timestamp": current["asOf"], "timezone": timezone_name},
+        "dailyMoon": daily,
+        "currentMoon": current,
+        "natalMoon": None,
+        "signs": cards,
+        "basis": "transit_moon_nakshatra_lord_ruled_rashis_whole_sign_from_native_moon",
+        "nakshatra": {
+            "name": transit_nakshatra,
+            "lord": transit_lord,
+            "ruledRashis": list(ruled_signs),
+            # Legacy keys remain empty for compatible clients. Neither
+            # behavioural Nakshatra meanings nor Navtara participates in Daily.
+            "mode": "",
+            "navtara": "",
+            "navtaraTone": {},
         },
     }

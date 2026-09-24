@@ -140,10 +140,9 @@ function DailyContent() {
     void load(storedCity);
   }, [load]);
 
-  // The Daily location is kept in a ref so the rollover check never depends on
-  // it. The current Daily is TRANSIT-ONLY: no birth profile, natal Moon Rashi,
-  // Janma Nakshatra or Navtara personal tone feeds today's prediction. The
-  // natal/Navtara code is preserved elsewhere for possible future use.
+  // Daily is public and uses no birth profile, natal Moon, Janma Nakshatra or
+  // Navtara. Each selected Moon sign is interpreted from today's Nakshatra
+  // lord and the Rashi/Rashis that lord rules.
 
   const chooseSign = (sign: string) => {
     setSelected(sign);
@@ -195,6 +194,11 @@ function DailyContent() {
                 <div className="mt-3">
                   <div className={LABEL}>Moon Nakshatra</div>
                   <div className="mt-1 text-[15px] text-[#F7F5F0]">{data.nakshatra.name}</div>
+                  {data.nakshatra.lord && (
+                    <div className="mt-0.5 text-[11px] text-[#EEE9DF]/40">
+                      Nakshatra Lord: {data.nakshatra.lord}
+                    </div>
+                  )}
                   {data.nakshatra.mode && (
                     <p className="mt-1 text-[12px] leading-relaxed text-[#EEE9DF]/55">
                       {data.nakshatra.mode}

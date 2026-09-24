@@ -12,9 +12,12 @@ export interface DailyCategory {
 
 export interface DailyCard {
   sign: string;
+  /** Authoritative active houses from the Nakshatra lord's ruled Rashi/Rashis. */
+  activeHouses: number[];
+  /** Backwards-compatible first active house. */
   activeHouse: number;
   title: string;
-  /** ONE integrated house x transit-Nakshatra prediction. */
+  /** ONE integrated prediction based on the active house or houses. */
   pattern: string;
   categories: { love: DailyCategory; health: DailyCategory; career: DailyCategory };
   bestColour: string | null;
@@ -44,9 +47,11 @@ export interface DailyResponse {
   natalMoon: string | null;
   signs: DailyCard[];
   basis: string;
-  /** ADDITIVE Nakshatra layer: HOW today's lunar influence expresses. */
+  /** Transparent context for the Nakshatra-lord rulership calculation. */
   nakshatra?: {
     name: string;
+    lord: string;
+    ruledRashis: string[];
     mode: string;
     navtara: string;
     navtaraTone: { tone?: string; guidance?: string };
@@ -59,9 +64,9 @@ export interface DailyRequest {
   timezone: string;
   /** The user's LOCAL calendar date (YYYY-MM-DD). Authoritative for the day. */
   date?: string;
-  /** Natal Moon Rashi (from the selected birth profile). Not a Nakshatra. */
+  /** Legacy only; ignored by the active Daily methodology. */
   natal_moon?: string;
-  /** Janma Nakshatra, derived from the selected profile's birth facts. */
+  /** Legacy only; ignored by the active Daily methodology. */
   natal_nakshatra?: string;
 }
 

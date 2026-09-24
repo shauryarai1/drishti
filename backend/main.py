@@ -729,7 +729,7 @@ class DailyRequest(BaseModel):
     place: str = ""
 
 
-# Public Daily Prediction: natal Moon as house 1 + current transit Moon.
+# Public Daily Prediction: transit Moon Nakshatra lord rulership by Moon sign.
 @app.post("/api/daily")
 async def daily_endpoint(payload: DailyRequest):
     from daily import build_daily_prediction
@@ -737,8 +737,11 @@ async def daily_endpoint(payload: DailyRequest):
     data = payload.model_dump()
     if not data.get("natal_moon"):
         data.pop("natal_moon", None)
-    if not (data.get("date") and data.get("time")):
-        for key in ("date", "time", "place"):
+    # Date is the selected local Daily date and must remain authoritative even
+    # when no clock time is supplied. Natal fields are accepted only for older
+    # clients and do not participate in the current Daily methodology.
+    for key in ("time", "place"):
+        if not data.get(key):
             data.pop(key, None)
     try:
         result = build_daily_prediction(data)

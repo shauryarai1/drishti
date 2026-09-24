@@ -1,4 +1,4 @@
-"""KAVACH Daily Prediction module (natal Moon as house 1 + transit Moon)."""
+"""KAVACH Daily Prediction module (Nakshatra-lord sign rulership)."""
 
 from .engine import (
     RASHIS,
