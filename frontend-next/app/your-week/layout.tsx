@@ -1,6 +1,10 @@
 import React from 'react';
-import { GuardedLayout } from '../../components/GuardedLayout';
 
+/**
+ * Public route. KAVACH astrology tools are usable without an account; signing
+ * in is an optional convenience for saving readings and profiles. No login or
+ * Primary Profile gate is applied here.
+ */
 export default function YourWeekLayout({ children }: { children: React.ReactNode }) {
-  return <GuardedLayout>{children}</GuardedLayout>;
+  return children;
 }

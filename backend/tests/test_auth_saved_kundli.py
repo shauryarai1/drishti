@@ -178,10 +178,10 @@ def test_result_gate_copy_and_buttons():
 
 
 @pytest.mark.parametrize("path", [KUNDLI, RESULTS, LIFE_SUMMARY, YOUR_WEEK])
-def test_personalized_results_are_gated(path):
+def test_personalized_results_are_not_hidden_behind_login(path):
     source = _read(path)
-    assert "ResultGate" in source, f"{path.name} must gate its result"
-    assert "authStatus" in source, path.name
+    # Guest access: the result is shown without an account.
+    assert "ResultGate" not in source, f"{path.name} must not hide its result behind sign-in"
 
 
 @pytest.mark.parametrize("page", ["yes-no", "panchang", "services"])
@@ -197,42 +197,34 @@ def test_ask_kavach_is_untouched_by_this_work():
         assert banned not in source, banned
 
 
-# --- guest can fill, cannot reveal ------------------------------------------
-def test_guest_can_fill_the_kundli_form_but_not_reveal_the_result():
+# --- guest can fill AND reveal ----------------------------------------------
+def test_guest_can_generate_the_kundli():
     source = _read(KUNDLI)
-    # The form is rendered for a guest: the gate is inside generate(), not on render.
+    # The form is offered to a guest, and the calculation runs for everyone.
     assert "showName" in source and "requireName" in source
-    assert "savePendingForm('kundli'" in source
-    assert "loginHref('/kundli')" in source
-    # The gate fires before any calculation.
-    gate_index = source.index("savePendingForm('kundli'")
-    fetch_index = source.index("await fetchKundli(payload)")
-    assert gate_index < fetch_index, "the auth gate must run before the calculation"
+    assert "await fetchKundli(payload)" in source
+    # generate() never bounces to login: the only login redirect in the page is
+    # the optional "Save to history" action, which is not part of calculation.
+    generate_block = source.split("const generate = async", 1)[1].split("const saveToHistory", 1)[0]
+    assert "loginHref" not in generate_block
+    assert "savePendingForm" not in generate_block
 
 
-def test_pending_kundli_form_survives_auth_and_resumes():
-    source = _read(KUNDLI)
-    assert "takePendingForm('kundli')" in source
-    assert "generate(restored as unknown as BirthDetailsType)" in source
-
-    reading = _read(READING)
-    assert "savePendingForm('reading'" in reading
-    assert "takePendingForm('reading')" in reading
-
-    life = _read(LIFE_SUMMARY)
-    assert "savePendingForm('life_summary'" in life
-    assert "takePendingForm('life_summary')" in life
+def test_public_tools_no_longer_store_a_pending_form_for_login():
+    for path in (KUNDLI, READING, LIFE_SUMMARY, YOUR_WEEK):
+        source = _read(path)
+        assert "savePendingForm" not in source, path.name
+        assert "takePendingForm" not in source, path.name
 
 
-def test_guest_your_week_result_is_gated_and_the_form_is_preserved():
+def test_guest_your_week_result_is_public():
     source = _read(YOUR_WEEK)
-    assert "ResultGate" in source
-    assert "authStatus" in source
-    assert "savePendingForm('your_week'" in source
-    assert "takePendingForm('your_week')" in source
-    assert "loginHref('/your-week')" in source
-    # The gate must run before the weekly calculation.
-    assert source.index("savePendingForm('your_week'") < source.index("await fetchWeekly(")
+    assert "ResultGate" not in source
+    assert "savePendingForm('your_week'" not in source
+    assert "takePendingForm('your_week')" not in source
+    assert "loginHref('/your-week')" not in source
+    # The weekly calculation runs for a guest.
+    assert "await fetchWeekly(" in source
 
 
 def test_your_week_pending_state_cannot_collide_with_reading():
@@ -253,7 +245,7 @@ def test_weekly_calculation_request_is_unchanged():
     """The gate must not alter the weekly request the calculation receives."""
     source = _read(YOUR_WEEK)
     assert "fetchWeekly(" in source
-    assert "birth: { date:" in source and "forecast: { startDate:" in source
+    assert "birth: { date: birthDate" in source and "forecast: { startDate" in source
     weekly_lib = _read(FRONTEND / "lib" / "weekly.ts")
     assert "fetchWeekly" in weekly_lib
     for banned in ("ResultGate", "pendingForms", "useAuth"):

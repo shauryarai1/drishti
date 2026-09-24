@@ -6,7 +6,6 @@ import { Header } from '../../components/Header';
 import { SectionLabel } from '../../components/SectionLabel';
 import { Kundli } from '../../components/Kundli';
 import { BirthDetailsFlow } from '../../components/BirthDetails';
-import { ResultGate } from '../../components/ResultGate';
 import { RetrogradePlanets } from '../../components/RetrogradePlanets';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import type { BirthDetails as BirthDetailsType } from '../../lib/types';
@@ -25,7 +24,6 @@ import {
 import { useAuth } from '../../lib/auth';
 import { getReading, saveKundliReading } from '../../lib/history';
 import { loginHref } from '../../lib/authPaths';
-import { takePendingForm, savePendingForm } from '../../lib/pendingForms';
 
 const TABS = ['OVERVIEW', 'CHARTS', 'PLANETS', 'NAKSHATRAS', 'PANCHANG',
   'BNN', 'STRENGTH', 'ANALYSIS', 'DASHA', 'TRANSITS'] as const;
@@ -118,14 +116,9 @@ export default function KundliPage() {
   };
 
   const generate = async (details: BirthDetailsType) => {
-    // The RESULT is protected, never the form: a guest may fill everything and
-    // is asked to sign in only at the point the chart would be revealed.
-    if (authStatus !== 'signedIn' || !user) {
-      savePendingForm('kundli', details as unknown as Record<string, unknown>);
-      window.location.href = loginHref('/kundli');
-      return;
-    }
-
+    // The chart is public: a guest calculates immediately. Saving to My KAVACH
+    // is the only account-gated step, and it never runs for a guest (see
+    // autoSave, which requires a signed-in user).
     setPending(details);
     setBusy(true);
     setError('');
@@ -204,17 +197,6 @@ export default function KundliPage() {
     return () => {
       active = false;
     };
-  }, [authStatus, user]);
-
-  // Resume a pending Kundli after the guest signs in: no retyping required.
-  useEffect(() => {
-    if (authStatus !== 'signedIn' || !user) return;
-    if (new URLSearchParams(window.location.search).get('saved')) return;
-    const restored = takePendingForm('kundli');
-    if (!restored) return;
-    void generate(restored as unknown as BirthDetailsType);
-    // generate is stable in behaviour; re-running is gated by the consumed form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus, user]);
 
   const saveToHistory = async () => {

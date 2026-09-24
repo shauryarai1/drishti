@@ -14,11 +14,15 @@ APP = REPO / "frontend-next" / "app"
 COMPONENTS = REPO / "frontend-next" / "components"
 LIB = REPO / "frontend-next" / "lib"
 
-# Login + Primary Profile.
-TWO_GATE = ("kundli", "reading", "results", "life-summary", "your-week", "compatibility")
-# Login only - the feature must not use profile astrology.
-LOGIN_ONLY = ("ask", "yes-no", "panchang")
-# Public.
+# Astrology tools are PUBLIC: usable without an account. Accounts remain an
+# optional convenience for saving readings and profiles.
+PUBLIC_TOOLS = ("kundli", "reading", "results", "life-summary", "your-week",
+                "compatibility", "ask", "yes-no", "panchang")
+# Account management surfaces stay protected. They self-guard in the page (no
+# route-level gate), so a signed-out visitor is asked to sign in, not blocked
+# from the rest of the product.
+ACCOUNT_ONLY = ("account", "history", "admin", "profile/setup")
+# Public informational routes.
 PUBLIC = ("services", "privacy", "terms", "login", "signup", "forgot-password",
           "reset-password", "profile")
 
@@ -32,23 +36,33 @@ def _layout(route: str) -> str:
 
 
 # --- route matrix ------------------------------------------------------------
-def test_personal_tools_require_login_and_primary_profile():
-    for route in TWO_GATE:
-        source = _layout(route)
-        assert "GuardedLayout" in source, route
-        assert "requireProfile={false}" not in source, f"{route} must require a Primary Profile"
+def test_astrology_tools_have_no_login_or_profile_gate():
+    for route in PUBLIC_TOOLS:
+        layout = APP / route / "layout.tsx"
+        # daily has no layout; the rest have a pass-through layout.
+        if layout.exists():
+            source = _read(layout)
+            assert "GuardedLayout" not in source, route
+            assert "RequireProfile" not in source, route
+            assert "return children" in source, route
 
 
-def test_ask_yes_no_panchang_are_login_only_and_use_no_profile():
-    for route in LOGIN_ONLY:
-        source = _layout(route)
-        assert "GuardedLayout requireProfile={false}" in source, route
-
-
-def test_daily_requires_login_and_primary_profile():
+def test_daily_has_no_login_gate():
     page = _read(APP / "daily" / "page.tsx")
-    assert "RequireProfile" in page
-    assert "requireProfile={false}" not in page
+    assert "RequireProfile" not in page
+    assert "<RequireProfile>" not in page
+
+
+def test_account_only_routes_still_enforce_authentication():
+    # No layout-level gate, but each page refuses to expose account data.
+    history = _read(APP / "history" / "page.tsx")
+    assert "useAuth" in history
+    account = _read(APP / "account" / "page.tsx")
+    assert "useAuth" in account
+    setup = _read(APP / "profile" / "setup" / "page.tsx")
+    assert "status !== 'signedIn'" in setup
+    admin = _read(APP / "admin" / "page.tsx")
+    assert "useAuth" in admin
 
 
 def test_public_routes_have_no_guard():
@@ -61,12 +75,16 @@ def test_public_routes_have_no_guard():
             assert not layout.exists()
 
 
-def test_shared_guard_is_reused_not_duplicated():
+def test_tool_layouts_do_not_reimplement_or_use_the_guard():
     guard = _read(COMPONENTS / "RequireProfile.tsx")
+    # The shared guard is preserved for any future account-only surface.
     assert "export function RequireProfile" in guard
-    for route in TWO_GATE + LOGIN_ONLY:
-        source = _layout(route)
-        assert "from './RequireProfile'" not in source, f"{route} must use the shared wrapper"
+    for route in PUBLIC_TOOLS:
+        layout = APP / route / "layout.tsx"
+        if not layout.exists():
+            continue
+        source = _read(layout)
+        assert "from './RequireProfile'" not in source, f"{route} must not use the guard"
         assert "getPrimaryProfile" not in source, f"{route} must not reimplement the guard"
 
 
@@ -129,7 +147,7 @@ def test_daily_is_transit_only_and_has_no_person_selector():
     assert "listProfiles" not in page
     assert "PersonSelector" not in page
     assert "natalRef" not in page
-    assert "RequireProfile" in page  # the login/profile gate may remain
+    assert "RequireProfile" not in page  # Daily is public: no login/profile gate
 
 
 def test_daily_never_sends_natal_values():
@@ -195,17 +213,17 @@ def test_daily_never_falls_back_to_a_saved_reading():
     assert "personal reading" not in page
 
 
-def test_daily_requires_login_and_creates_no_anonymous_profile():
+def test_daily_is_public_and_creates_no_anonymous_profile():
     page = _read(APP / "daily" / "page.tsx")
-    assert "<RequireProfile>" in page
+    assert "RequireProfile" not in page
     assert "createPrimaryProfile" not in page
     assert "createOtherPerson" not in page
     assert "sessionStorage" not in page
 
 
-def test_daily_is_login_only_and_never_creates_an_anonymous_profile():
+def test_daily_never_creates_an_anonymous_profile():
     page = _read(APP / "daily" / "page.tsx")
-    assert "<RequireProfile>" in page
+    assert "RequireProfile" not in page
     # No session-only birth profile: Daily never writes or creates a profile.
     assert "createPrimaryProfile" not in page
     assert "createOtherPerson" not in page

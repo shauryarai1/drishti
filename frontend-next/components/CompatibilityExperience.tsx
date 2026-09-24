@@ -5,13 +5,10 @@ import { Header } from './Header';
 import { Footer } from './Footer';
 import { Container } from './Container';
 import { SectionLabel } from './SectionLabel';
-import { ResultGate } from './ResultGate';
 import { API_BASE, api } from '../lib/api';
 import { authHeaders } from '../lib/authHeaders';
 import { useAuth } from '../lib/auth';
-import { loginHref } from '../lib/authPaths';
 import { isValidPersonName, normalisePersonName } from '../lib/personName';
-import { savePendingForm, takePendingForm } from '../lib/pendingForms';
 import {
   getReading,
   saveCompatibilityReading,
@@ -191,58 +188,32 @@ export function CompatibilityExperience() {
       setError(problem);
       return;
     }
-    if (authStatus !== 'signedIn' || !user) {
-      savePendingForm('compatibility', {
-        bride_name: normalisePersonName(bride.name), bride_date: bride.date, bride_time: bride.time,
-        bride_place: bride.place, bride_latitude: bride.lat, bride_longitude: bride.lon, bride_timezone: bride.tz,
-        groom_name: normalisePersonName(groom.name), groom_date: groom.date, groom_time: groom.time,
-        groom_place: groom.place, groom_latitude: groom.lat, groom_longitude: groom.lon, groom_timezone: groom.tz,
-      });
-      window.location.href = loginHref('/compatibility');
-      return;
-    }
+    // Public: a guest checks compatibility immediately. Saving to My KAVACH is
+    // the only account-gated step, and it never runs for a guest (see autoSave).
     submittingRef.current = true;
     await run(bride, groom);
   };
 
-  // Resume a pending form after sign-in, or open a saved report from My KAVACH.
+  // Open a saved report from My KAVACH. Only meaningful for a signed-in account.
   useEffect(() => {
     if (authStatus !== 'signedIn' || !user) return;
     const params = new URLSearchParams(window.location.search);
     const savedId = params.get('saved');
-    if (savedId) {
-      (async () => {
-        try {
-          const reading = await getReading(user.id, savedId);
-          const stored = reading?.result_data as { people?: PersonView[]; report?: Report } | undefined;
-          if (reading?.type !== 'compatibility' || !stored?.report) {
-            setError('That saved compatibility report could not be found.');
-            return;
-          }
-          setPeople(stored.people ?? []);
-          setReport(stored.report);
-        } catch (exc) {
-          setError(exc instanceof Error ? exc.message : 'We could not open that saved report.');
+    if (!savedId) return;
+    (async () => {
+      try {
+        const reading = await getReading(user.id, savedId);
+        const stored = reading?.result_data as { people?: PersonView[]; report?: Report } | undefined;
+        if (reading?.type !== 'compatibility' || !stored?.report) {
+          setError('That saved compatibility report could not be found.');
+          return;
         }
-      })();
-      return;
-    }
-    const restored = takePendingForm('compatibility');
-    if (!restored) return;
-    const nextBride: Profile = {
-      name: restored.bride_name ?? '', date: restored.bride_date ?? '', time: restored.bride_time ?? '',
-      place: restored.bride_place ?? '', lat: restored.bride_latitude, lon: restored.bride_longitude,
-      tz: restored.bride_timezone,
-    };
-    const nextGroom: Profile = {
-      name: restored.groom_name ?? '', date: restored.groom_date ?? '', time: restored.groom_time ?? '',
-      place: restored.groom_place ?? '', lat: restored.groom_latitude, lon: restored.groom_longitude,
-      tz: restored.groom_timezone,
-    };
-    setBride(nextBride);
-    setGroom(nextGroom);
-    void run(nextBride, nextGroom);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        setPeople(stored.people ?? []);
+        setReport(stored.report);
+      } catch (exc) {
+        setError(exc instanceof Error ? exc.message : 'We could not open that saved report.');
+      }
+    })();
   }, [authStatus, user]);
 
   const ready = report !== null;
@@ -321,15 +292,6 @@ export function CompatibilityExperience() {
           </div>
         )}
 
-        {authStatus === 'signedOut' && !ready && (
-          <div className="mt-8">
-            <ResultGate
-              nextPath="/compatibility"
-              title="SAVE & VIEW YOUR COMPATIBILITY REPORT"
-              body="Sign in to view your compatibility report and keep it safely in My KAVACH."
-            />
-          </div>
-        )}
       </Container>
       <Footer />
     </main>

@@ -1,7 +1,9 @@
 import React from 'react';
-import { GuardedLayout } from '../../components/GuardedLayout';
 
-/** Login only: YES / NO does not use a birth profile. */
+/**
+ * Public route. YES / NO does not use a birth profile and is usable without an
+ * account; signing in is an optional convenience for saving history.
+ */
 export default function YesNoLayout({ children }: { children: React.ReactNode }) {
-  return <GuardedLayout requireProfile={false}>{children}</GuardedLayout>;
+  return children;
 }

@@ -201,13 +201,15 @@ def test_route_page_and_metadata_exist():
     assert "metadata" in page and "CompatibilityExperience" in page
 
 
-def test_frontend_gate_and_pending_form_and_bearer():
+def test_frontend_is_guest_accessible_and_sends_a_bearer_when_signed_in():
     ui = _read(EXPERIENCE)
-    assert "ResultGate" in ui, "the result must be gated"
+    # Guests calculate immediately: no result gate and no pending-form login bounce.
+    assert "ResultGate" not in ui
+    assert "savePendingForm" not in ui
+    assert "takePendingForm" not in ui
+    assert "loginHref('/compatibility')" not in ui
+    # A verified session is still attached when one exists (identity for the archive).
     assert "authStatus" in ui
-    assert "savePendingForm('compatibility'" in ui
-    assert "takePendingForm('compatibility')" in ui
-    assert "loginHref('/compatibility')" in ui
     assert "authHeaders" in ui, "the verified bearer token must be sent"
     assert "token" not in ui.split("authHeaders")[0][-40:].lower()  # no token in a URL
 

@@ -47,11 +47,11 @@ def test_life_summary_guard_covers_data_error_and_busy():
     assert "if (requestId === requestIdRef.current) setBusy(false);" in source
 
 
-def test_your_week_guard_covers_both_fetch_paths():
+def test_your_week_guard_covers_the_reveal_fetch():
     source = _read(GUARDED["your-week"])
     assert "requestIdRef" in source
-    # Both the user-triggered reveal and the pending-form resume share the guard.
-    assert source.count("requestIdRef.current + 1") == 2
+    # The user-triggered reveal uses the latest-request-wins guard.
+    assert source.count("requestIdRef.current + 1") == 1
     assert "if (requestId === requestIdRef.current) setBusy(false);" in source
 
 

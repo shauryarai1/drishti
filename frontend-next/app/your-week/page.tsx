@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
-import { ResultGate } from '../../components/ResultGate';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import {
   fetchWeekly,
@@ -11,9 +10,6 @@ import {
   type WeeklyForecast,
   type WeeklyPlace,
 } from '../../lib/weekly';
-import { useAuth } from '../../lib/auth';
-import { loginHref } from '../../lib/authPaths';
-import { savePendingForm, takePendingForm } from '../../lib/pendingForms';
 
 const LABEL = 'font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]';
 const PANEL = 'rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70';
@@ -171,7 +167,6 @@ function PlaceField({ label, value, onResolve, placeholder }: {
 }
 
 export default function YourWeekPage() {
-  const { status: authStatus, user } = useAuth();
   const requestIdRef = useRef(0);
   const [birthDate, setBirthDate] = useState('1990-05-15');
   const [birthTime, setBirthTime] = useState('14:15');
@@ -205,25 +200,8 @@ export default function YourWeekPage() {
       return;
     }
 
-    // The result is protected, not the form: preserve the details, sign in, resume.
-    if (authStatus !== 'signedIn' || !user) {
-      savePendingForm('your_week', {
-        date: birthDate,
-        time: birthTime,
-        place: birthPlace.label,
-        latitude: birthPlace.latitude,
-        longitude: birthPlace.longitude,
-        timezone: birthPlace.timezone ?? undefined,
-        startDate,
-        forecastPlace: forecastPlace.label,
-        forecastLatitude: forecastPlace.latitude,
-        forecastLongitude: forecastPlace.longitude,
-        forecastTimezone: forecastPlace.timezone ?? undefined,
-      });
-      window.location.href = loginHref('/your-week');
-      return;
-    }
-
+    // Public: a guest reveals the week immediately. Nothing is saved to the
+    // account unless the request carries a verified session (see lib/weekly).
     await runWeekly();
   };
 
@@ -256,60 +234,6 @@ export default function YourWeekPage() {
       if (requestId === requestIdRef.current) setBusy(false);
     }
   };
-
-  // Resume a pending week after the guest signs in: no retyping required.
-  useEffect(() => {
-    if (authStatus !== 'signedIn' || !user) return;
-    const restored = takePendingForm('your_week');
-    if (!restored) return;
-
-    const restoredBirth: WeeklyPlace = {
-      label: restored.place,
-      latitude: restored.latitude ?? 0,
-      longitude: restored.longitude ?? 0,
-      timezone: restored.timezone ?? '',
-    };
-    const restoredForecast: WeeklyPlace = {
-      label: restored.forecastPlace ?? '',
-      latitude: restored.forecastLatitude ?? 0,
-      longitude: restored.forecastLongitude ?? 0,
-      timezone: restored.forecastTimezone ?? '',
-    };
-    if (!restoredForecast.label) return;
-
-    setBirthDate(restored.date);
-    setBirthTime(restored.time);
-    setBirthPlace(restoredBirth);
-    if (restored.startDate) setStartDate(restored.startDate);
-    setForecastPlace(restoredForecast);
-
-    // The pending form is consumed on first use, so this cannot double-generate.
-    void (async () => {
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
-      setBusy(true);
-      setWeek(null);
-      try {
-        const result = await fetchWeekly({
-          birth: { date: restored.date, time: restored.time, place: restoredBirth.label,
-                   latitude: restoredBirth.latitude, longitude: restoredBirth.longitude,
-                   timezone: restoredBirth.timezone },
-          forecast: { startDate: restored.startDate ?? startDate, place: restoredForecast.label,
-                      latitude: restoredForecast.latitude, longitude: restoredForecast.longitude,
-                      timezone: restoredForecast.timezone },
-        });
-        if (requestId !== requestIdRef.current) return;
-        setWeek(result);
-        setSelected(0);
-      } catch {
-        if (requestId !== requestIdRef.current) return;
-        setError("We couldn't prepare your week with those details. Check your birth and location information and try again.");
-      } finally {
-        if (requestId === requestIdRef.current) setBusy(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authStatus, user]);
 
   return (
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF] architectural-grid">
@@ -387,7 +311,7 @@ export default function YourWeekPage() {
           </div>
         )}
 
-        {week && selectedDay && authStatus === 'signedIn' && (
+        {week && selectedDay && (
           <>
             <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
               <div>

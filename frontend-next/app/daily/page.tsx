@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '../../components/Container';
 import { Header } from '../../components/Header';
-import { RequireProfile } from '../../components/RequireProfile';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import {
   DAILY_CITIES,
@@ -166,7 +165,6 @@ function DailyContent() {
   const cards: DailyCard[] = data?.signs ?? [];
 
   return (
-    <RequireProfile>
     <main className="min-h-screen bg-[#090909] text-[#EEE9DF] architectural-grid">
       <Header onStartReading={() => { window.location.href = '/'; }} />
       <Container size="xl" className="py-8 sm:py-12">
@@ -297,7 +295,6 @@ function DailyContent() {
         </p>
       </Container>
     </main>
-    </RequireProfile>
   );
 }
 

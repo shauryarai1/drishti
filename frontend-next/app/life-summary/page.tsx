@@ -1,14 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { API_BASE, api } from '../../lib/api';
 import { MaskedReveal } from '../../components/motion/MaskedReveal';
 import { Header } from '../../components/Header';
 import { CurrentDashaSection } from '../../components/CurrentDashaSection';
-import { ResultGate } from '../../components/ResultGate';
-import { useAuth } from '../../lib/auth';
-import { loginHref } from '../../lib/authPaths';
-import { savePendingForm, takePendingForm } from '../../lib/pendingForms';
 import { authHeaders } from '../../lib/authHeaders';
 
 interface Section {
@@ -26,7 +22,6 @@ interface Summary {
 }
 
 export default function LifeSummaryPage() {
-  const { status: authStatus, user } = useAuth();
   const requestIdRef = useRef(0);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -81,13 +76,8 @@ export default function LifeSummaryPage() {
       ...(selectedTimezone ? { timezone: selectedTimezone } : {}),
     };
 
-    // The result is protected, not the form: preserve the details, sign in, resume.
-    if (authStatus !== 'signedIn' || !user) {
-      savePendingForm('life_summary', payload);
-      window.location.href = loginHref('/life-summary');
-      return;
-    }
-
+    // Public: a guest prepares the summary immediately. Nothing is saved to the
+    // account unless the request carries a verified session (see authHeaders).
     await runSummary(payload);
   };
 
@@ -117,27 +107,6 @@ export default function LifeSummaryPage() {
       if (requestId === requestIdRef.current) setBusy(false);
     }
   };
-
-  // Resume a pending life summary after the guest signs in.
-  useEffect(() => {
-    if (authStatus !== 'signedIn' || !user) return;
-    const restored = takePendingForm('life_summary');
-    if (!restored) return;
-    setDate(restored.date);
-    setTime(restored.time);
-    setPlace(restored.place);
-    if (typeof restored.latitude === 'number' && typeof restored.longitude === 'number') {
-      setCoords({ lat: restored.latitude, lon: restored.longitude });
-    }
-    if (restored.timezone) setSelectedTimezone(restored.timezone);
-    void runSummary({
-      ...restored,
-      latitude: restored.latitude ?? null,
-      longitude: restored.longitude ?? null,
-    });
-    // The pending form is consumed on first use, so this cannot double-generate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authStatus, user]);
 
   const field = 'w-full rounded border border-[#A62A34]/35 bg-[#160A0C] px-3.5 py-3 text-sm text-[#F7F5F0] outline-none focus:border-[#A62A34]';
 
@@ -215,7 +184,7 @@ export default function LifeSummaryPage() {
           </section>
         )}
 
-        {summary && authStatus === 'signedIn' && (
+        {summary && (
           <div className="mt-8 space-y-4">
             <div className="text-xs uppercase tracking-[0.2em] text-[#EEE9DF]/45">Your life summary</div>
 
