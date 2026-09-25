@@ -120,12 +120,48 @@ _PLACE_STOPWORDS = {
     # detail-collection filler, so only the place words survive
     "my", "me", "i", "am", "the", "a", "an", "and", "or", "to", "of", "at",
     "on", "in", "born", "birth", "date", "time", "dob", "tob", "was",
+    # conversation filler that must never be mistaken for a city
+    "that's", "thats", "great", "good", "bad", "nice", "cool", "wow",
+    "interesting", "sorry", "hey", "hmm", "actually", "later", "now",
+    "explain", "explained", "happened", "happen", "format", "look", "know",
+    "think", "want", "need", "wait", "say", "said", "there", "here",
 }
 
 _PLACE_CUE = re.compile(
     r"(?:born\s+in|birth\s*place\s*[:=-]*|birthplace\s*[:=-]*|place\s*[:=]\s*"
     r"|city\s*[:=]\s*|from\s+)([A-Za-z][A-Za-z .,'&()-]{1,60})",
     re.I)
+
+# Explicit birth wording: a place mentioned this way may also CORRECT an
+# already-collected place, not just supply one mid-collection.
+_BIRTH_PLACE_CUE = re.compile(r"(?:born\s+in|birth\s*place|birthplace)", re.I)
+
+# Birth-data wording that makes a longer message a detail supply or correction
+# ("sorry, my date of birth is actually 5.5.1995").
+_BIRTH_CONTEXT = re.compile(r"\b(birth|born|dob|tob)\b", re.I)
+
+# A detail fragment never opens with a question or instruction word.
+_QUESTION_OPENERS = ("what", "when", "where", "why", "how", "who", "which",
+                     "tell", "explain", "define", "describe", "give", "show",
+                     "look", "summarise", "summarize", "translate", "write",
+                     "read", "calculate")
+
+
+def is_detail_message(text: str) -> bool:
+    """A short, non-question fragment carrying a date or a time.
+
+    "21/01/2010", "08:19 am", "23.11.2009 14:30 Jaipur" - plausibly birth
+    details being shared in conversation, so they are retained for later. A
+    question ("What happened on 21/01/2010?") or an instruction ("Explain
+    21/01/2010 as a date format") never qualifies.
+    """
+    stripped = (text or "").strip()
+    if not stripped or "?" in stripped:
+        return False
+    tokens = stripped.split()
+    if len(tokens) > 5 or tokens[0].lower() in _QUESTION_OPENERS:
+        return False
+    return parse_date(stripped) is not None or parse_time(stripped) is not None
 
 
 def _valid_date(year: int, month: int, day: int) -> Optional[str]:
@@ -239,6 +275,7 @@ def display_date(iso: str) -> str:
 def _new_state(pending: str = "") -> Dict[str, Any]:
     return {"date": None, "time": None, "place": None, "latitude": None,
             "longitude": None, "timezone": None, "pending": pending,
+            "collecting": False,
             "chart": None, "context": None, "fingerprint": None}
 
 
@@ -399,28 +436,55 @@ def gate(conversation_id: str, question: str, route: str) -> Tuple[str, str]:
 
     parsed_date = parse_date(text)
     parsed_time = parse_time(text)
+    detail_message = is_detail_message(text)
+    # A longer message still counts as a detail supply/correction when it uses
+    # explicit birth wording ("sorry, my date of birth is actually 5.5.1995").
+    birth_context = bool(_BIRTH_CONTEXT.search(text)) and (
+        parsed_date is not None or parsed_time is not None)
     natal_question = needs_natal(text) and not chit_chat
 
     state = _STATES.get(conversation_id)
     if state is None:
-        if not natal_question:
-            # A bare date or detail with no chart request stays ordinary chat
-            # (the assistant acknowledges it without inventing anything).
+        # A bare detail fragment or an explicit birth-data message opens a
+        # QUIET collection state, so details survive across turns. It never
+        # changes THIS reply: ordinary conversation continues naturally and
+        # nothing is calculated until the details are actually complete.
+        if not natal_question and not detail_message and not birth_context:
             return "continue", ""
-        state = _new_state(pending=text)
+        state = _new_state(pending=text if natal_question else "")
+        state["collecting"] = not natal_question
         _STATES[conversation_id] = state
         _evict(conversation_id)
     elif natal_question and not state.get("pending"):
         state["pending"] = text
 
-    # The place is only read from a detail-shaped message once both other
-    # details exist (in this message or earlier in this conversation).
-    effective_date = parsed_date or state.get("date")
-    effective_time = parsed_time or state.get("time")
-    parsed_place = parse_place(text) if (effective_date and effective_time) else None
+    # Details are ingested only from a chart request, a detail-shaped fragment
+    # or explicit birth wording. A date mentioned inside an ordinary question
+    # ("what about events on 23.11.2009") never touches the collected state.
+    ingest_details = natal_question or detail_message or birth_context
+
+    # The place is read only from a detail-shaped message: explicit birth
+    # wording ("born in Jaipur" - supply or correction), or a short
+    # non-question fragment while the place is still being collected.
+    # Ordinary sentences are never mistaken for places, and a complete chart
+    # is never corrupted by stray words.
+    effective_date = state.get("date") or (
+        parsed_date if ingest_details else None)
+    collecting = (state.get("place") is None
+                  and (natal_question or state.get("pending")
+                       or state.get("collecting")))
+    if _BIRTH_PLACE_CUE.search(text):
+        parsed_place = parse_place(text)
+    elif (collecting and effective_date and "?" not in text
+          and len(tokens) <= 3
+          and (not tokens or tokens[0] not in _QUESTION_OPENERS)):
+        parsed_place = parse_place(text)
+    else:
+        parsed_place = None
 
     changed = False
-    for key, value in (("date", parsed_date), ("time", parsed_time),
+    for key, value in (("date", parsed_date if ingest_details else None),
+                       ("time", parsed_time if ingest_details else None),
                        ("place", parsed_place)):
         if value and value != state.get(key):
             state[key] = value
@@ -437,23 +501,24 @@ def gate(conversation_id: str, question: str, route: str) -> Tuple[str, str]:
         if failure:
             return "reply", failure
 
+    supplies_details = ((ingest_details and (parsed_date or parsed_time))
+                         or bool(parsed_place))
+
     if _missing(state):
-        if parsed_date or parsed_time or parsed_place or natal_question:
+        if natal_question or (state.get("pending")
+                              and (parsed_date or parsed_time or parsed_place)):
             return "reply", _missing_reply(state)
-        # Ordinary conversation while details are still being collected is
-        # never interrupted with a nag.
+        # A detail shared without an explicit chart request stays natural
+        # conversation; the state quietly retains it for when the chart is
+        # actually asked for.
         return "continue", ""
 
     # Chart context is supplied only when this message actually carries chart
     # intent: an explicit personal-chart question, an astrology question, or a
     # message genuinely supplying/correcting birth details. A calculated chart
     # is never attached to ordinary conversation just because it is cached.
-    # Intent is checked FIRST: parse_place() can return leftover words from
-    # ordinary prose, which is not evidence of chart intent.
     chart_intent = (natal_question or route == ASTROLOGY
                     or has_astrology_signal(text))
-    supplies_details = bool(parsed_date or parsed_time) or (
-        bool(parsed_place) and natal_question)
     if not chart_intent and not supplies_details:
         return "continue", ""
 

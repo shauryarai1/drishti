@@ -365,6 +365,13 @@ _CARD_TERMS = ("tarot", "card", "cards", "upright", "reversed", "spread", "arcan
                "wands", "cups", "swords", "pentacles", "private kavach reading",
                "situation:", "influence:")
 
+# Internal architecture may never surface in a public answer, even if a model
+# paraphrases its own instructions ("I need the official chart context block").
+_INTERNAL_TERMS = ("chart context", "context block", "build_kundli",
+                   "system instruction", "system prompt", "official chart",
+                   "provided chart", "authoritative context", "provider",
+                   "calculated placement")
+
 
 def _sanitise_public_answer(text: str) -> str:
     """No internal mechanism may ever reach the public answer."""
@@ -372,7 +379,10 @@ def _sanitise_public_answer(text: str) -> str:
 
     kept = []
     for sentence in _re2.split(r"(?<=[.!?])\s+", text or ""):
-        if any(term in sentence.lower() for term in _CARD_TERMS):
+        lowered = sentence.lower()
+        if any(term in lowered for term in _CARD_TERMS):
+            continue
+        if any(term in lowered for term in _INTERNAL_TERMS):
             continue
         kept.append(sentence.strip())
     return " ".join(part for part in kept if part).strip()

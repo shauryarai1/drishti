@@ -185,7 +185,7 @@ def test_prompt_forbids_the_model_from_calculating_placements():
     from chat.gemini import (ASTROLOGY_INSTRUCTION, SYSTEM_INSTRUCTION,
                              _system_instruction_for)
 
-    assert ("unless an authoritative calculated chart context block is supplied"
+    assert ("unless the calculated chart is supplied"
             in SYSTEM_INSTRUCTION)
     assert ("Birth details mentioned in the conversation are not permission to "
             "calculate" in SYSTEM_INSTRUCTION)
@@ -196,6 +196,19 @@ def test_prompt_forbids_the_model_from_calculating_placements():
     # the default system prompt still forbids personal placements.
     assert _system_instruction_for("") == SYSTEM_INSTRUCTION
     assert "Never invent chart data" in SYSTEM_INSTRUCTION
+
+
+def test_prompt_never_directs_the_user_to_internal_mechanisms():
+    """The user must never be told to provide a chart context or placements."""
+    from chat.gemini import SYSTEM_INSTRUCTION
+
+    lowered = SYSTEM_INSTRUCTION.lower()
+    assert "chart context block" not in lowered
+    assert "never mention chart contexts" in lowered
+    assert "never ask them to provide calculated placements" in lowered
+    assert "users only ever share ordinary details" in lowered
+    # Missing information is requested as ordinary birth details only.
+    assert "date of birth, the exact birth time and the birth place" in lowered
 
 
 def test_general_astrology_gets_no_chart_context_and_no_calculation(env, client):
