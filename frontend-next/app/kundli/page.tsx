@@ -12,6 +12,7 @@ import type { BirthDetails as BirthDetailsType } from '../../lib/types';
 import { BnnConnections } from '../../components/kundli/BnnConnections';
 import { ChartAnalysis } from '../../components/kundli/ChartAnalysis';
 import { KundliCharts } from '../../components/kundli/KundliCharts';
+import { DashaFlow } from '../../components/kundli/DashaFlow';
 import { StrengthEvidence } from '../../components/kundli/StrengthEvidence';
 import {
   birthDetailsFor,
@@ -37,12 +38,6 @@ function degree(value: number): string {
   const whole = Math.floor(value);
   const minutes = Math.round((value - whole) * 60);
   return `${whole}° ${String(minutes).padStart(2, '0')}'`;
-}
-
-function stamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return `${String(date.getDate()).padStart(2, '0')} ${date.toLocaleString('en-GB', { month: 'short' })} ${date.getFullYear()}`;
 }
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
@@ -475,55 +470,13 @@ export default function KundliPage() {
             )}
 
             {tab === 'DASHA' && (
-              <section className="mt-4 space-y-4">
-                <div className={PANEL}>
-                  <div className={LABEL}>Current Period</div>
-                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                    {kundli.dasha.currentMahadasha && (
-                      <div className="rounded border border-[#A62A34]/30 bg-[#0E0708]/50 p-3">
-                        <div className={LABEL}>Mahadasha</div>
-                        <div className="mt-1 text-lg font-semibold text-[#F7F5F0]">{kundli.dasha.currentMahadasha.lord}</div>
-                        <div className="mt-1 text-[12.5px] text-[#EEE9DF]/60">
-                          {stamp(kundli.dasha.currentMahadasha.start)} &rarr; {stamp(kundli.dasha.currentMahadasha.end)}
-                        </div>
-                      </div>
-                    )}
-                    {kundli.dasha.currentAntardasha && (
-                      <div className="rounded border border-[#A62A34]/30 bg-[#0E0708]/50 p-3">
-                        <div className={LABEL}>Antardasha</div>
-                        <div className="mt-1 text-lg font-semibold text-[#F7F5F0]">{kundli.dasha.currentAntardasha.lord}</div>
-                        <div className="mt-1 text-[12.5px] text-[#EEE9DF]/60">
-                          {stamp(kundli.dasha.currentAntardasha.start)} &rarr; {stamp(kundli.dasha.currentAntardasha.end)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-4 text-[12.5px] text-[#EEE9DF]/50">
-                    Birth balance: {kundli.dasha.balanceAtBirth.lord} &middot; {kundli.dasha.balanceAtBirth.years.toFixed(2)} years remaining
-                    at birth (progress {(kundli.dasha.progressAtBirth * 100).toFixed(1)}% through {kundli.dasha.birthNakshatra})
-                  </div>
+              <div className="mt-4">
+                <DashaFlow dasha={kundli.dasha} />
+                <div className={`${PANEL} mt-4 text-[12.5px] text-[#EEE9DF]/50`}>
+                  Birth balance: {kundli.dasha.balanceAtBirth.lord} &middot; {kundli.dasha.balanceAtBirth.years.toFixed(2)} years remaining
+                  at birth (progress {(kundli.dasha.progressAtBirth * 100).toFixed(1)}% through {kundli.dasha.birthNakshatra})
                 </div>
-
-                <div className={PANEL}>
-                  <div className={LABEL}>Vimshottari Mahadasha</div>
-                  <div className="mt-3">
-                    <Table
-                      head={['Lord', 'Start', 'End', 'Years']}
-                      rows={kundli.dasha.mahadashas.map((period) => {
-                        const current = kundli.dasha.currentMahadasha?.start === period.start;
-                        return [
-                          <span key="l" className={current ? 'font-semibold text-[#D6BE85]' : 'text-[#F7F5F0]'}>
-                            {period.lord}{current ? ' · current' : ''}
-                          </span>,
-                          stamp(period.start),
-                          stamp(period.end),
-                          period.years.toFixed(2),
-                        ];
-                      })}
-                    />
-                  </div>
-                </div>
-              </section>
+              </div>
             )}
 
             {tab === 'TRANSITS' && (

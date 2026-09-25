@@ -29,6 +29,7 @@ YEARS: Dict[str, float] = {
 }
 TOTAL_YEARS = sum(YEARS.values())  # 120
 YEAR_DAYS = 365.2425
+DASHA_LEVELS = ("Mahadasha", "Antardasha", "Pratyantardasha", "Sookshma", "Prana")
 
 
 
@@ -62,8 +63,60 @@ def antardashas(maha_lord: str, start: datetime, maha_years: float) -> List[Dict
     return result
 
 
+def _parse_stamp(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def _subperiods(parent_lord: str, parent_start: str, parent_end: str) -> List[Dict[str, Any]]:
+    """Recursively subdivide one period using the existing Vimshottari ratios."""
+    start = _parse_stamp(parent_start)
+    end = _parse_stamp(parent_end)
+    total_seconds = (end - start).total_seconds()
+    result: List[Dict[str, Any]] = []
+    cursor = start
+    cycle = _cycle_from(parent_lord)
+
+    for index, lord in enumerate(cycle):
+        child_end = end if index == len(cycle) - 1 else cursor + timedelta(
+            seconds=total_seconds * YEARS[lord] / TOTAL_YEARS)
+        result.append({
+            "lord": lord,
+            "start": parent_start if index == 0 else _stamp(cursor),
+            "end": parent_end if index == len(cycle) - 1 else _stamp(child_end),
+            "years": round((child_end - cursor).total_seconds() / (YEAR_DAYS * 86400), 9),
+            "index": index + 1,
+            "of": len(cycle),
+        })
+        cursor = child_end
+    return result
+
+
+def dasha_children(level: int, parent_lord: str, parent_start: str,
+                   parent_end: str) -> List[Dict[str, Any]]:
+    """Return one on-demand child level below a Vimshottari parent period.
+
+    `level` is the child depth: 1=Antardasha, 2=Pratyantardasha,
+    3=Sookshma, 4=Prana. The parent boundary strings are preserved exactly
+    for the first/last child so recursive consumers cannot accumulate gaps.
+    """
+    if level not in range(1, len(DASHA_LEVELS)):
+        raise ValueError("Dasha child level must be between 1 and 4")
+    if parent_lord not in YEARS:
+        raise ValueError("Unknown Vimshottari lord")
+    children = _subperiods(parent_lord, parent_start, parent_end)
+    child_level = DASHA_LEVELS[level]
+    return [{**item, "level": child_level} for item in children]
+
+
+def _current_period(periods: List[Dict[str, Any]], now: datetime) -> Optional[Dict[str, Any]]:
+    stamp = _stamp(now)
+    return next((period for period in periods
+                 if period["start"] <= stamp < period["end"]), None)
+
+
 def vimshottari_dasha(moon_longitude: float, birth: datetime,
-                      span_years: float = TOTAL_YEARS) -> Dict[str, Any]:
+                      span_years: float = TOTAL_YEARS,
+                      now: Optional[datetime] = None) -> Dict[str, Any]:
     """Balance-at-birth Mahadashas plus current Mahadasha and Antardasha."""
     info = nakshatra_of(moon_longitude)
     lord = info["lord"] or lord_for_name(info["name"])
@@ -95,9 +148,8 @@ def vimshottari_dasha(moon_longitude: float, birth: datetime,
         first = False
         step += 1
 
-    now = datetime.now(birth.tzinfo) if birth.tzinfo else datetime.now()
-    current = next((item for item in mahadashas
-                    if item["start"] <= _stamp(now) < item["end"]), None)
+    now = now or (datetime.now(birth.tzinfo) if birth.tzinfo else datetime.now())
+    current = _current_period(mahadashas, now)
 
     current_antar = None
     antars: List[Dict[str, Any]] = []
@@ -108,6 +160,18 @@ def vimshottari_dasha(moon_longitude: float, birth: datetime,
             if item["start"] <= _stamp(now) < item["end"]:
                 current_antar = {**item, "index": index + 1, "of": len(antars)}
                 break
+
+    current_levels: List[Dict[str, Any]] = []
+    parent = current
+    for level in range(1, len(DASHA_LEVELS)):
+        if not parent:
+            break
+        children = dasha_children(level, parent["lord"], parent["start"], parent["end"])
+        current_child = _current_period(children, now)
+        if not current_child:
+            break
+        current_levels.append(current_child)
+        parent = current_child
 
     return {
         "birthNakshatra": info["name"],
@@ -122,4 +186,14 @@ def vimshottari_dasha(moon_longitude: float, birth: datetime,
         "currentMahadasha": current,
         "antardashas": antars,
         "currentAntardasha": current_antar,
+        "currentPratyantardasha": current_levels[1] if len(current_levels) > 1 else None,
+        "currentSookshma": current_levels[2] if len(current_levels) > 2 else None,
+        "currentPrana": current_levels[3] if len(current_levels) > 3 else None,
+        "currentDashaFlow": ([item for item in [
+            {"level": "Mahadasha", **current} if current else None,
+            {"level": "Antardasha", **current_levels[0]} if len(current_levels) > 0 else None,
+            {"level": "Pratyantardasha", **current_levels[1]} if len(current_levels) > 1 else None,
+            {"level": "Sookshma", **current_levels[2]} if len(current_levels) > 2 else None,
+            {"level": "Prana", **current_levels[3]} if len(current_levels) > 3 else None,
+        ] if item is not None] if current else []),
     }

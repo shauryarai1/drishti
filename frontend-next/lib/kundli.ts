@@ -92,6 +92,16 @@ export interface KundliAntardasha {
   of?: number;
 }
 
+export interface KundliDashaPeriod {
+  lord: string;
+  start: string;
+  end: string;
+  years?: number;
+  index?: number;
+  of?: number;
+  level?: string;
+}
+
 export interface KundliDasha {
   birthNakshatra: string;
   birthNakshatraLord: string;
@@ -101,6 +111,10 @@ export interface KundliDasha {
   currentMahadasha: KundliMahadasha | null;
   antardashas: KundliAntardasha[];
   currentAntardasha: KundliAntardasha | null;
+  currentPratyantardasha?: KundliDashaPeriod | null;
+  currentSookshma?: KundliDashaPeriod | null;
+  currentPrana?: KundliDashaPeriod | null;
+  currentDashaFlow?: KundliDashaPeriod[];
 }
 
 export interface KundliResponse {
@@ -169,6 +183,30 @@ export function fetchKundli(payload: KundliRequest): Promise<KundliResponse> {
 
 export function fetchKundliTransits(payload: KundliRequest): Promise<KundliTransitResponse> {
   return postTransitWithRetry(payload);
+}
+
+export interface DashaChildrenResponse {
+  status: string;
+  level: string;
+  parent: { lord: string; start: string; end: string };
+  periods: KundliDashaPeriod[];
+}
+
+export async function fetchDashaChildren(
+  level: number,
+  parent: Pick<KundliDashaPeriod, 'lord' | 'start' | 'end'>,
+): Promise<DashaChildrenResponse> {
+  const identity = await authHeaders();
+  const response = await fetch(`${API_BASE}/kundli/dasha/children`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...identity },
+    body: JSON.stringify({ level, lord: parent.lord, start: parent.start, end: parent.end }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || (body as { status?: string }).status === 'error') {
+    throw new Error('We could not load that Dasha level.');
+  }
+  return body as DashaChildrenResponse;
 }
 
 const TRANSIT_TIMEOUT_MS = 10000;

@@ -741,6 +741,13 @@ class KundliRequest(BaseModel):
     timezone: str = "Asia/Kolkata"
 
 
+class DashaChildrenRequest(BaseModel):
+    level: int
+    lord: str
+    start: str
+    end: str
+
+
 # Public Kundli Generator: calculated chart data only.
 @app.post("/api/kundli")
 async def kundli_endpoint(payload: KundliRequest):
@@ -777,6 +784,21 @@ async def kundli_transits_endpoint(payload: KundliRequest):
     except Exception as exc:
         logger.error("Transit calculation failed: %s", exc, exc_info=True)
         return JSONResponse(status_code=400, content={"status": "error", "message": "We could not calculate current transits right now."})
+
+
+@app.post("/api/kundli/dasha/children")
+async def kundli_dasha_children_endpoint(payload: DashaChildrenRequest):
+    """Return one deterministic Vimshottari child level on demand."""
+    from kundli import dasha_children
+
+    try:
+        periods = dasha_children(payload.level, payload.lord, payload.start, payload.end)
+        return {"status": "ok", "level": periods[0]["level"] if periods else None,
+                "parent": {"lord": payload.lord, "start": payload.start, "end": payload.end},
+                "periods": periods}
+    except (TypeError, ValueError, OverflowError) as exc:
+        logger.info("Dasha child request rejected: %s", type(exc).__name__)
+        return JSONResponse(status_code=400, content={"status": "error", "message": "We could not load that Dasha level."})
 
 
 class DailyRequest(BaseModel):
