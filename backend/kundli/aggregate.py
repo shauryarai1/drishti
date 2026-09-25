@@ -22,6 +22,7 @@ from panchang.moment import calculate_panchang_moment
 
 from .dasha import vimshottari_dasha
 from .nakshatra import nakshatra_of
+from navtara import build_navtara_profile
 
 NAVAGRAHA = ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu")
 NODES = ("Rahu", "Ketu")
@@ -89,6 +90,7 @@ def build_kundli(payload: Dict[str, Any]) -> Dict[str, Any]:
     nakshatra = panchang.get("nakshatra", {})
     ascendant = chart.ascendant
     ascendant_nakshatra = nakshatra_of(ascendant.longitude)
+    navtara = build_navtara_profile(str(nakshatra.get("name") or "")).to_dict()
 
     return {
         "status": "ok",
@@ -143,6 +145,7 @@ def build_kundli(payload: Dict[str, Any]) -> Dict[str, Any]:
             "moonRashi": moon["rashi"] if moon else None,
         },
         "dasha": dasha,
+        "navtara": navtara,
     }
 
 

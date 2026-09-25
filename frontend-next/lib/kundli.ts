@@ -117,6 +117,20 @@ export interface KundliDasha {
   currentDashaFlow?: KundliDashaPeriod[];
 }
 
+export interface KundliNavtaraPosition {
+  position: number;
+  nakshatra: string;
+  taraNumber: number;
+  tara: string;
+  specialRoles: string[];
+  meaning: string;
+}
+
+export interface KundliNavtara {
+  janmaNakshatra: string;
+  positions: KundliNavtaraPosition[];
+}
+
 export interface KundliResponse {
   status: string;
   birth: KundliBirth;
@@ -125,6 +139,7 @@ export interface KundliResponse {
   planets: KundliPlanet[];
   panchang: KundliPanchang;
   dasha: KundliDasha;
+  navtara: KundliNavtara;
   analysis?: AnalysisPayload | null;
   analysisStatus?: string;
 }

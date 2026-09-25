@@ -33,12 +33,14 @@ class NavtaraPosition:
     special_roles: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        meaning = "; ".join(str(item) for item in tara_meaning(self.tara).get("public_tone", []))
         return {
             "position": self.position,
             "nakshatra": self.nakshatra,
             "taraNumber": self.tara_number,
             "tara": self.tara,
             "specialRoles": list(self.special_roles),
+            "meaning": meaning,
         }
 
 

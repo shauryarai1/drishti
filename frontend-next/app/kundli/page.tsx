@@ -13,6 +13,7 @@ import { BnnConnections } from '../../components/kundli/BnnConnections';
 import { ChartAnalysis } from '../../components/kundli/ChartAnalysis';
 import { KundliCharts } from '../../components/kundli/KundliCharts';
 import { DashaFlow } from '../../components/kundli/DashaFlow';
+import { NavtaraPanel } from '../../components/kundli/NavtaraPanel';
 import { StrengthEvidence } from '../../components/kundli/StrengthEvidence';
 import {
   birthDetailsFor,
@@ -26,7 +27,7 @@ import { useAuth } from '../../lib/auth';
 import { getReading, saveKundliReading } from '../../lib/history';
 import { loginHref } from '../../lib/authPaths';
 
-const TABS = ['OVERVIEW', 'CHARTS', 'PLANETS', 'NAKSHATRAS', 'PANCHANG',
+const TABS = ['OVERVIEW', 'CHARTS', 'PLANETS', 'NAKSHATRAS', 'NAVTARA', 'PANCHANG',
   'BNN', 'STRENGTH', 'ANALYSIS', 'DASHA', 'TRANSITS'] as const;
 type Tab = (typeof TABS)[number];
 
@@ -476,6 +477,12 @@ export default function KundliPage() {
                   Birth balance: {kundli.dasha.balanceAtBirth.lord} &middot; {kundli.dasha.balanceAtBirth.years.toFixed(2)} years remaining
                   at birth (progress {(kundli.dasha.progressAtBirth * 100).toFixed(1)}% through {kundli.dasha.birthNakshatra})
                 </div>
+              </div>
+            )}
+
+            {tab === 'NAVTARA' && (
+              <div className="mt-4">
+                <NavtaraPanel data={kundli.navtara} />
               </div>
             )}
 
