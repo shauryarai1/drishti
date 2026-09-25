@@ -31,7 +31,12 @@ function moonChartToKundliData(moon: NonNullable<KundliResponse['analysis']>['mo
       planets: byHouse.get(house) ?? [],
     };
   });
-  return toKundliData({ ascendant: { rashi: moon.lagnaSign, degree: 0, longitude: 0 }, houses, planets: [] });
+  return toKundliData({
+    ascendant: { rashi: moon.lagnaSign, degree: 0, longitude: 0,
+      nakshatra: '', pada: 0, nakshatraLord: '' },
+    houses,
+    planets: [],
+  });
 }
 
 export function KundliCharts({ data }: { data: KundliResponse }) {

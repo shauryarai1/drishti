@@ -88,6 +88,7 @@ def build_kundli(payload: Dict[str, Any]) -> Dict[str, Any]:
     tithi = panchang.get("tithi", {})
     nakshatra = panchang.get("nakshatra", {})
     ascendant = chart.ascendant
+    ascendant_nakshatra = nakshatra_of(ascendant.longitude)
 
     return {
         "status": "ok",
@@ -109,12 +110,18 @@ def build_kundli(payload: Dict[str, Any]) -> Dict[str, Any]:
             "pada": nakshatra.get("pada"),
             "paksha": tithi.get("paksha"),
             "tithi": tithi.get("name"),
+            "ascendantNakshatra": ascendant_nakshatra["name"],
+            "ascendantPada": ascendant_nakshatra["pada"],
+            "ascendantNakshatraLord": ascendant_nakshatra["lord"],
         },
         "chart": {
             "ascendant": {
                 "rashi": ascendant.sign,
                 "degree": round(ascendant.degree, 4),
                 "longitude": round(ascendant.longitude, 6),
+                "nakshatra": ascendant_nakshatra["name"],
+                "pada": ascendant_nakshatra["pada"],
+                "nakshatraLord": ascendant_nakshatra["lord"],
             },
             "houses": [
                 {"number": house.number, "rashi": house.sign,

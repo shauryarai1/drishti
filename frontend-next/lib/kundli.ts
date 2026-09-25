@@ -26,6 +26,9 @@ export interface KundliSummary {
   sunRashi: string;
   nakshatra: string;
   pada: number;
+  ascendantNakshatra: string;
+  ascendantPada: number;
+  ascendantNakshatraLord: string;
   paksha: string;
   tithi: string;
 }
@@ -49,7 +52,14 @@ export interface KundliHouse {
 }
 
 export interface KundliChart {
-  ascendant: { rashi: string; degree: number; longitude: number };
+  ascendant: {
+    rashi: string;
+    degree: number;
+    longitude: number;
+    nakshatra: string;
+    pada: number;
+    nakshatraLord: string;
+  };
   houses: KundliHouse[];
   planets: KundliPlanet[];
 }
@@ -158,7 +168,61 @@ export function fetchKundli(payload: KundliRequest): Promise<KundliResponse> {
 }
 
 export function fetchKundliTransits(payload: KundliRequest): Promise<KundliTransitResponse> {
-  return post<KundliTransitResponse>('/kundli/transits', payload);
+  return postTransitWithRetry(payload);
+}
+
+const TRANSIT_TIMEOUT_MS = 10000;
+
+function transitError(message: string, status?: number): Error & { status?: number } {
+  const error = new Error(message) as Error & { status?: number };
+  error.status = status;
+  return error;
+}
+
+async function postTransit(payload: KundliRequest): Promise<KundliTransitResponse> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), TRANSIT_TIMEOUT_MS);
+  try {
+    const identity = await authHeaders();
+    const response = await fetch(`${API_BASE}/kundli/transits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...identity },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || (body as { status?: string }).status === 'error') {
+      const status = response.status;
+      const message = status >= 500 || status === 429
+        ? 'Transit data could not be loaded.'
+        : 'Please check the birth details and try again.';
+      throw transitError(message, status);
+    }
+    return body as KundliTransitResponse;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw transitError('Transit request timed out.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function postTransitWithRetry(payload: KundliRequest): Promise<KundliTransitResponse> {
+  let attempt = 0;
+  while (attempt < 2) {
+    try {
+      return await postTransit(payload);
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      const retryable = !status || status === 429 || status >= 500;
+      if (!retryable || attempt === 1) throw error;
+      attempt += 1;
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+  }
+  throw transitError('Transit data could not be loaded.');
 }
 
 /** Adapter so the existing D1 renderer can consume the Kundli chart response.

@@ -152,43 +152,14 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
       </div>
 
       {/* SVG Canvas Container with distinct framing */}
-      <div className="relative w-full max-w-[520px] aspect-square rounded-2xl p-2 bg-[#160A0C]/90 border-2 border-[#B99145]/50 shadow-[0_20px_60px_rgba(0,0,0,0.38)]">
+      <div className="relative w-full max-w-[680px] aspect-square rounded-md border border-[#B4232F]/35 bg-white p-1 sm:p-2">
         <svg
           id="north-indian-kundli-svg"
           viewBox="0 0 500 500"
           className="kundli-archive-svg w-full h-full rounded-xl overflow-hidden block"
         >
-          <defs>
-            {/* Soft Glow for Vedic Geometric Borders */}
-            <filter id="goldGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#f59e0b" floodOpacity="0.5" />
-            </filter>
-
-            {/* Facet Fill Gradients - High Contrast so houses are visible */}
-            <linearGradient id="kendraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#1e1812" />
-              <stop offset="100%" stopColor="#251f16" />
-            </linearGradient>
-            <linearGradient id="trikonaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#161822" />
-              <stop offset="100%" stopColor="#1c202e" />
-            </linearGradient>
-            <linearGradient id="dusthanaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#171418" />
-              <stop offset="100%" stopColor="#1f181f" />
-            </linearGradient>
-            <linearGradient id="normalHouseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#121218" />
-              <stop offset="100%" stopColor="#191922" />
-            </linearGradient>
-            <linearGradient id="selectedHouseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#3d2108" />
-              <stop offset="100%" stopColor="#572e0a" />
-            </linearGradient>
-          </defs>
-
-          {/* Deep Base Canvas */}
-          <rect width="500" height="500" fill="#090909" />
+          {/* Flat printed chart surface. */}
+          <rect width="500" height="500" fill="#ffffff" />
 
           {/* 12 House Polygons */}
           {housePolygons.map((poly) => {
@@ -198,12 +169,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
             const isTrikona = [5, 9].includes(poly.houseNum);
             const isDusthana = [6, 8, 12].includes(poly.houseNum);
 
-            let fillUrl = 'url(#normalHouseGrad)';
-            if (isKendra) fillUrl = 'url(#kendraGrad)';
-            else if (isTrikona) fillUrl = 'url(#trikonaGrad)';
-            else if (isDusthana) fillUrl = 'url(#dusthanaGrad)';
-
-            if (isSelected) fillUrl = 'url(#selectedHouseGrad)';
+            const fillUrl = isSelected ? '#fff1f1' : (isKendra || isTrikona || isDusthana ? '#fffafa' : '#ffffff');
 
             return (
               <g
@@ -215,9 +181,9 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                 <polygon
                   points={poly.points}
                   fill={fillUrl}
-                  stroke={isSelected ? '#fbbf24' : 'rgba(217,119,6,0.35)'}
-                  strokeWidth={isSelected ? '2.5' : '1'}
-                  className="hover:brightness-125 transition-all"
+                  stroke={isSelected ? '#B4232F' : '#D66A5F'}
+                  strokeWidth={isSelected ? '2.5' : '1.4'}
+                  className="transition-all hover:fill-[#fff1f1]"
                 />
 
                 {/* House Identifier Tag (H1, H2.. or Roman) */}
@@ -226,8 +192,9 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                   y={poly.labelPos.y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fill="rgba(148,163,184,0.4)"
-                  fontSize="9"
+                  fill="#151719"
+                  opacity="0.42"
+                  fontSize="10"
                   fontWeight="600"
                   fontFamily="sans-serif"
                   className="kundli-house-label pointer-events-none"
@@ -238,16 +205,16 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                 {/* Rashi Sign Number Medallion */}
                 <g transform={`translate(${poly.rashiPos.x}, ${poly.rashiPos.y})`} className="pointer-events-none">
                   <circle
-                    r="11"
-                    fill={isSelected ? '#B99145' : '#160A0C'}
-                    stroke={isSelected ? '#6F1D1B' : '#6F1D1B'}
-                    strokeWidth="1.2"
+                    r="13"
+                    fill={isSelected ? '#B4232F' : '#ffffff'}
+                    stroke="#B4232F"
+                    strokeWidth="1.4"
                   />
                   <text className="kundli-rashi-label"
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fill={isSelected ? '#151719' : '#6F1D1B'}
-                    fontSize="11"
+                    fill={isSelected ? '#ffffff' : '#B4232F'}
+                    fontSize="13"
                     fontWeight="800"
                     fontFamily="sans-serif"
                   >
@@ -322,11 +289,11 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                         {/* Planet name and symbol sit directly on the ivory chart surface. */}
                         <text className="kundli-planet-text"
                           x="0"
-                          y="-1"
+                          y="-5"
                           textAnchor="middle"
                           dominantBaseline="central"
-                          fill="#6F1D1B"
-                          fontSize="11"
+                          fill="#151719"
+                          fontSize="14"
                           fontWeight="700"
                           fontFamily="sans-serif"
                         >
@@ -353,6 +320,19 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                           )}
                         </text>
 
+                        <text className="kundli-degree-text"
+                          x="0"
+                          y="11"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fill="#B4232F"
+                          fontSize="10.5"
+                          fontWeight="700"
+                          fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                        >
+                          {Math.floor(planet.degreeInSign).toString().padStart(2, '0')}°
+                        </text>
+
                       </g>
                     );
                   })}
@@ -362,10 +342,10 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
           })}
 
           {/* Golden Geometric Line Overlay - CRISP, LUMINOUS & ACCURATE */}
-          <g stroke="rgba(120,25,35,0.45)" strokeWidth="2" fill="none" className="pointer-events-none">
+          <g stroke="#C94B43" strokeWidth="1.8" fill="none" className="pointer-events-none">
             {/* Outer Border */}
-            <rect x="2" y="2" width="496" height="496" rx="10" strokeWidth="3" stroke="rgba(120,25,35,0.5)" />
-            <rect x="6" y="6" width="488" height="488" rx="8" strokeWidth="1" stroke="#B99145" strokeOpacity="0.55" />
+            <rect x="2" y="2" width="496" height="496" strokeWidth="2.5" stroke="#B4232F" />
+            <rect x="7" y="7" width="486" height="486" strokeWidth="1" stroke="#E59A82" />
 
             {/* Corner to Corner Diagonals */}
             <line x1="0" y1="0" x2="500" y2="500" strokeWidth="2.2" />
@@ -380,23 +360,22 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
 
           {/* Auspicious Center Bindu (Yantra Central Point) */}
           <g transform="translate(250, 250)" className="pointer-events-none">
-            <circle r="18" fill="#160A0C" stroke="rgba(120,25,35,0.45)" strokeWidth="1.5" />
-            <circle r="10" fill="#541219" stroke="#B99145" strokeWidth="1" />
-            <circle r="4" fill="#6F1D1B" />
+            <circle r="18" fill="#ffffff" stroke="#C94B43" strokeWidth="1.5" />
+            <circle r="10" fill="#fff1f1" stroke="#B4232F" strokeWidth="1" />
+            <circle r="4" fill="#B4232F" />
             <circle r="1.5" fill="#151719" />
           </g>
         </svg>
       </div>
 
       {/* Quick Footnote Legend */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-[11px] text-[#151719]/70">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-[#22190f] border border-amber-500 text-amber-300 flex items-center justify-center text-[9px] font-bold">1</span>
+          <span className="w-3 h-3 rounded-full bg-white border border-[#B4232F] text-[#B4232F] flex items-center justify-center text-[9px] font-bold">1</span>
           <span>Rashi Sign No.</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="text-emerald-400 font-bold">↑ Uchcha</span>
-          <span className="text-slate-500">(Exalted)</span>
+          <span className="text-[#B4232F] font-bold">R Retrograde</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="text-rose-400 font-bold">↓ Neecha</span>

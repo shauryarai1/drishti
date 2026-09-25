@@ -71,6 +71,7 @@ export default function KundliPage() {
   const [kundli, setKundli] = useState<KundliResponse | null>(null);
   const [transits, setTransits] = useState<KundliTransitResponse | null>(null);
   const [transitError, setTransitError] = useState('');
+  const [transitLoading, setTransitLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('OVERVIEW');
@@ -115,6 +116,21 @@ export default function KundliPage() {
     }
   };
 
+  const loadTransits = async (payload: ReturnType<typeof birthPayload>, loadId: number) => {
+    setTransitLoading(true);
+    setTransitError('');
+    try {
+      const transitData = await fetchKundliTransits(payload);
+      if (loadId !== loadIdRef.current) return;
+      setTransits(transitData);
+    } catch {
+      if (loadId !== loadIdRef.current) return;
+      setTransitError('Transit data couldn\'t be loaded.');
+    } finally {
+      if (loadId === loadIdRef.current) setTransitLoading(false);
+    }
+  };
+
   const generate = async (details: BirthDetailsType) => {
     // The chart is public: a guest calculates immediately. Saving to My KAVACH
     // is the only account-gated step, and it never runs for a guest (see
@@ -123,6 +139,7 @@ export default function KundliPage() {
     setBusy(true);
     setError('');
     setTransitError('');
+    setTransitLoading(false);
     setKundli(null);
     setTransits(null);
     setSaveState('idle');
@@ -149,16 +166,15 @@ export default function KundliPage() {
     }
 
     // Transits are secondary: a failure must never discard the natal Kundli.
-    try {
-      const transitData = await fetchKundliTransits(payload);
-      if (loadId !== loadIdRef.current) return;
-      setTransits(transitData);
-    } catch (exc) {
-      if (loadId !== loadIdRef.current) return;
-      setTransitError(exc instanceof Error ? exc.message : 'Could not calculate current transits.');
-    } finally {
-      if (loadId === loadIdRef.current) setBusy(false);
-    }
+    await loadTransits(payload, loadId);
+    if (loadId === loadIdRef.current) setBusy(false);
+  };
+
+  const retryTransits = () => {
+    if (!pending) return;
+    const loadId = loadIdRef.current + 1;
+    loadIdRef.current = loadId;
+    void loadTransits(birthPayload(pending), loadId);
   };
 
   // A saved Kundli is re-opened from its stored snapshot, never recalculated.
@@ -220,6 +236,7 @@ export default function KundliPage() {
   const reset = () => {
     setKundli(null);
     setTransits(null);
+    setTransitLoading(false);
     setPending(null);
     setError('');
     setTransitError('');
@@ -422,6 +439,20 @@ export default function KundliPage() {
                     ])}
                   />
                 </div>
+                <div className={`${LABEL} mt-5`}>Ascendant Nakshatra</div>
+                <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-4">
+                  {[
+                    ['Lagna', kundli.chart.ascendant.rashi],
+                    ['Nakshatra', kundli.chart.ascendant.nakshatra || kundli.summary.ascendantNakshatra],
+                    ['Pada', kundli.chart.ascendant.pada || kundli.summary.ascendantPada],
+                    ['Lord', kundli.chart.ascendant.nakshatraLord || kundli.summary.ascendantNakshatraLord],
+                  ].map(([label, value]) => (
+                    <div key={String(label)}>
+                      <div className={LABEL}>{label}</div>
+                      <div className="mt-1 text-[15px] text-[#F7F5F0]">{value || '—'}</div>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
 
@@ -498,9 +529,18 @@ export default function KundliPage() {
             {tab === 'TRANSITS' && (
               <section className={`${PANEL} mt-4`}>
                 <div className={LABEL}>Current Transits</div>
-                {transitError ? (
+                {transitLoading ? (
+                  <div className="mt-3 text-[13px] text-[#EEE9DF]/60" role="status">Loading transit data&hellip;</div>
+                ) : transitError ? (
                   <div className="mt-3 rounded border border-[#A62A34]/40 bg-[#2B0C11]/60 p-3 text-[13px] text-[#EEE9DF]/80">
-                    {transitError} The natal Kundli above is unaffected.
+                    <div>Transit data couldn&apos;t be loaded. The natal Kundli above is unaffected.</div>
+                    <button
+                      type="button"
+                      onClick={retryTransits}
+                      className="mt-3 rounded border border-[#D6BE85]/50 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#D6BE85] hover:border-[#D6BE85]"
+                    >
+                      Retry
+                    </button>
                   </div>
                 ) : transits ? (
                   <>
