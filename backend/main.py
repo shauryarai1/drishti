@@ -394,7 +394,9 @@ def _sanitise_public_answer(text: str) -> str:
 async def ask_endpoint(payload: ChatRequest):
     """Public Ask KAVACH: chat first, hidden Tarot only when a reading is asked for."""
     from chat import append, get_history
-    from chat.session import get_mode, get_reading, set_mode, set_reading
+    from chat.session import (clear_tool_intent, get_mode, get_reading,
+                              get_tool_intent, set_mode, set_reading,
+                              set_tool_intent)
     from chat.gemini import UNAVAILABLE_MESSAGE, generate_reply_detailed
     from chat.router import (OUT_OF_SCOPE, PERSONAL_READING,
                              READING_FOLLOWUP, SCOPE_MESSAGE, route_message)
@@ -469,12 +471,22 @@ async def ask_endpoint(payload: ChatRequest):
     # Dedicated calculations belong to their dedicated KAVACH tools. Ask gives
     # a deterministic allowlisted action and never collects birth data or
     # invokes the Kundli engine inside chat.
-    from chat.tools import tool_action_for
+    from chat.tools import followup_tool_action_for, tool_action_for
 
+    last_tool = get_tool_intent(conversation_id)
     tool_action = tool_action_for(question)
+    if not tool_action and last_tool:
+        followup = followup_tool_action_for(question, last_tool)
+        if followup and followup.get("clear"):
+            clear_tool_intent(conversation_id)
+        elif followup:
+            tool_action = followup
+    if not tool_action and last_tool:
+        clear_tool_intent(conversation_id)
     if tool_action:
         append(conversation_id, "user", question)
         append(conversation_id, "assistant", tool_action["answer"])
+        set_tool_intent(conversation_id, tool_action["tool_action"]["tool"])
         set_mode(conversation_id, route)
         record_submission(
             "ask",

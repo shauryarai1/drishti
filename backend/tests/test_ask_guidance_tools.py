@@ -146,12 +146,71 @@ def test_kundli_request_never_calls_build_kundli_inside_ask(env, client):
     assert env["groq"] == []
 
 
+def test_kundli_tool_context_survives_ambiguous_followup(env, client):
+    first = ask(client, "21/01/2010 tell me about my kundli", "sticky-kundli")
+    second = ask(client, "so what can u tell me?", "sticky-kundli")
+
+    assert first["tool_action"]["tool"] == "kundli"
+    assert second["tool_action"]["tool"] == "kundli"
+    assert "date of birth" not in second["answer"].lower()
+    assert env["groq"] == [], "ambiguous personal-chart follow-up is blocked before the model"
+
+
+@pytest.mark.parametrize("followup", [
+    "tell me more", "what about Saturn?", "and Jupiter?", "what does that mean for me?",
+    "anything else?", "why?",
+])
+def test_kundli_followups_never_generate_personal_placements(env, client, followup):
+    ask(client, "Tell me about my Kundli", f"sticky-{followup[:3]}")
+    body = ask(client, followup, f"sticky-{followup[:3]}")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == []
+    assert all(sign not in body["answer"] for sign in (" in Aries", " in Aquarius", " in Capricorn"))
+
+
+def test_educational_astrology_after_kundli_context_is_allowed(env, client):
+    ask(client, "Tell me about my Kundli", "education-after-tool")
+    body = ask(client, "What does Saturn generally represent?", "education-after-tool")
+
+    assert "tool_action" not in body
+    assert env["groq"]
+    assert env["kundli"] == 0
+
+
+def test_topic_change_clears_kundli_tool_context(env, client):
+    ask(client, "Tell me about my Kundli", "change-topic")
+    body = ask(client, "anyway explain gravity", "change-topic")
+    followup = ask(client, "tell me more", "change-topic")
+
+    assert "tool_action" not in body
+    assert "tool_action" not in followup
+    assert len(env["groq"]) == 2
+
+
+def test_dasha_tool_context_survives_followup_without_dasha_calculation(env, client):
+    ask(client, "What Mahadasha am I running?", "sticky-dasha")
+    body = ask(client, "tell me more", "sticky-dasha")
+
+    assert body["tool_action"]["tool"] == "dasha"
+    assert env["groq"] == []
+
+
 def test_identity_stays_product_level(env, client):
     body = ask(client, "Which model are you?", "identity-1")
 
     assert "Ask KAVACH" in body["answer"]
     assert all(term not in body["answer"].lower() for term in ("openai", "chatgpt", "groq", "gemini"))
     assert env["groq"] == []
+
+
+def test_provider_instruction_forbids_personal_astrology_inference():
+    from chat.gemini import SYSTEM_INSTRUCTION
+
+    lowered = SYSTEM_INSTRUCTION.lower()
+    assert "never calculate, estimate or infer" in lowered
+    assert "from a date, time, location" in lowered
+    assert "do not ask for birth details" in lowered
 
 
 def test_welcome_is_exact_static_content_and_not_an_astrology_manual():

@@ -39,6 +39,12 @@ TOOL_COPY = {
     "life_summary": "KAVACH Life Summary is the dedicated experience for an overall life reading.",
 }
 
+FOLLOWUP_COPY = {
+    "kundli": "I can explain astrology concepts and help you think through something here, but I won't guess your personal chart from a birth date - KAVACH Kundli calculates that properly. Open your Kundli first, then ask me about anything you see there.",
+    "dasha": "I can explain what Dasha periods mean, but I won't guess your personal Dasha. Open Kundli to calculate it properly, then ask me about the result.",
+    "navtara": "I can explain Navtara concepts, but I won't guess your personal cycle. Open Kundli to calculate your Navtara properly, then ask me about the result.",
+}
+
 
 def _action(tool: str) -> Dict[str, Any]:
     entry = TOOL_REGISTRY[tool]
@@ -87,6 +93,50 @@ def tool_action_for(question: str) -> Optional[Dict[str, Any]]:
         return {"answer": TOOL_COPY["life_summary"], "tool_action": _action("life_summary")}
 
     return None
+
+
+def followup_tool_action_for(question: str, tool: str) -> Optional[Dict[str, Any]]:
+    """Preserve a specialized-tool boundary across ambiguous follow-ups.
+
+    Returns ``{"clear": True}`` when the user clearly changed topic. A
+    normal ``None`` means the caller should clear the specialized context and
+    let ordinary conversation proceed.
+    """
+    text = (question or "").strip().lower()
+    if not text or tool not in TOOL_REGISTRY:
+        return None
+
+    educational = re.search(
+        r"\b(generally|in astrology|as a concept|conceptually)\b"
+        r"|^what is (?:an? )?(?:saturn|jupiter|mars|mercury|venus|sun|moon|"
+        r"ascendant|lagna|mahadasha|antardasha|navtara)\b",
+        text,
+    )
+    if educational:
+        return {"clear": True}
+
+    topic_change = re.search(r"\b(?:anyway|instead)\b", text) or re.search(
+        r"\b(gravity|photosynthesis|code|coding|email|recipe)\b", text)
+    if topic_change and not re.search(r"\b(?:chart|kundli|dasha|navtara|planet|saturn|jupiter)\b", text):
+        return {"clear": True}
+
+    ambiguous = re.search(
+        r"^(?:so\s+)?(?:what can (?:you|u) tell me|tell me more|anything else|why|how|then|explain)\b"
+        r"|\bwhat about\b|\bwhat does that mean\b|\bwhat does .* mean for me\b",
+        text,
+    )
+    if not ambiguous and re.search(
+        r"^and\s+(?:saturn|jupiter|mars|mercury|venus|sun|moon|rahu|ketu)\b",
+        text,
+    ):
+        ambiguous = True
+    if not ambiguous:
+        return None
+
+    return {
+        "answer": FOLLOWUP_COPY.get(tool, FOLLOWUP_COPY["kundli"]),
+        "tool_action": _action(tool),
+    }
 
 
 def is_allowed_action(action: Any) -> bool:
