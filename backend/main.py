@@ -437,6 +437,29 @@ async def ask_endpoint(payload: ChatRequest):
         return {"status": "ok", "answered": True, "answer": SCOPE_MESSAGE,
                 "conversation_id": conversation_id}
 
+    # Natal grounding: a personal chart question is answered ONLY from the
+    # calculated Kundli engine (kundli.build_kundli), or with a deterministic
+    # request for the birth details still missing. The model is never allowed
+    # to invent or calculate a placement itself - there is no third path.
+    # Readings, reading follow-ups and out-of-scope requests are never touched.
+    from chat import natal
+
+    natal_kind, natal_value = natal.gate(conversation_id, question, route)
+    if natal_kind == "reply":
+        append(conversation_id, "user", question)
+        append(conversation_id, "assistant", natal_value)
+        set_mode(conversation_id, ASTROLOGY)
+        record_submission(
+            "ask",
+            {"question": question, "conversation_id": conversation_id},
+            {"answered": True, "answer": natal_value},
+        )
+        return {"status": "ok", "answered": True, "answer": natal_value,
+                "conversation_id": conversation_id}
+    natal_supplied = natal_kind == "context"
+    if natal_supplied:
+        route = ASTROLOGY
+
     # Context isolation: each mode carries ONLY its own hidden evidence.
     reading = active if route == READING_FOLLOWUP else None
     tarot = "REUSED" if reading else "NOT USED"
@@ -460,17 +483,11 @@ async def ask_endpoint(payload: ChatRequest):
             logger.warning("Reading context skipped: %s", type(exc).__name__)
             private = ""
 
-    # The chart context is built only for astrology mode, so a personal reading
-    # can never leak into a chart answer.
-    astrology = ""
-    if route == ASTROLOGY:
-        try:
-            from chat.astrology import chart_context
-
-            astrology = chart_context(payload)
-        except Exception as exc:
-            logger.warning("Chart context skipped: %s", type(exc).__name__)
-            astrology = ""
+    # The chart context comes ONLY from the natal gate above: it is the
+    # calculated Kundli for this conversation's birth details, or nothing.
+    # A personal reading can never leak into a chart answer, and the model
+    # never receives a question-moment "chart" built from the chat timestamp.
+    astrology = natal_value
 
     detail = {}
     answer = None
@@ -594,6 +611,11 @@ async def ask_endpoint(payload: ChatRequest):
         _archive_ask(UNAVAILABLE_MESSAGE, False, "empty_answer")
         return {"status": "ok", "answered": False, "answer": UNAVAILABLE_MESSAGE,
                 "conversation_id": conversation_id}
+
+    # Output-side grounding: with a calculated chart on the table, any sentence
+    # that asserts a placement the chart does not show is dropped.
+    if natal_supplied:
+        clean = natal.scrub(clean, conversation_id)
 
     safe_trace("ok", answer, clean)
     if reading is not None and route != READING_FOLLOWUP:

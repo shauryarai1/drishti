@@ -1,133 +1,82 @@
-"""Astrology context for Ask KAVACH.
+"""Authoritative chart context for Ask KAVACH.
 
-Builds a compact, factual chart block from the birth details already present in
-the Ask request, using the EXISTING KAVACH calculation engine (`calculator`) and
-the existing current-dasha reader. No astrology methodology is added or changed
-here - this module only formats what the approved engine already returns.
+Formats the compact, factual chart block from the output of the EXISTING
+KAVACH Kundli engine (`kundli.build_kundli` - Swiss Ephemeris, Lahiri
+ayanamsha, the same pipeline as /api/kundli). No astrology methodology is
+added or changed here - this module only formats what the approved engine
+already returns.
 
-Returns "" when the birth details needed for a chart are not available, so the
-caller can tell the model to ask for them instead of inventing a placement.
+The old question-moment chart (question timestamp treated as birth data) is
+gone: this formatter is fed a calculated natal result, never a chat payload.
 """
 
 from __future__ import annotations
 
-import logging
-from typing import Any, Optional
-
-logger = logging.getLogger("kavach.chat")
+from typing import Any
 
 CHART_HEADER = (
-    "[KAVACH CHART CONTEXT - factual chart data for your interpretation. Use only "
-    "the placements listed here, never invent one, and never mention this block.]"
+    "[KAVACH CHART CONTEXT - authoritative chart data calculated by the KAVACH "
+    "engine from the user's supplied birth details. Use only the placements "
+    "listed here, never recalculate or invent one, and never mention this block.]"
 )
 
 
-def _parse_local(timestamp: str):
-    from datetime import datetime
+def format_chart(result: Any) -> str:
+    """Compact factual chart block from a `build_kundli` result."""
+    if not isinstance(result, dict) or result.get("status") not in (None, "ok"):
+        return ""
 
-    value = (timestamp or "").strip()
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        pass
-    for pattern in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(value, pattern)
-        except ValueError:
-            continue
-    return None
+    lines = [CHART_HEADER]
+    birth = result.get("birth") or {}
+    summary = result.get("summary") or {}
 
+    if birth.get("date"):
+        place = birth.get("place") or ""
+        where = f" - {place}" if place else ""
+        lines.append(f"Birth: {birth.get('date')} {birth.get('time')}{where} "
+                     "(Lahiri ayanamsha, whole-sign houses)")
 
-def _format_chart(chart: Any) -> list:
-    lines: list = []
-    ascendant = getattr(chart, "ascendant", None)
-    if ascendant is not None:
-        sign = getattr(ascendant, "sign", None)
-        if sign:
-            lines.append(f"Lagna (ascendant): {sign}")
+    if summary.get("lagna"):
+        lines.append(f"Lagna (ascendant): {summary['lagna']}")
+    if summary.get("moonRashi"):
+        lines.append(f"Moon sign (rashi): {summary['moonRashi']}")
+    if summary.get("nakshatra"):
+        lines.append(f"Nakshatra: {summary['nakshatra']}, pada {summary.get('pada')}")
 
-    planets = list(getattr(chart, "planets", []) or [])
-    moon = next((p for p in planets if getattr(p, "name", "") == "Moon"), None)
-    if moon is not None and getattr(moon, "sign", None):
-        lines.append(f"Moon sign (rashi): {moon.sign}")
+    planets = list(result.get("planets") or [])
+    if planets:
+        lines.append("Planets (sign, house, degree, motion):")
+        for planet in planets:
+            name = planet.get("planet") or ""
+            sign = planet.get("rashi") or ""
+            if not name or not sign:
+                continue
+            where = f"{sign}, house {planet.get('house')}"
+            degree = planet.get("degree")
+            if isinstance(degree, (int, float)):
+                where = f"{where}, {degree:.1f} deg"
+            motion = planet.get("motion")
+            if motion:
+                where = f"{where}, {motion}"
+            lines.append(f"- {name}: {where}")
 
-    lines.append("Planets (sign, house, degree):")
-    for planet in planets:
-        name = getattr(planet, "name", "") or ""
-        sign = getattr(planet, "sign", "") or ""
-        house = getattr(planet, "house", None)
-        degree = getattr(planet, "degree", None)
-        if not name or not sign:
-            continue
-        where = f"{sign}, house {house}" if house else sign
-        if isinstance(degree, (int, float)):
-            where = f"{where}, {degree:.1f} deg"
-        lines.append(f"- {name}: {where}")
-
-    houses = list(getattr(chart, "houses", []) or [])
+    houses = ((result.get("chart") or {}).get("houses")) or []
     if houses:
         listed = ", ".join(
-            f"H{getattr(h, 'number', '?')} {getattr(h, 'sign', '')}".strip()
-            for h in houses[:12]
+            f"H{house.get('number')} {house.get('rashi')}".strip()
+            for house in houses[:12]
         )
         lines.append(f"Whole-sign houses: {listed}")
-    return lines
 
+    # Current dasha straight from the engine's Vimshottari calculation.
+    dasha = result.get("dasha") or {}
+    mahadasha = dasha.get("currentMahadasha") or {}
+    antardasha = dasha.get("currentAntardasha") or {}
+    if mahadasha.get("lord"):
+        lines.append(f"Current Mahadasha: {mahadasha['lord']} "
+                     f"(until {str(mahadasha.get('end'))[:10]})")
+    if antardasha.get("lord"):
+        lines.append(f"Current Antardasha: {antardasha['lord']} "
+                     f"(until {str(antardasha.get('end'))[:10]})")
 
-def _format_dasha(payload: Any) -> list:
-    try:
-        from dasha_reading import build_current_dasha_reading
-
-        birth = {
-            "date": _parse_local(getattr(payload, "timestamp", "")).strftime("%Y-%m-%d"),
-            "time": _parse_local(getattr(payload, "timestamp", "")).strftime("%H:%M"),
-            "place": getattr(payload, "location_label", "") or "",
-            "latitude": getattr(payload, "latitude", None),
-            "longitude": getattr(payload, "longitude", None),
-            "timezone": getattr(payload, "timezone", "") or "Asia/Kolkata",
-        }
-        dasha = build_current_dasha_reading(birth)
-    except Exception as exc:  # a dasha failure must never break the chart answer
-        logger.warning("Dasha context skipped: %s", type(exc).__name__)
-        return []
-
-    lines: list = []
-    mahadasha = (dasha or {}).get("mahadasha") or {}
-    antardasha = (dasha or {}).get("antardasha") or {}
-    if mahadasha.get("name"):
-        lines.append(f"Current Mahadasha: {mahadasha['name']} (until {str(mahadasha.get('end'))[:10]})")
-    if antardasha.get("name"):
-        lines.append(f"Current Antardasha: {antardasha['name']} (until {str(antardasha.get('end'))[:10]})")
-    return lines
-
-
-def chart_context(payload: Any) -> str:
-    """Compact factual chart block, or "" when birth details are unavailable."""
-    latitude = getattr(payload, "latitude", None)
-    longitude = getattr(payload, "longitude", None)
-    local = _parse_local(getattr(payload, "timestamp", ""))
-    if latitude is None or longitude is None or local is None:
-        return ""
-
-    try:
-        from calculator import BirthData, generate_chart
-
-        birth = BirthData(
-            date=local.strftime("%Y-%m-%d"),
-            time=local.strftime("%H:%M"),
-            place=getattr(payload, "location_label", "") or "",
-            latitude=float(latitude),
-            longitude=float(longitude),
-        )
-        chart = generate_chart(birth)
-    except Exception as exc:
-        logger.warning("Chart context skipped: %s", type(exc).__name__)
-        return ""
-
-    if getattr(chart, "status", "") != "CALCULATED":
-        return ""
-
-    lines = [CHART_HEADER, *_format_chart(chart), *_format_dasha(payload)]
     return "\n".join(lines)

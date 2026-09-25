@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import chat.gemini as gemini
 import chat.groq as groq
+import chat.natal as natal
 import chat.router as router
 import main
 from chat.gemini import READING_INSTRUCTION, SYSTEM_INSTRUCTION, _system_instruction_for
@@ -22,6 +23,15 @@ from chat.gemini import READING_INSTRUCTION, SYSTEM_INSTRUCTION, _system_instruc
 REPO = pathlib.Path(__file__).resolve().parents[2]
 ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata"}
+
+# Complete birth details: chart questions are grounded in a calculated chart.
+BIRTH = {"date": "1990-05-14", "time": "07:45", "place": "New Delhi, India",
+         "latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata"}
+
+
+def seed_chart(conversation_id):
+    natal.seed(conversation_id, BIRTH)
+
 
 REPRESENTATIVE_PROMPTS = {
     "hi": "casual",
@@ -154,6 +164,7 @@ def test_groq_primary_receives_the_style_instruction(captured, monkeypatch):
     import archive
 
     monkeypatch.setattr(archive, "store", FakeStore())
+    seed_chart("style-1")
     body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                                        "conversation_id": "style-1"}).json()
 
@@ -171,6 +182,7 @@ def test_gemini_fallback_receives_the_same_style_instruction(captured, monkeypat
                                          "attempts": [{"model": groq.MODEL, "reason": "timeout"}],
                                          "fallback": True})
 
+    seed_chart("style-2")
     body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                                        "conversation_id": "style-2"}).json()
 
@@ -236,6 +248,7 @@ def test_out_of_scope_questions_get_no_context_and_no_geocoder(mock_env):
 
 def test_astrology_questions_get_context_and_internals_stay_hidden(mock_env, caplog):
     client = TestClient(main.app)
+    seed_chart("a-1")
     body = client.post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                          "conversation_id": "a-1"}).text
 

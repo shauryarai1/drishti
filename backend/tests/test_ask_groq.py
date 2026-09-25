@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import archive
 import chat.gemini as gemini
 import chat.groq as groq
+import chat.natal as natal
 import main
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -23,6 +24,15 @@ ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude
        "timezone": "Asia/Kolkata"}
 FAKE_KEY = "groq-test-key-never-real"
 REASONING = "HIDDEN MODEL REASONING that must never surface"
+
+# Complete birth details: the chart questions below are grounded in a real
+# calculated chart (no geocoding, no question-moment chart).
+BIRTH = {"date": "1990-05-14", "time": "07:45", "place": "New Delhi, India",
+         "latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata"}
+
+
+def seed_chart(conversation_id):
+    natal.seed(conversation_id, BIRTH)
 
 
 class FakeResponse:
@@ -137,6 +147,7 @@ def test_casual_question_carries_no_astrology_context(env, client):
 def test_astrology_question_carries_the_chart_context(env, client):
     from chat.gemini import ASTROLOGY_INSTRUCTION, READING_INSTRUCTION
 
+    seed_chart("groq-1")
     ask(client, "what does Saturn mean in my chart?")
     request = env["seen"]["groq"][0]
 
@@ -149,6 +160,7 @@ def test_astrology_question_carries_the_chart_context(env, client):
 def test_astrology_follow_up_keeps_context_then_out_of_scope_returns(env, client):
     import chat.router as router
 
+    seed_chart("switch")
     ask(client, "read my kundli", conversation_id="switch")
     assert "CHART CONTEXT" in env["seen"]["groq"][-1]["messages"][0]["content"]
 
@@ -285,6 +297,7 @@ def test_system_prompt_and_reasoning_are_never_exposed(env, client):
 
 def test_reasoning_is_never_archived(env, client):
     env["script"]["response"] = FakeResponse(200, groq_payload("Archived answer.", reasoning=REASONING))
+    seed_chart("groq-1")
     ask(client, "read my kundli")
 
     row = archive.store.rows[0]

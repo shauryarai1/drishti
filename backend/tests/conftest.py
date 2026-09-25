@@ -89,3 +89,13 @@ def archive_isolation(monkeypatch):
 
     monkeypatch.setattr(archive, "store", _MemoryStore())
     yield
+
+
+@pytest.fixture(autouse=True)
+def natal_state_isolation():
+    """Natal birth details are per-conversation, never shared across tests."""
+    import chat.natal
+
+    chat.natal.clear()
+    yield
+    chat.natal.clear()

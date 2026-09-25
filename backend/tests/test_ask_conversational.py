@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import archive
 import chat.gemini as gemini
 import chat.groq as groq
+import chat.natal as natal
 import chat.router as router
 import chat.session as session
 import main
@@ -26,6 +27,10 @@ ASK = {"timestamp": "2026-09-24T11:45:00+05:30", "latitude": 28.6139, "longitude
 
 GENERAL_ANSWER = "Saturn is the planet of discipline, structure and long-term lessons."
 FOLLOWUP_ANSWER = "It matters because it shapes how you handle responsibility over time."
+
+# Complete birth details: a chart question gets the calculated chart context.
+BIRTH = {"date": "1990-05-14", "time": "07:45", "place": "New Delhi, India",
+         "latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata"}
 
 
 class FakeStore:
@@ -301,6 +306,7 @@ def test_o_reading_followup_preserves_tarot_isolation(env, client):
     assert env["readings"] == 1, "the same hidden reading is reused"
     assert env["groq"][-1]["private"], "the follow-up still answers from the reading"
 
+    natal.seed("conv-o", BIRTH)
     ask(client, "What does Saturn mean in my chart?", "conv-o")
     assert env["readings"] == 1, "an astrology question must not redraw"
     assert env["groq"][-1]["private"] == "", "reading context never leaks to chart"

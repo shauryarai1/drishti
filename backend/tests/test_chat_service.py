@@ -181,7 +181,7 @@ def test_api_all_models_exhausted(monkeypatch):
     session.reset("exhausted-1")
     client = TestClient(main.app)
     body = client.post("/api/ask", json={
-        "question": "Will I do okay as per my chart?", "conversation_id": "exhausted-1",
+        "question": "What does Saturn represent in astrology?", "conversation_id": "exhausted-1",
         "timestamp": "2026-09-20T14:15:00+05:30", "latitude": 28.6, "longitude": 77.2,
         "timezone": "Asia/Kolkata", "location_label": "New Delhi"}).json()
     assert body["answered"] is False

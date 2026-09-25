@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 import archive
 import chat.gemini as gemini
 import chat.groq as groq
+import chat.natal as natal
 import chat.router as router
 import main
 from chat.gemini import SYSTEM_INSTRUCTION, _system_instruction_for
@@ -26,6 +27,15 @@ from chat.gemini import SYSTEM_INSTRUCTION, _system_instruction_for
 REPO = pathlib.Path(__file__).resolve().parents[2]
 ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude": 77.209,
        "timezone": "Asia/Kolkata"}
+
+# Complete birth details: chart questions are grounded in a calculated chart.
+BIRTH = {"date": "1990-05-14", "time": "07:45", "place": "New Delhi, India",
+         "latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata"}
+
+
+def seed_chart(conversation_id):
+    natal.seed(conversation_id, BIRTH)
+
 
 CASUAL_QUESTIONS = ["hi", "hello", "thanks"]
 
@@ -215,6 +225,7 @@ def test_general_questions_are_answered_without_reading_or_scope(env, client):
 
 
 def test_astrology_questions_keep_the_astrology_context(env, client):
+    seed_chart("astro")
     ask(client, "what does Saturn mean in my chart?", conversation_id="astro")
     assert env["groq"] == [""], "astrology must NOT carry the private Tarot reading"
     assert env["readings"] == [], "astrology must not draw a Tarot reading"
@@ -245,6 +256,7 @@ def test_personal_follow_ups_reuse_then_exit_the_reading(env, client):
 
 def test_personal_reading_never_leaks_into_an_astrology_question(env, client):
     """BUG 1: the active Tarot reading must not be supplied for a chart question."""
+    seed_chart("isolation")
     ask(client, "will i be successful in life?", conversation_id="isolation")
     assert len(env["readings"]) == 1
     assert env["groq"][-1] == "PRIVATE READING CONTEXT"
@@ -260,6 +272,7 @@ def test_personal_reading_never_leaks_into_an_astrology_question(env, client):
 
 def test_personal_reading_to_astrology_to_new_reading(env, client):
     """astrology -> personal reading -> astrology keeps each context separate."""
+    seed_chart("switch-2")
     ask(client, "read my kundli", conversation_id="switch-2")
     assert env["astrology"][-1], "astrology context supplied"
     assert env["groq"][-1] == ""

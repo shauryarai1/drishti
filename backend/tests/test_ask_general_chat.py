@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import archive
 import chat.gemini as gemini
 import chat.groq as groq
+import chat.natal as natal
 import chat.router as router
 import main
 
@@ -28,6 +29,14 @@ OUT_OF_SCOPE_QUESTIONS = ["what is gravity?", "explain photosynthesis", "write a
                           "write a Python script", "will it rain tomorrow?",
                           "solve this equation", "give me a recipe"]
 ASTROLOGY_QUESTIONS = ["read my kundli", "what does Saturn mean in my chart?", "how is my dasha?"]
+
+# Complete birth details: chart questions are grounded in a calculated chart.
+BIRTH = {"date": "1990-05-14", "time": "07:45", "place": "New Delhi, India",
+         "latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata"}
+
+
+def seed_chart(conversation_id):
+    natal.seed(conversation_id, BIRTH)
 
 
 class FakeStore:
@@ -148,7 +157,9 @@ def test_out_of_scope_never_returns_code(env, client):
 # --- astrology --------------------------------------------------------------
 @pytest.mark.parametrize("question", ASTROLOGY_QUESTIONS)
 def test_astrology_questions_use_the_chart_context(env, client, question):
-    body = ask(client, question, conversation_id=f"astro-{abs(hash(question))}").json()
+    conversation_id = f"astro-{abs(hash(question))}"
+    seed_chart(conversation_id)
+    body = ask(client, question, conversation_id=conversation_id).json()
 
     assert body["answered"] is True
     assert body["answer"] == "Groq answer."
@@ -158,6 +169,7 @@ def test_astrology_questions_use_the_chart_context(env, client, question):
 
 
 def test_astrology_then_astrology_follow_up_stays_astrology(env, client):
+    seed_chart("astro-switch")
     ask(client, "read my kundli", conversation_id="astro-switch")
     assert env["astrology"][-1]
 
@@ -216,6 +228,7 @@ def test_provider_chain_is_one_primary_and_one_fallback():
 
 # --- privacy ----------------------------------------------------------------
 def test_internal_metadata_and_prompts_are_never_returned(env, client):
+    seed_chart("private-1")
     body = json.dumps(ask(client, "what does Saturn mean in my chart?", "private-1").json())
 
     for forbidden in ("HIDDEN", "reasoning", "PRIVATE READING CONTEXT", "CHART CONTEXT",
