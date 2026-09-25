@@ -13,6 +13,7 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend-next"
 CHART = FRONTEND / "components" / "NorthIndianChart.tsx"
 KUNDLI = FRONTEND / "components" / "Kundli.tsx"
+CHARTS = FRONTEND / "components" / "kundli" / "KundliCharts.tsx"
 KUNDLI_PAGE = FRONTEND / "app" / "kundli" / "page.tsx"
 KUNDLI_LIB = FRONTEND / "lib" / "kundli.ts"
 
@@ -61,6 +62,8 @@ def test_chart_uses_real_degree_and_motion_fields():
 
 def test_chart_presentation_is_mobile_readable_white_and_red():
     chart = read(CHART)
+    wrapper = read(CHARTS)
+    kundli = read(KUNDLI)
 
     assert "max-w-[680px]" in chart
     assert "bg-white" in chart
@@ -69,6 +72,21 @@ def test_chart_presentation_is_mobile_readable_white_and_red():
     assert "kundli-degree-text" in chart
     assert "linearGradient" not in chart
     assert "feDropShadow" not in chart
+    assert "H{poly.houseNum}" not in chart
+    assert "Rashi Sign No." not in chart
+    assert "LAGNA (1)" not in chart
+    assert "-mx-3" in wrapper
+    assert "w-[calc(100%+1.5rem)]" in wrapper
+    assert "rounded-xl border" not in kundli
+
+
+def test_planet_slots_are_deterministic_and_compact():
+    chart = read(CHART)
+    assert "total === 2" in chart
+    assert "total === 3" in chart
+    assert "[-23, 0], [23, 0]" in chart
+    assert "[-25, -12], [25, -12], [0, 16]" in chart
+    assert "[-25, -13], [25, -13], [-25, 14], [25, 14]" in chart
 
 
 def test_transit_request_has_bounded_retry_and_timeout():

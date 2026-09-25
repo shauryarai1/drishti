@@ -35,7 +35,7 @@ body {
     linear-gradient(to bottom, rgba(166, 42, 52, 0.05) 1px, transparent 1px);
 }
 
-.kundli-archive-svg polygon { stroke: #D66A5F !important; }
+.kundli-archive-svg polygon { stroke: none !important; }
 .kundli-archive-svg line { stroke: #C94B43 !important; }
 .kundli-archive-svg .kundli-house-label { fill: #151719 !important; opacity: 0.42; }
 .kundli-archive-svg .kundli-rashi-label { fill: #B4232F !important; }

@@ -10,8 +10,7 @@ import { birthDetailsFor, toKundliData, type KundliResponse } from '../../lib/ku
 const RASHIS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
-const LABEL = 'font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]';
-const PANEL = 'rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70';
+const LABEL = 'font-mono text-[10px] uppercase tracking-[0.18em] text-[#B3922F]';
 
 function moonChartToKundliData(moon: NonNullable<KundliResponse['analysis']>['moonChart']) {
   const start = RASHIS.indexOf(moon.lagnaSign);
@@ -44,9 +43,9 @@ export function KundliCharts({ data }: { data: KundliResponse }) {
   const analysis = data.analysis;
 
   return (
-    <section className={`${PANEL} p-4 sm:p-5`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className={LABEL}>{view === 'D1' ? 'Rashi Chart (D1)' : 'Moon Chart'}</div>
+    <section className="-mx-3 w-[calc(100%+1.5rem)] bg-transparent p-0 sm:mx-0 sm:w-full">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1 sm:px-0">
+        <div className="text-[15px] font-semibold tracking-[0.04em] text-[#F7F5F0]">{view === 'D1' ? 'Lagna Chart' : 'Moon Chart'}</div>
         <div className="flex gap-1.5">
           {(['D1', 'MOON'] as const).map((option) => (
             <button
@@ -63,7 +62,7 @@ export function KundliCharts({ data }: { data: KundliResponse }) {
         </div>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-1">
         {view === 'D1' ? (
           <Kundli
             kundli={toKundliData(data.chart)}
@@ -72,9 +71,6 @@ export function KundliCharts({ data }: { data: KundliResponse }) {
           />
         ) : analysis?.moonChart?.lagnaSign ? (
           <>
-            <div className="mb-2 text-[11.5px] text-[#EEE9DF]/50">
-              Moon Chart — the Moon&apos;s natal rashi is taken as the first house. Planetary positions are unchanged.
-            </div>
             <Kundli
               kundli={moonChartToKundliData(analysis.moonChart)}
               birthDetails={birthDetailsFor(data)}
@@ -86,9 +82,6 @@ export function KundliCharts({ data }: { data: KundliResponse }) {
         )}
       </div>
 
-      <p className="mt-3 text-[11px] text-[#EEE9DF]/35">
-        Bhava Chalit analysis is not enabled in this version.
-      </p>
     </section>
   );
 }

@@ -4,8 +4,8 @@ import { NorthHouseData as HouseData, NorthPlanetPosition as PlanetPosition } fr
 interface NorthIndianChartProps {
   houses: HouseData[];
   ascendant: PlanetPosition;
-  selectedHouse: number | null;
-  onSelectHouse: (houseNumber: number) => void;
+  selectedHouse?: number | null;
+  onSelectHouse?: (houseNumber: number) => void;
   highlightPlanet?: string | null;
 }
 
@@ -144,19 +144,11 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
   return (
     <div className="w-full flex flex-col items-center select-none">
       {/* Chart Interactive Controls */}
-      <div className="w-full flex items-center justify-between mb-3 px-2 text-xs text-slate-400">
-        <span className="flex items-center gap-1.5 font-mono text-[11px] text-amber-400">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          North Indian Vedic Diamond (Rashi Kundli)
-        </span>
-      </div>
-
-      {/* SVG Canvas Container with distinct framing */}
-      <div className="relative w-full max-w-[680px] aspect-square rounded-md border border-[#B4232F]/35 bg-white p-1 sm:p-2">
+      <div className="relative w-full max-w-[680px] aspect-square bg-white p-0">
         <svg
           id="north-indian-kundli-svg"
           viewBox="0 0 500 500"
-          className="kundli-archive-svg w-full h-full rounded-xl overflow-hidden block"
+          className="kundli-archive-svg block h-auto w-full"
         >
           {/* Flat printed chart surface. */}
           <rect width="500" height="500" fill="#ffffff" />
@@ -174,80 +166,29 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
             return (
               <g
                 key={`house-${poly.houseNum}`}
-                className="cursor-pointer transition-all duration-150"
-                onClick={() => onSelectHouse(poly.houseNum)}
+                className={onSelectHouse ? 'cursor-pointer transition-all duration-150' : 'transition-all duration-150'}
+                onClick={() => onSelectHouse?.(poly.houseNum)}
               >
                 {/* House Compartment Polygon */}
                 <polygon
                   points={poly.points}
                   fill={fillUrl}
-                  stroke={isSelected ? '#B4232F' : '#D66A5F'}
-                  strokeWidth={isSelected ? '2.5' : '1.4'}
+                  stroke="none"
+                  strokeWidth="0"
                   className="transition-all hover:fill-[#fff1f1]"
                 />
 
-                {/* House Identifier Tag (H1, H2.. or Roman) */}
-                <text
-                  x={poly.labelPos.x}
-                  y={poly.labelPos.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fill="#151719"
-                  opacity="0.42"
-                  fontSize="10"
-                  fontWeight="600"
-                  fontFamily="sans-serif"
-                  className="kundli-house-label pointer-events-none"
-                >
-                  H{poly.houseNum}
-                </text>
-
-                {/* Rashi Sign Number Medallion */}
-                <g transform={`translate(${poly.rashiPos.x}, ${poly.rashiPos.y})`} className="pointer-events-none">
-                  <circle
-                    r="13"
-                    fill={isSelected ? '#B4232F' : '#ffffff'}
-                    stroke="#B4232F"
-                    strokeWidth="1.4"
-                  />
-                  <text className="kundli-rashi-label"
+                {/* Small printed Rashi number, without a medallion. */}
+                <text className="kundli-rashi-label pointer-events-none"
+                    x={poly.rashiPos.x}
+                    y={poly.rashiPos.y}
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill={isSelected ? '#ffffff' : '#B4232F'}
-                    fontSize="13"
+                    fontSize="12"
                     fontWeight="800"
                     fontFamily="sans-serif"
-                  >
-                    {house?.signNumber}
-                  </text>
-                </g>
-
-                {/* Lagna / Ascendant Crown Badge on House 1 */}
-                {poly.houseNum === 1 && (
-                  <g transform={`translate(${poly.badgePos.x}, ${poly.badgePos.y + 12})`} className="pointer-events-none">
-                    <rect
-                      x="-36"
-                      y="-9"
-                      width="72"
-                      height="18"
-                      rx="9"
-                      fill="#B99145"
-                      stroke="#6F1D1B"
-                      strokeWidth="1"
-                    />
-                      <text className="kundli-lagna-label"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill="#151719"
-                      fontSize="9.5"
-                      fontWeight="900"
-                      letterSpacing="1px"
-                      fontFamily="sans-serif"
-                    >
-                      LAGNA (1)
-                    </text>
-                  </g>
-                )}
+                >{house?.signNumber}</text>
 
                 {/* Planets occupying this house */}
                 <g
@@ -256,22 +197,14 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                 >
                   {house?.planets.map((planet, pIdx) => {
                     const total = house.planets.length;
-                    let dx = 0;
-                    let dy = 0;
-
-                    if (total === 1) {
-                      dy = 0;
-                    } else if (total === 2) {
-                      dy = (pIdx - 0.5) * 22;
-                    } else if (total === 3) {
-                      dy = (pIdx - 1) * 19;
-                    } else if (total === 4) {
-                      dx = pIdx % 2 === 0 ? -30 : 30;
-                      dy = (Math.floor(pIdx / 2) - 0.5) * 22;
-                    } else {
-                      dx = ((pIdx % 2) - 0.5) * 54;
-                      dy = (Math.floor(pIdx / 2) - 1) * 18;
-                    }
+                    const slots = total === 1
+                      ? [[0, 0]]
+                      : total === 2
+                        ? [[-23, 0], [23, 0]]
+                        : total === 3
+                          ? [[-25, -12], [25, -12], [0, 16]]
+                          : [[-25, -13], [25, -13], [-25, 14], [25, 14], [0, 38]];
+                    const [dx, dy] = slots[pIdx] ?? [0, 38 + (pIdx - 4) * 18];
 
                     const meta = PLANET_SYMBOLS[planet.englishName] || {
                       abbr: planet.name.slice(0, 2),
@@ -345,7 +278,6 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
           <g stroke="#C94B43" strokeWidth="1.8" fill="none" className="pointer-events-none">
             {/* Outer Border */}
             <rect x="2" y="2" width="496" height="496" strokeWidth="2.5" stroke="#B4232F" />
-            <rect x="7" y="7" width="486" height="486" strokeWidth="1" stroke="#E59A82" />
 
             {/* Corner to Corner Diagonals */}
             <line x1="0" y1="0" x2="500" y2="500" strokeWidth="2.2" />
@@ -368,28 +300,6 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
         </svg>
       </div>
 
-      {/* Quick Footnote Legend */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-[11px] text-[#151719]/70">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-white border border-[#B4232F] text-[#B4232F] flex items-center justify-center text-[9px] font-bold">1</span>
-          <span>Rashi Sign No.</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-[#B4232F] font-bold">R Retrograde</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-rose-400 font-bold">↓ Neecha</span>
-          <span className="text-slate-500">(Debilitated)</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-red-400 font-bold">R</span>
-          <span className="text-slate-500">(Vakri / Retro)</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="text-orange-400 font-bold">c</span>
-          <span className="text-slate-500">(Combust)</span>
-        </span>
-      </div>
     </div>
   );
 };
