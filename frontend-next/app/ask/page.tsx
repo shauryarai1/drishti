@@ -29,22 +29,18 @@ const STARTERS = [
 
 const STORAGE_KEY = 'kavach_ask_location';
 
-// Static first-run greeting. Rendered from this constant only: it never calls
-// /ask, never triggers a provider, never creates an archive/trace event and is
-// never persisted as a turn. Shown once for a fresh conversation.
-const WELCOME_MESSAGE =
-  "Hi, I'm Ask KAVACH.\n\n" +
-  "Ask me anything — I can help with everyday questions, explanations, ideas, writing and more. I can also help you understand your Kundli using KAVACH's astrology system.\n\n" +
-  "For a personal Kundli reading, I'll need your date of birth, exact birth time and birth place.";
+// Static first-run greeting. It is rendered without an Ask request and is never
+// persisted as a conversation turn.
+const WELCOME_MESSAGE = "Hi, I’m Ask KAVACH.\n\nAsk me what’s on your mind — a situation, decision, relationship,\nconcern, or simply something you want clarity on. I’ll help you explore\nit, and when one of KAVACH’s dedicated tools can give you a better\nanswer, I’ll take you there.";
 
 // Development-only inspector tooling. In a production build Next.js inlines
-// `process.env.NODE_ENV` as "production", so this is false, the probe never
-// runs, the control is never rendered, and no trace request is ever made. The
-// backend independently refuses inspector/trace data to ordinary production
-// requests, so this is defence in depth rather than the only control.
+// `process.env.NODE_ENV` as "production", so the control is never rendered.
+// The backend independently refuses inspector/trace data to ordinary
+// production requests.
 const DEV_TOOLS_ENABLED = process.env.NODE_ENV !== 'production';
 
-interface Turn { id: number; question: string; answer: string; answered: boolean; assistantIndex: number }
+interface ToolAction { tool: string; label: string; href: string }
+interface Turn { id: number; question: string; answer: string; answered: boolean; assistantIndex: number; toolAction?: ToolAction }
 interface TraceCard {
   position_label: string; name: string; orientation: string; card_id: string; valence?: string | null;
   core_meaning?: string | null; contextual_meaning?: string | null; source?: string | null;
@@ -197,10 +193,7 @@ export default function AskPage() {
 
   useEffect(() => {
     if (!DEV_TOOLS_ENABLED) return;
-    fetch(`${API_BASE}/dev/kavach-trace`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ probe: true }),
-    }).then((response) => setDevEnabled(response.ok)).catch(() => setDevEnabled(false));
+    setDevEnabled(true);
   }, []);
 
   useEffect(() => {
@@ -271,6 +264,14 @@ export default function AskPage() {
         }),
       });
       const body = await res.json();
+      const allowedTools: Record<string, string> = {
+        kundli: '/kundli', dasha: '/kundli', navtara: '/kundli', daily: '/daily',
+        matchmaking: '/compatibility', yes_no: '/yes-no', panchang: '/panchang',
+        life_summary: '/life-summary',
+      };
+      const candidate = body.tool_action as ToolAction | undefined;
+      const toolAction = candidate && allowedTools[candidate.tool]
+        && candidate.href === allowedTools[candidate.tool] ? candidate : undefined;
       assistantCount.current += 1;
       setTurns((prev) => [
         ...prev,
@@ -280,6 +281,7 @@ export default function AskPage() {
           answer: body.answer ?? "We couldn't process that question right now.",
           answered: Boolean(body.answered),
           assistantIndex: assistantCount.current,
+          toolAction,
         },
       ]);
     } catch {
@@ -395,6 +397,14 @@ export default function AskPage() {
                   <div className="rounded-2xl rounded-bl-sm border border-[#A62A34]/25 bg-[#160A0C]/80 px-4 py-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">
                     <RichAnswer text={turn.answer} />
                   </div>
+                  {turn.toolAction && (
+                    <a
+                      href={turn.toolAction.href}
+                      className="mt-2 inline-flex rounded border border-[#D6BE85]/55 bg-[#B39250]/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#D6BE85] hover:border-[#D6BE85]"
+                    >
+                      {turn.toolAction.label} →
+                    </a>
+                  )}
                   {DEV_TOOLS_ENABLED && devEnabled && (
                     <button
                       onClick={() => openInspector(turn)}

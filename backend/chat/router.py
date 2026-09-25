@@ -8,9 +8,9 @@ a scope message just because classification confidence is low. Modes:
     CASUAL           normal conversation: greetings, follow-ups, short
                      fragments and ordinary informational questions, answered
                      naturally by the assistant with the recent conversation.
-    ASTROLOGY        explicit Kundli / chart / planet / rashi / nakshatra /
-                     dasha / transit / Panchang / Hora / KAVACH-reading wording
-                     (selects the chart context).
+    ASTROLOGY        explicit astrology / Kundli vocabulary. It keeps the topic
+                      in conversational chat; dedicated personal calculations
+                      are recommended through controlled KAVACH tool actions.
     PERSONAL_READING the user's OWN uncertain situation, future or decision
                      (the hidden KAVACH/Tarot reading), plus the user's own
                      life topics (career, money, relationships, studies...).

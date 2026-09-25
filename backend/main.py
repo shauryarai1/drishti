@@ -370,7 +370,9 @@ _CARD_TERMS = ("tarot", "card", "cards", "upright", "reversed", "spread", "arcan
 _INTERNAL_TERMS = ("chart context", "context block", "build_kundli",
                    "system instruction", "system prompt", "official chart",
                    "provided chart", "authoritative context", "provider",
-                   "calculated placement")
+                   "calculated placement", "hidden tarot", "tarot routing",
+                   "provider fallback", "model routing", "internal context",
+                   "tool_action", "function name")
 
 
 def _sanitise_public_answer(text: str) -> str:
@@ -394,7 +396,7 @@ async def ask_endpoint(payload: ChatRequest):
     from chat import append, get_history
     from chat.session import get_mode, get_reading, set_mode, set_reading
     from chat.gemini import UNAVAILABLE_MESSAGE, generate_reply_detailed
-    from chat.router import (ASTROLOGY, OUT_OF_SCOPE, PERSONAL_READING,
+    from chat.router import (OUT_OF_SCOPE, PERSONAL_READING,
                              READING_FOLLOWUP, SCOPE_MESSAGE, route_message)
 
     question = (getattr(payload, "question", "") or "").strip()
@@ -464,28 +466,25 @@ async def ask_endpoint(payload: ChatRequest):
         return {"status": "ok", "answered": True, "answer": SCOPE_MESSAGE,
                 "conversation_id": conversation_id}
 
-    # Natal grounding: a personal chart question is answered ONLY from the
-    # calculated Kundli engine (kundli.build_kundli), or with a deterministic
-    # request for the birth details still missing. The model is never allowed
-    # to invent or calculate a placement itself - there is no third path.
-    # Readings, reading follow-ups and out-of-scope requests are never touched.
-    from chat import natal
+    # Dedicated calculations belong to their dedicated KAVACH tools. Ask gives
+    # a deterministic allowlisted action and never collects birth data or
+    # invokes the Kundli engine inside chat.
+    from chat.tools import tool_action_for
 
-    natal_kind, natal_value = natal.gate(conversation_id, question, route)
-    if natal_kind == "reply":
+    tool_action = tool_action_for(question)
+    if tool_action:
         append(conversation_id, "user", question)
-        append(conversation_id, "assistant", natal_value)
-        set_mode(conversation_id, ASTROLOGY)
+        append(conversation_id, "assistant", tool_action["answer"])
+        set_mode(conversation_id, route)
         record_submission(
             "ask",
             {"question": question, "conversation_id": conversation_id},
-            {"answered": True, "answer": natal_value},
+            {"answered": True, "answer": tool_action["answer"],
+             "tool_action": tool_action["tool_action"]},
         )
-        return {"status": "ok", "answered": True, "answer": natal_value,
+        return {"status": "ok", "answered": True, "answer": tool_action["answer"],
+                "tool_action": tool_action["tool_action"],
                 "conversation_id": conversation_id}
-    natal_supplied = natal_kind == "context"
-    if natal_supplied:
-        route = ASTROLOGY
 
     # Context isolation: each mode carries ONLY its own hidden evidence.
     reading = active if route == READING_FOLLOWUP else None
@@ -510,23 +509,10 @@ async def ask_endpoint(payload: ChatRequest):
             logger.warning("Reading context skipped: %s", type(exc).__name__)
             private = ""
 
-    # The chart context comes ONLY from the natal gate above: it is the
-    # calculated Kundli for this conversation's birth details, or nothing.
-    # A personal reading can never leak into a chart answer, and the model
-    # never receives a question-moment "chart" built from the chat timestamp.
-    astrology = natal_value
-
-    # Interpretation layer: KAVACH's owner-defined nine-planet meanings are
-    # joined to THAT calculated chart, so real placements are read through the
-    # owner framework. Interpretation only - no placement is computed here.
-    if astrology:
-        from chat import planet_framework
-
-        hint = planet_framework.lens_hint(question)
-        parts = [astrology, "", planet_framework.context_block()]
-        if hint:
-            parts += ["", hint]
-        astrology = "\n".join(parts)
+    # Ask has no personal chart context. The Kundli generator supplies that
+    # deterministic calculation separately; general astrology stays educational
+    # conversation here.
+    astrology = ""
 
     detail = {}
     answer = None
@@ -650,11 +636,6 @@ async def ask_endpoint(payload: ChatRequest):
         _archive_ask(UNAVAILABLE_MESSAGE, False, "empty_answer")
         return {"status": "ok", "answered": False, "answer": UNAVAILABLE_MESSAGE,
                 "conversation_id": conversation_id}
-
-    # Output-side grounding: with a calculated chart on the table, any sentence
-    # that asserts a placement the chart does not show is dropped.
-    if natal_supplied:
-        clean = natal.scrub(clean, conversation_id)
 
     safe_trace("ok", answer, clean)
     if reading is not None and route != READING_FOLLOWUP:
