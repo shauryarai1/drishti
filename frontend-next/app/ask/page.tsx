@@ -29,6 +29,15 @@ const STARTERS = [
 
 const STORAGE_KEY = 'kavach_ask_location';
 
+// Static first-run greeting. Rendered from this constant only: it never calls
+// /ask, never triggers a provider, never creates an archive/trace event and is
+// never persisted as a turn. Shown once for a fresh conversation.
+const WELCOME_MESSAGE =
+  "Hi, I'm Ask KAVACH.\n\n" +
+  "I can help you understand your Kundli and explore questions about your career, relationships, goals, responsibilities, strengths, patterns and other areas of life through KAVACH's astrology framework.\n\n" +
+  "For questions about your personal Kundli, I'll need your date of birth, exact birth time and birth place. You can give them to me naturally, even across separate messages.\n\n" +
+  "You can also ask me general astrology questions without sharing birth details.";
+
 // Development-only inspector tooling. In a production build Next.js inlines
 // `process.env.NODE_ENV` as "production", so this is false, the probe never
 // runs, the control is never rendered, and no trace request is ever made. The
@@ -350,6 +359,14 @@ export default function AskPage() {
         </div>
 
         <div className="flex-1 space-y-4 py-6">
+          {turns.length === 0 && (
+            <div className="flex justify-start">
+              <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-[#A62A34]/25 bg-[#160A0C]/80 px-4 py-3 text-[15px] leading-relaxed text-[#EEE9DF]/85">
+                <RichAnswer text={WELCOME_MESSAGE} />
+              </div>
+            </div>
+          )}
+
           {turns.length === 0 && (
             <div className="pt-6">
               <p className="text-sm text-[#EEE9DF]/60">Ask anything.</p>

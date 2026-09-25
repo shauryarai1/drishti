@@ -423,6 +423,23 @@ async def ask_endpoint(payload: ChatRequest):
 
     from archive import record_submission
 
+    # Product identity: answered deterministically at the KAVACH product level.
+    # No provider call, no quota spent, never an infrastructure detail.
+    from chat.identity import identity_reply
+
+    identity_answer = identity_reply(question)
+    if identity_answer:
+        append(conversation_id, "user", question)
+        append(conversation_id, "assistant", identity_answer)
+        set_mode(conversation_id, route)
+        record_submission(
+            "ask",
+            {"question": question, "conversation_id": conversation_id},
+            {"answered": True, "answer": identity_answer},
+        )
+        return {"status": "ok", "answered": True, "answer": identity_answer,
+                "conversation_id": conversation_id}
+
     # Out of scope: answered deterministically. No reading is drawn, no chart is
     # built, no provider is called and the requested content is never produced.
     if route == OUT_OF_SCOPE:
@@ -488,6 +505,18 @@ async def ask_endpoint(payload: ChatRequest):
     # A personal reading can never leak into a chart answer, and the model
     # never receives a question-moment "chart" built from the chat timestamp.
     astrology = natal_value
+
+    # Interpretation layer: KAVACH's owner-defined nine-planet meanings are
+    # joined to THAT calculated chart, so real placements are read through the
+    # owner framework. Interpretation only - no placement is computed here.
+    if astrology:
+        from chat import planet_framework
+
+        hint = planet_framework.lens_hint(question)
+        parts = [astrology, "", planet_framework.context_block()]
+        if hint:
+            parts += ["", hint]
+        astrology = "\n".join(parts)
 
     detail = {}
     answer = None
