@@ -37,13 +37,11 @@ PERSONAL_READING = "PERSONAL_READING"
 READING_FOLLOWUP = "READING_FOLLOWUP"
 OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
-# The short, natural scope reply. Used ONLY for genuinely unrelated requests
-# (the OUT_OF_SCOPE_SIGNALS below) - never for low-confidence classification
-# and never for conversational fragments that merely lack astrology keywords.
+# Rare: live data nobody can honestly produce from here. Everything else,
+# including everyday questions and tasks, is answered normally.
 SCOPE_MESSAGE = (
-    "I'm here for astrology, KAVACH readings and questions about your personal "
-    "path. Ask me about your chart, career, relationships, money, timing or "
-    "something you're uncertain about."
+    "I can't pull live real-world data like that here, but ask me anything else "
+    "- explanations, writing, ideas, everyday questions, or your KAVACH Kundli."
 )
 
 # Explicit astrology vocabulary: the only thing that selects the astrology path.
@@ -122,21 +120,14 @@ PERSONAL_DOMAIN_NOUNS = (
     "visa", "contract", "deal", "offer", "opportunity",
 )
 
-# Clearly unrelated domains: never answered substantively.
+# Only requests no assistant should entertain for this product: live
+# real-world data nobody can honestly produce here, and sports results.
+# Everyday assistant work - explaining, writing, translating, reasoning,
+# maths, homework help - is NOT out of scope: Ask KAVACH answers it normally.
 OUT_OF_SCOPE_SIGNALS = (
-    "python", "javascript", "typescript", "java", "c++", "c#", "golang", "rust",
-    "code", "coding", "script", "program", "function", "debug", "compile",
-    "html", "css", "sql", "react", "regex", "algorithm", "api endpoint",
-    "gravity", "photosynthesis", "physics", "chemistry", "biology",
-    "equation", "maths", "math problem", "solve this", "solve the", "solve for",
-    "solve x", "integral", "derivative", "algebra", "calculus",
-    "recipe", "ingredients", "how to cook", "cook", "bake",
-    "email", "essay", "article", "poem", "resume", "cover letter", "blog post",
-    "translate", "translation", "grammar", "spell",
-    "weather", "forecast", "rain", "temperature", "humidity",
-    "who won", "match", "football", "cricket", "score", "tournament",
-    "capital of", "president of", "history of", "wikipedia", "stock price",
-    "bitcoin", "movie", "song", "lyrics",
+    "weather", "forecast", "rain tomorrow", "temperature tomorrow", "humidity",
+    "who won", "win the match", "match score", "football match", "cricket match",
+    "tournament", "stock price", "bitcoin price",
 )
 
 # Short continuations that refer to what was just said.

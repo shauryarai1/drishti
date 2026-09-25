@@ -25,9 +25,7 @@ ASK = {"timestamp": "2026-09-22T11:45:00+05:30", "latitude": 28.6139, "longitude
        "timezone": "Asia/Kolkata"}
 
 CASUAL_QUESTIONS = ["hi", "how are you?", "thanks", "hello"]
-OUT_OF_SCOPE_QUESTIONS = ["what is gravity?", "explain photosynthesis", "write an email",
-                          "write a Python script", "will it rain tomorrow?",
-                          "solve this equation", "give me a recipe"]
+OUT_OF_SCOPE_QUESTIONS = ["will it rain tomorrow?", "who won the match?"]
 ASTROLOGY_QUESTIONS = ["read my kundli", "what does Saturn mean in my chart?", "how is my dasha?"]
 
 # Complete birth details: chart questions are grounded in a calculated chart.
@@ -146,12 +144,22 @@ def test_out_of_scope_never_reaches_a_provider_or_the_reading(env, client):
     assert env["geocoder"] == 0
 
 
-def test_out_of_scope_never_returns_code(env, client):
-    body = ask(client, "write a basic python script to generate a menu", "code-1").json()
+def test_live_data_request_never_returns_content(env, client):
+    """Only live-data requests are refused - and they return no content."""
+    body = ask(client, "will it rain tomorrow?", "code-1").json()
     answer = body["answer"]
-    assert "def " not in answer and "print(" not in answer and "import " not in answer
-    assert "```" not in answer
     assert answer == router.SCOPE_MESSAGE
+    assert "```" not in answer
+
+
+def test_writing_and_code_requests_are_answered_normally(env, client):
+    """Everyday assistant work is not astrology-gated: it gets a real answer."""
+    body = ask(client, "write a basic python script to generate a menu", "code-2").json()
+
+    assert body["answered"] is True
+    assert body["answer"] != router.SCOPE_MESSAGE, "a coding request is answered"
+    assert env["groq"], "the provider was actually used"
+    assert env["astrology"][-1] == "", "no chart context for a coding request"
 
 
 # --- astrology --------------------------------------------------------------

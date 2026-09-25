@@ -169,8 +169,11 @@ def test_astrology_follow_up_keeps_context_then_out_of_scope_returns(env, client
 
     before = len(env["seen"]["groq"])
     body = ask(client, "thanks. Now explain gravity.", conversation_id="switch").json()
-    assert body["answer"] == router.SCOPE_MESSAGE
-    assert len(env["seen"]["groq"]) == before, "an unrelated question is not sent to the model"
+    assert body["answered"] is True
+    assert body["answer"] != router.SCOPE_MESSAGE, "general questions are answered"
+    assert len(env["seen"]["groq"]) > before, "the assistant answered normally"
+    # No calculated chart block rides along with an ordinary question.
+    assert "[KAVACH CHART CONTEXT -" not in env["seen"]["groq"][-1]["messages"][0]["content"]
 
 
 def test_out_of_scope_and_casual_never_carry_hidden_context(env, client):

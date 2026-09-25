@@ -258,6 +258,28 @@ def test_identity_questions_answer_from_the_product(env, client, question):
         f"provider leaked in: {body['answer']}"
 
 
+def test_identity_does_not_claim_astrology_is_the_only_job(env, client):
+    """Identity must present a general assistant that ALSO does astrology."""
+    body = ask(client, "Who are you?", "id-only").json()
+    answer = body["answer"].lower()
+
+    assert "ai assistant" in answer, "described as a general AI assistant"
+    # General capability is named, not just astrology.
+    assert any(word in answer for word in ("chat", "questions", "tasks", "everyday")), \
+        "it advertises normal assistant capability"
+    assert "astrology" in answer or "kundli" in answer, "astrology is still offered"
+
+
+def test_purpose_question_covers_both_general_and_astrology(env, client):
+    """'What can you do?' must explain BOTH capabilities."""
+    body = ask(client, "what can you do", "id-both").json()
+    answer = body["answer"].lower()
+
+    assert any(word in answer for word in ("writing", "explanations", "ideas",
+                                           "everyday", "questions"))
+    assert "astrology" in answer or "kundli" in answer
+
+
 def test_identity_questions_never_spend_provider_quota(env, client):
     ask(client, "Who are you?", "id-2")
 
@@ -289,6 +311,7 @@ def test_purpose_question_describes_the_product(env, client, question):
 
     assert "KAVACH" in body["answer"]
     assert not mentions_provider(body["answer"])
+    assert "ai assistant" in body["answer"].lower()
 
 
 # --- 4. preserved behaviour ---------------------------------------------------
@@ -339,12 +362,12 @@ def test_no_invented_placement_is_survives_scrubbing(env, client):
         assert "Pisces" not in answer, "fabricated Sun placement was scrubbed"
 
 
-def test_out_of_scope_is_still_refused_deterministically(env, client):
-    body = ask(client, "write me a python script", "o1").json()
+def test_live_data_is_still_refused_deterministically(env, client):
+    body = ask(client, "will it rain tomorrow?", "o1").json()
 
     assert body["answered"] is True
     assert env["seen"]["kundli"] == 0
-    assert env["seen"]["groq"] == [], "out of scope never reaches a provider"
+    assert env["seen"]["groq"] == [], "a refusal never reaches a provider"
 
 
 def test_follow_up_reuses_the_calculated_chart(env, client):

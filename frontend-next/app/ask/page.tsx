@@ -34,9 +34,8 @@ const STORAGE_KEY = 'kavach_ask_location';
 // never persisted as a turn. Shown once for a fresh conversation.
 const WELCOME_MESSAGE =
   "Hi, I'm Ask KAVACH.\n\n" +
-  "I can help you understand your Kundli and explore questions about your career, relationships, goals, responsibilities, strengths, patterns and other areas of life through KAVACH's astrology framework.\n\n" +
-  "For questions about your personal Kundli, I'll need your date of birth, exact birth time and birth place. You can give them to me naturally, even across separate messages.\n\n" +
-  "You can also ask me general astrology questions without sharing birth details.";
+  "Ask me anything — I can help with everyday questions, explanations, ideas, writing and more. I can also help you understand your Kundli using KAVACH's astrology system.\n\n" +
+  "For a personal Kundli reading, I'll need your date of birth, exact birth time and birth place.";
 
 // Development-only inspector tooling. In a production build Next.js inlines
 // `process.env.NODE_ENV` as "production", so this is false, the probe never

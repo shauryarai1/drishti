@@ -39,14 +39,12 @@ def seed_chart(conversation_id):
 
 CASUAL_QUESTIONS = ["hi", "hello", "thanks"]
 
-# Genuinely unrelated requests: still refused with the short scope message,
-# with no provider call and no reading.
+# Live-data requests no assistant can honestly produce: still refused with the
+# short scope message, with no provider call and no reading. Everyday assistant
+# tasks (writing, explaining, maths) are answered normally.
 OUT_OF_SCOPE_QUESTIONS = [
-    "what is gravity?",
-    "write an email",
-    "write a Python script",
-    "solve this equation",
     "will it rain tomorrow?",
+    "who won the match?",
 ]
 
 # Ordinary informational questions: answered naturally as conversation - never
@@ -291,9 +289,12 @@ def test_personal_reading_to_general_carries_no_hidden_context(env, client):
     ask(client, "will my project work?", conversation_id="to-general")
     assert env["groq"][-1] == "PRIVATE READING CONTEXT"
 
+    # A general question leaves the reading and is answered as normal
+    # conversation - no new provider call carries the hidden reading context.
+    before = len(env["groq"])
     body = ask(client, "explain gravity", conversation_id="to-general").json()
-    assert body["answer"] == router.SCOPE_MESSAGE
-    assert env["groq"][-1] == "PRIVATE READING CONTEXT", "no provider call was made"
+    assert body["answered"] is True
+    assert body["answer"] != router.SCOPE_MESSAGE, "general questions are answered"
     assert env["astrology"][-1] == "", "no chart context either"
 
 

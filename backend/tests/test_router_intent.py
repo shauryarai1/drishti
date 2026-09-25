@@ -51,18 +51,9 @@ PERSONAL_READING_QUESTIONS = [
 ]
 
 OUT_OF_SCOPE_QUESTIONS = [
-    "write a Python script",
-    "debug this JavaScript",
-    "what is gravity?",
-    "explain photosynthesis",
-    "solve this equation",
-    "write an email",
-    "give me a recipe",
     "will it rain tomorrow?",
     "will India win the match?",
     "who won the football match?",
-    "what is the capital of France?",
-    "translate this into Spanish",
 ]
 
 
@@ -113,11 +104,17 @@ def test_weather_and_public_forecasts_are_not_readings():
 
 
 def test_out_of_scope_detector_is_specific():
-    assert is_out_of_scope("write python code") is True
-    assert is_out_of_scope("give me a recipe") is True
+    """Only live-data requests no assistant can honestly produce are filtered."""
+    assert is_out_of_scope("what is the weather tomorrow?") is True
+    assert is_out_of_scope("who won the cricket match?") is True
     assert is_out_of_scope("what does Saturn mean in my chart?") is False
     assert is_out_of_scope("will my business work?") is False
     assert is_out_of_scope("what is blocking my career?") is False
+    # Everyday assistant work is answered normally, never refused.
+    for task in ("write python code", "write an email", "give me a recipe",
+                 "solve this equation", "translate this sentence"):
+        assert is_out_of_scope(task) is False, task
+        assert route_message(task, False) == CASUAL, task
 
 
 def test_personal_topic_helper_covers_the_users_own_life():
@@ -143,8 +140,9 @@ def test_reading_does_not_lock_the_conversation():
     # An ordinary informational question leaves the reading entirely: answered
     # as normal conversation, never with a scope message, never a redraw.
     assert route_message("explain compound interest.", True, {}) == CASUAL
-    assert route_message("what is gravity?", True, {}) == OUT_OF_SCOPE
-    assert route_message("write an email", True, {}) == OUT_OF_SCOPE
+    # Everyday tasks are answered as normal conversation even mid-reading.
+    assert route_message("what is gravity?", True, {}) == CASUAL
+    assert route_message("write an email", True, {}) == CASUAL
     assert route_message("thanks", True, {}) == CASUAL
 
 
@@ -163,10 +161,13 @@ def test_astrology_follow_up_uses_the_last_mode():
     assert route_message("will my business work?", False, None, last_mode=ASTROLOGY) == PERSONAL_READING
 
 
-def test_scope_message_is_short_and_kavach_specific():
-    assert "astrology" in SCOPE_MESSAGE.lower()
+def test_scope_message_is_short_and_offers_normal_conversation():
+    """The rare refusal invites anything else rather than pushing astrology."""
     assert "KAVACH" in SCOPE_MESSAGE
     assert len(SCOPE_MESSAGE) < 220
+    # It invites ordinary conversation instead of narrowing to astrology.
+    assert "anything else" in SCOPE_MESSAGE.lower()
+    assert "explanations" in SCOPE_MESSAGE.lower()
 
 
 def test_empty_message_is_casual():

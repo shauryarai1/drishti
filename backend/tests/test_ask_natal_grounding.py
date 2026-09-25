@@ -344,8 +344,8 @@ def test_safety_gate_is_answered_before_any_natal_flow(env, client, monkeypatch)
     assert natal.get_state("natal-12") is None
 
 
-def test_out_of_scope_is_still_answered_without_a_provider(env, client):
-    body = ask(client, "write a python script", "natal-12b")
+def test_live_data_is_still_answered_without_a_provider(env, client):
+    body = ask(client, "will it rain tomorrow?", "natal-12b")
 
     assert body["answer"] == router.SCOPE_MESSAGE
     assert env["seen"]["groq"] == [] and env["seen"]["gemini"] == []

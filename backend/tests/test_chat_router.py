@@ -88,10 +88,16 @@ def test_personal_reading_routing(message):
     assert router.route_message(message, has_active_reading=False) == router.PERSONAL_READING
 
 
-@pytest.mark.parametrize("message", ["write python code", "what is gravity?",
-                                     "give me a recipe", "will it rain tomorrow?"])
+@pytest.mark.parametrize("message", ["will it rain tomorrow?", "who won the match?"])
 def test_out_of_scope_routing(message):
     assert router.route_message(message, has_active_reading=False) == router.OUT_OF_SCOPE
+
+
+def test_everyday_assistant_tasks_are_not_out_of_scope():
+    """Writing, explaining and maths are normal assistant work, never refused."""
+    for message in ("write python code", "what is gravity?", "give me a recipe",
+                    "write an email", "solve this equation", "translate this"):
+        assert router.route_message(message, has_active_reading=False) == router.CASUAL, message
 
 
 @pytest.mark.parametrize("message", ["why?", "are you sure?", "explain", "what does that mean?",
@@ -137,7 +143,7 @@ def test_out_of_scope_never_calls_a_provider_and_never_draws(monkeypatch):
     monkeypatch.setattr("chat.reading.draw_cards", spy)
     session.reset("scope-1")
     trace.clear("scope-1")
-    body = _ask("write a python script", "scope-1")
+    body = _ask("will it rain tomorrow?", "scope-1")
 
     assert body["answered"] is True
     assert body["answer"] == router.SCOPE_MESSAGE
@@ -213,7 +219,7 @@ def test_subject_change_then_out_of_scope(monkeypatch):
     _ask("How will my exam go?", "reading-3")
     _ask("why?", "reading-3")
     _ask("okay thanks", "reading-3")
-    body = _ask("what is photosynthesis?", "reading-3")
+    body = _ask("what is the weather tomorrow?", "reading-3")
     assert body["answer"] == router.SCOPE_MESSAGE
     routes = [event["route"] for event in trace.list_events("reading-3")]
     assert routes == [router.PERSONAL_READING, router.READING_FOLLOWUP, router.CASUAL]

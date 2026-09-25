@@ -383,7 +383,8 @@ def gate(conversation_id: str, question: str, route: str) -> Tuple[str, str]:
     their contexts stay exactly as they were.
     """
     from chat.router import (ASTROLOGY, CHIT_CHAT, GREETINGS, OUT_OF_SCOPE,
-                             PERSONAL_READING, READING_FOLLOWUP)
+                             PERSONAL_READING, READING_FOLLOWUP,
+                             has_astrology_signal)
 
     if route in (PERSONAL_READING, READING_FOLLOWUP, OUT_OF_SCOPE):
         return "continue", ""
@@ -443,8 +444,17 @@ def gate(conversation_id: str, question: str, route: str) -> Tuple[str, str]:
         # never interrupted with a nag.
         return "continue", ""
 
-    if (route != ASTROLOGY and not natal_question
-            and not (parsed_date or parsed_time or parsed_place)):
+    # Chart context is supplied only when this message actually carries chart
+    # intent: an explicit personal-chart question, an astrology question, or a
+    # message genuinely supplying/correcting birth details. A calculated chart
+    # is never attached to ordinary conversation just because it is cached.
+    # Intent is checked FIRST: parse_place() can return leftover words from
+    # ordinary prose, which is not evidence of chart intent.
+    chart_intent = (natal_question or route == ASTROLOGY
+                    or has_astrology_signal(text))
+    supplies_details = bool(parsed_date or parsed_time) or (
+        bool(parsed_place) and natal_question)
+    if not chart_intent and not supplies_details:
         return "continue", ""
 
     context = _context(state)

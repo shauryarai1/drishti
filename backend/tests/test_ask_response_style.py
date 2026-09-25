@@ -35,9 +35,12 @@ def seed_chart(conversation_id):
 
 REPRESENTATIVE_PROMPTS = {
     "hi": "casual",
-    "What is gravity?": "out_of_scope",
-    "Write a Python script": "out_of_scope",
-    "Explain photosynthesis": "out_of_scope",
+    # Everyday questions and tasks are answered normally; only live-data
+    # requests nobody can produce here are refused.
+    "What is gravity?": "casual",
+    "Write a Python script": "casual",
+    "Explain photosynthesis": "casual",
+    "Will it rain tomorrow?": "out_of_scope",
     "Will I be successful?": "reading",
     "What does Saturn mean in my chart?": "astrology",
     "Give me a full detailed reading of my chart": "astrology",
@@ -233,17 +236,28 @@ def mock_env(monkeypatch):
     return seen
 
 
-def test_out_of_scope_questions_get_no_context_and_no_geocoder(mock_env):
+def test_live_data_questions_get_no_context_and_no_geocoder(mock_env):
+    """Only unproducible live-data requests are refused, cleanly."""
     client = TestClient(main.app)
-    for index, question in enumerate(("What is gravity?", "How do I cook pasta?",
-                                      "Write a Python script", "Explain photosynthesis",
-                                      "Will it rain tomorrow?", "Who won the match?")):
+    for index, question in enumerate(("Will it rain tomorrow?",
+                                      "Who won the match?",
+                                      "what is the stock price today?")):
         body = client.post("/api/ask", json={**ASK, "question": question,
                                              "conversation_id": f"oos-{index}"}).json()
         assert body["answer"] == router.SCOPE_MESSAGE, question
 
-    assert mock_env["geocoder"] == 0, "out-of-scope chat must never geocode"
-    assert mock_env["private"] == [], "out-of-scope requests must not reach the model"
+
+def test_everyday_questions_are_no_longer_refused(mock_env):
+    """General knowledge and assistant tasks are answered, not scoped."""
+    client = TestClient(main.app)
+    for index, question in enumerate(("What is gravity?", "How do I cook pasta?",
+                                      "Write a Python script",
+                                      "Explain photosynthesis")):
+        body = client.post("/api/ask", json={**ASK, "question": question,
+                                             "conversation_id": f"gen-{index}"}).json()
+        assert body["answered"] is True, question
+        assert body["answer"] != router.SCOPE_MESSAGE, question
+    assert mock_env["geocoder"] == 0, "general chat must never geocode"
 
 
 def test_astrology_questions_get_context_and_internals_stay_hidden(mock_env, caplog):
