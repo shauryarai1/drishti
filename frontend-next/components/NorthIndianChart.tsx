@@ -18,6 +18,32 @@ interface HousePolygon {
   labelPos: { x: number; y: number };
 }
 
+type Slot = [number, number];
+
+// Local offsets from each house's content anchor. These are deliberately
+// different for the narrow triangular houses and the wider diamond houses so
+// conjunctions stay inside their own geometry and away from sign numbers.
+const HOUSE_SAFE_SLOTS: Record<number, Slot[]> = {
+  1: [[0, 0], [-30, -15], [30, -15], [-30, 18], [30, 18], [0, 40]],
+  2: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
+  3: [[0, 0], [0, -24], [0, 24], [-18, -11], [-18, 14], [0, 42]],
+  4: [[0, 0], [-30, 0], [30, 0], [-28, 25], [28, 25], [0, 48]],
+  5: [[0, 0], [0, -24], [0, 24], [-18, -11], [-18, 14], [0, 42]],
+  6: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
+  7: [[0, 0], [-30, 15], [30, 15], [-30, -18], [30, -18], [0, -40]],
+  8: [[0, 0], [-22, 0], [22, 0], [-18, -22], [18, -22], [0, -42]],
+  9: [[0, 0], [0, -24], [0, 24], [18, -11], [18, 14], [0, -42]],
+  10: [[0, 0], [-30, 0], [30, 0], [-28, -25], [28, -25], [0, -48]],
+  11: [[0, 0], [0, -24], [0, 24], [18, -11], [18, 14], [0, -42]],
+  12: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
+};
+
+function planetSlots(houseNumber: number, count: number): Slot[] {
+  const safe = HOUSE_SAFE_SLOTS[houseNumber] ?? HOUSE_SAFE_SLOTS[1];
+  if (count <= safe.length) return safe.slice(0, count);
+  return [...safe, ...Array.from({ length: count - safe.length }, (_unused, index) => [0, 58 + index * 17] as Slot)];
+}
+
 // Planetary Vedic symbols and English abbreviations
 const PLANET_SYMBOLS: Record<string, { abbr: string; symbol: string; color: string }> = {
   Sun: { abbr: 'Su', symbol: '☉', color: '#f59e0b' },
@@ -144,11 +170,12 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
   return (
     <div className="w-full flex flex-col items-center select-none">
       {/* Chart Interactive Controls */}
-      <div className="relative w-full max-w-[680px] aspect-square bg-white p-0">
+      <div className="relative w-full max-w-[680px] aspect-[0.862] bg-white p-0 sm:aspect-square">
         <svg
           id="north-indian-kundli-svg"
           viewBox="0 0 500 500"
-          className="kundli-archive-svg block h-auto w-full"
+          className="kundli-archive-svg block h-full w-full"
+          preserveAspectRatio="none"
         >
           {/* Flat printed chart surface. */}
           <rect width="500" height="500" fill="#ffffff" />
@@ -196,14 +223,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                   className="kundli-planet-label pointer-events-none"
                 >
                   {house?.planets.map((planet, pIdx) => {
-                    const total = house.planets.length;
-                    const slots = total === 1
-                      ? [[0, 0]]
-                      : total === 2
-                        ? [[-23, 0], [23, 0]]
-                        : total === 3
-                          ? [[-25, -12], [25, -12], [0, 16]]
-                          : [[-25, -13], [25, -13], [-25, 14], [25, 14], [0, 38]];
+                    const slots = planetSlots(poly.houseNum, house.planets.length);
                     const [dx, dy] = slots[pIdx] ?? [0, 38 + (pIdx - 4) * 18];
 
                     const meta = PLANET_SYMBOLS[planet.englishName] || {
@@ -230,7 +250,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                           fontWeight="700"
                           fontFamily="sans-serif"
                         >
-                          {meta.abbr} {meta.symbol}
+                          {meta.abbr}
                           {isRetro && (
                             <tspan fill="#ef4444" fontSize="9" fontWeight="900">
                               {' '}R

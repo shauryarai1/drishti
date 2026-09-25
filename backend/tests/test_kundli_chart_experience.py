@@ -66,6 +66,8 @@ def test_chart_presentation_is_mobile_readable_white_and_red():
     kundli = read(KUNDLI)
 
     assert "max-w-[680px]" in chart
+    assert "aspect-[0.862]" in chart
+    assert "preserveAspectRatio=\"none\"" in chart
     assert "bg-white" in chart
     assert "#B4232F" in chart
     assert "#ffffff" in chart
@@ -82,11 +84,11 @@ def test_chart_presentation_is_mobile_readable_white_and_red():
 
 def test_planet_slots_are_deterministic_and_compact():
     chart = read(CHART)
-    assert "total === 2" in chart
-    assert "total === 3" in chart
-    assert "[-23, 0], [23, 0]" in chart
-    assert "[-25, -12], [25, -12], [0, 16]" in chart
-    assert "[-25, -13], [25, -13], [-25, 14], [25, 14]" in chart
+    assert "HOUSE_SAFE_SLOTS" in chart
+    assert "1:" in chart and "12:" in chart
+    assert "[-30, -15], [30, -15]" in chart
+    assert "[-28, -25], [28, -25]" in chart
+    assert "safe.length" in chart
 
 
 def test_transit_request_has_bounded_retry_and_timeout():
