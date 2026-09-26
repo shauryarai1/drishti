@@ -471,10 +471,25 @@ async def ask_endpoint(payload: ChatRequest):
     # Dedicated calculations belong to their dedicated KAVACH tools. Ask gives
     # a deterministic allowlisted action and never collects birth data or
     # invokes the Kundli engine inside chat.
-    from chat.tools import followup_tool_action_for, tool_action_for
+    from chat.tools import (followup_tool_action_for, guard_for_tool,
+                            is_interpretation_allowed, personal_astrology_tool,
+                            tool_action_for)
 
     last_tool = get_tool_intent(conversation_id)
-    tool_action = tool_action_for(question)
+    # A concept question, or a fact the user already supplied and asked to
+    # interpret, is allowed to stay in normal conversation. Everything else that
+    # asks Ask to derive personal astrology is routed to a dedicated tool.
+    interpretation_allowed = is_interpretation_allowed(question)
+    tool_action = None if interpretation_allowed else tool_action_for(question)
+    # Structural pre-provider gate: a request that requires deriving astrology
+    # for a person or birth date is answered by a dedicated KAVACH tool and is
+    # never sent to the model. This is independent of the sticky tool intent.
+    if not tool_action and not interpretation_allowed:
+        required = personal_astrology_tool(question, last_tool)
+        if required:
+            tool_action = guard_for_tool(required)
+    if interpretation_allowed:
+        clear_tool_intent(conversation_id)
     if not tool_action and last_tool:
         followup = followup_tool_action_for(question, last_tool)
         if followup and followup.get("clear"):
@@ -647,6 +662,28 @@ async def ask_endpoint(payload: ChatRequest):
         safe_trace("error", answer, None)
         _archive_ask(UNAVAILABLE_MESSAGE, False, "empty_answer")
         return {"status": "ok", "answered": False, "answer": UNAVAILABLE_MESSAGE,
+                "conversation_id": conversation_id}
+
+    # Post-provider failsafe (secondary): if the model still asserts a personal
+    # placement, fail closed to the controlled tool response. Ask never supplies
+    # authoritative chart context, so such an answer is never returned.
+    from chat.tools import claims_derived_personal_placements
+
+    if claims_derived_personal_placements(clean):
+        guard = guard_for_tool("kundli")
+        set_tool_intent(conversation_id, "kundli")
+        safe_trace("blocked_personal_astrology", answer, guard["answer"])
+        append(conversation_id, "user", question)
+        append(conversation_id, "assistant", guard["answer"])
+        set_mode(conversation_id, route)
+        record_submission(
+            "ask",
+            {"question": question, "conversation_id": conversation_id},
+            {"answered": True, "answer": guard["answer"],
+             "tool_action": guard["tool_action"]},
+        )
+        return {"status": "ok", "answered": True, "answer": guard["answer"],
+                "tool_action": guard["tool_action"],
                 "conversation_id": conversation_id}
 
     safe_trace("ok", answer, clean)

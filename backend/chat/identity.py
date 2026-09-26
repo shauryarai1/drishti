@@ -92,11 +92,13 @@ def is_identity_question(question: str) -> bool:
     if _PROVIDER_QUESTION.search(text):
         return True
     # "What are you?" / "Who are you?" asks for identity; "how" does not.
-    if re.search(r"\b(who|what)\s+(are|is|can|do|does|r|s)\s+you\b", text):
+    if re.search(r"\b(who|what)\s+(are|is|r|s)\s+you\b", text):
         return True
-    if _SUBJECT_PATTERN.search(text) and _TOPIC_PATTERN.search(text):
+    # A bare capability question ("what can you do", "what do you offer"),
+    # never "what can you tell me about <topic>".
+    if re.search(r"\bwhat\s+(?:can|do|does)\s+you\s+(?:do|offer|provide|help\s+with)\b", text):
         return True
-    return bool(re.search(r"\bwhat\s+do\s+you\b|\bwhat\s+can\s+you\b", text))
+    return bool(_SUBJECT_PATTERN.search(text) and _TOPIC_PATTERN.search(text))
 
 
 def identity_reply(question: str) -> str:

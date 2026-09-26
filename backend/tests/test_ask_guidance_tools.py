@@ -36,6 +36,7 @@ def env(monkeypatch):
     import archive
 
     seen = {"groq": [], "gemini": [], "reading": 0, "kundli": 0}
+    script = {"groq_text": "A natural answer."}
     monkeypatch.setattr(archive, "store", FakeStore())
     monkeypatch.setattr("chat.reading.sensitive_response", lambda _q: None)
 
@@ -49,7 +50,7 @@ def env(monkeypatch):
     def fake_groq(_question, history, private_context="", astrology_context=""):
         seen["groq"].append({"private": private_context, "astrology": astrology_context,
                              "history": list(history)})
-        return {"text": "A natural answer.", "model": groq.MODEL,
+        return {"text": script["groq_text"], "model": groq.MODEL,
                 "preferred": groq.MODEL, "provider": "groq", "attempts": [],
                 "fallback": False}
 
@@ -69,6 +70,7 @@ def env(monkeypatch):
         return original_kundli(payload)
 
     monkeypatch.setattr(kundli, "build_kundli", counting_kundli)
+    seen["script"] = script
     yield seen
 
 
@@ -224,3 +226,124 @@ def test_welcome_is_exact_static_content_and_not_an_astrology_manual():
     assert "fetch(`${API_BASE}/ask`" in source
     assert "turns.length === 0" in source
     assert "date of birth" not in source[source.index("const WELCOME_MESSAGE"):source.index(";", source.index("const WELCOME_MESSAGE"))]
+
+
+# --- hard block: model must never derive personal/date astrology ---------------
+PLANET_TOKENS = ("sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn",
+                 "rahu", "ketu", "capricorn", "aquarius", "cancer", "libra",
+                 "virgo", "sagittarius")
+
+
+def _no_placements(answer: str) -> bool:
+    lowered = answer.lower()
+    return not any(token in lowered for token in PLANET_TOKENS)
+
+
+def test_date_followup_after_kundli_redirect_is_blocked_before_provider(env, client):
+    first = ask(client, "21/01/2010 tell me about my kundli", "date-flow")
+    assert first["tool_action"]["tool"] == "kundli"
+
+    before = len(env["groq"])
+    second = ask(client, "so what can u tell about 21/01/2010", "date-flow")
+
+    assert second["tool_action"]["tool"] == "kundli"
+    assert len(env["groq"]) == before, "the follow-up must not reach the provider"
+    assert _no_placements(second["answer"])
+    assert env["kundli"] == 0
+
+
+def test_new_chat_astrological_date_request_is_blocked(env, client):
+    body = ask(client, "Tell me astrologically about someone born 21 January 2010", "date-new")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == []
+    assert _no_placements(body["answer"])
+
+
+def test_new_chat_birth_data_planets_request_is_blocked(env, client):
+    body = ask(client, "21 January 2010, 08:19 AM, Delhi — tell me my planets", "date-birth")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == []
+    assert _no_placements(body["answer"])
+
+
+def test_new_chat_generic_ask_about_a_birth_date_is_blocked(env, client):
+    body = ask(client, "What can you tell me about someone born 21 Jan 2010?", "date-person")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == []
+
+
+def test_moon_sign_on_a_birth_date_is_blocked(env, client):
+    body = ask(client, "What sign was the Moon in on 21 Jan 2010?", "date-moon")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == []
+
+
+def test_provider_placements_are_failed_closed_post_provider(env, client):
+    env["script"]["groq_text"] = (
+        "Sun in Capricorn, Moon in Cancer, Mercury in Capricorn, Venus in "
+        "Sagittarius, Mars in Libra (using standard tropical astrology)."
+    )
+    body = ask(client, "Explain how astrology works in general", "failsafe")
+
+    assert body.get("tool_action", {}).get("tool") == "kundli"
+    assert _no_placements(body["answer"])
+    assert "tropical" not in body["answer"].lower()
+
+
+def test_educational_astrology_remains_allowed(env, client):
+    for index, question in enumerate((
+        "What does Saturn generally represent?",
+        "What does Saturn in the 7th house generally mean?",
+        "What is a Nakshatra?",
+    )):
+        before = len(env["groq"])
+        body = ask(client, question, f"edu-{index}")
+        assert "tool_action" not in body, question
+        assert len(env["groq"]) == before + 1, question
+
+
+def test_user_supplied_placement_interpretation_is_allowed(env, client):
+    body = ask(
+        client,
+        "My Kundli says Saturn is in the 7th house. What does that generally mean?",
+        "supplied-fact",
+    )
+
+    assert "tool_action" not in body
+    assert env["groq"]
+
+
+def test_ordinary_date_questions_stay_normal(env, client):
+    for index, question in enumerate((
+        "What day of the week was 21/01/2010?",
+        "How old is someone born 21/01/2010?",
+        "What happened in the world on 21 January 2010?",
+    )):
+        before = len(env["groq"])
+        body = ask(client, question, f"plain-date-{index}")
+        assert "tool_action" not in body, question
+        assert len(env["groq"]) == before + 1, question
+
+
+def test_contextual_kundli_followups_make_zero_provider_calls(env, client):
+    ask(client, "Tell me about my Kundli", "zero-provider")
+    before = len(env["groq"])
+    for index, followup in enumerate(("tell me more", "what about Saturn?", "and Jupiter?")):
+        body = ask(client, followup, "zero-provider")
+        assert body["tool_action"]["tool"] == "kundli"
+        assert len(env["groq"]) == before, f"{followup} reached the provider"
+        assert _no_placements(body["answer"])
+
+
+def test_topic_change_after_kundli_redirect_is_not_blocked(env, client):
+    ask(client, "21/01/2010 tell me about my kundli", "topic-change")
+    body = ask(client, "anyway explain gravity", "topic-change")
+    followup = ask(client, "tell me more", "topic-change")
+
+    assert "tool_action" not in body
+    assert "tool_action" not in followup
+    assert len(env["groq"]) == 2
