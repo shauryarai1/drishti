@@ -222,13 +222,14 @@ def test_general_questions_are_answered_without_reading_or_scope(env, client):
     assert env["geocoder"] == 0, "ordinary Ask traffic must not geocode"
 
 
-def test_astrology_questions_keep_the_astrology_context(env, client):
+def test_chart_question_is_a_boundary_without_reading_or_context(env, client):
     seed_chart("astro")
-    ask(client, "what does Saturn mean in my chart?", conversation_id="astro")
-    assert env["groq"] == [""], "astrology must NOT carry the private Tarot reading"
+    body = ask(client, "what does Saturn mean in my chart?", conversation_id="astro").json()
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == [], "a chart request must not reach the provider"
     assert env["readings"] == [], "astrology must not draw a Tarot reading"
-    assert env["astrology"], "astrology answers carry the chart context"
-    assert "CHART CONTEXT" in env["astrology"][-1]
+    assert env["astrology"] == [], "Ask never supplies chart context"
 
 
 # --- follow-up context reuse and exit ---------------------------------------
@@ -252,8 +253,8 @@ def test_personal_follow_ups_reuse_then_exit_the_reading(env, client):
     assert env["groq"][-1] == "", "the active reading must not leak into a general answer"
 
 
-def test_personal_reading_never_leaks_into_an_astrology_question(env, client):
-    """BUG 1: the active Tarot reading must not be supplied for a chart question."""
+def test_personal_reading_never_leaks_into_a_chart_question(env, client):
+    """The active private reading must not be supplied for a chart question."""
     seed_chart("isolation")
     ask(client, "will i be successful in life?", conversation_id="isolation")
     assert len(env["readings"]) == 1
@@ -262,27 +263,32 @@ def test_personal_reading_never_leaks_into_an_astrology_question(env, client):
     body = ask(client, "what does the saturn in my chart mean?", conversation_id="isolation").json()
 
     assert body["answered"] is True
-    assert len(env["readings"]) == 1, "an astrology question must not redraw the reading"
-    assert env["groq"][-1] == "", "the Tarot private context must NOT reach the chart answer"
-    assert env["astrology"][-1], "the chart context must be supplied instead"
-    assert "CHART CONTEXT" in env["astrology"][-1]
+    assert body["tool_action"]["tool"] == "kundli"
+    assert len(env["readings"]) == 1, "a chart question must not redraw the reading"
+    assert env["groq"][-1] == "PRIVATE READING CONTEXT", \
+        "the chart boundary makes no provider call carrying the reading"
+    assert all("CHART CONTEXT" not in item for item in env["astrology"]), \
+        "Ask never supplies chart context"
 
 
-def test_personal_reading_to_astrology_to_new_reading(env, client):
-    """astrology -> personal reading -> astrology keeps each context separate."""
+def test_kundli_boundary_to_reading_to_chart_boundary(env, client):
+    """kundli boundary -> personal reading -> chart boundary stays separate."""
     seed_chart("switch-2")
-    ask(client, "read my kundli", conversation_id="switch-2")
-    assert env["astrology"][-1], "astrology context supplied"
-    assert env["groq"][-1] == ""
+    first = ask(client, "read my kundli", conversation_id="switch-2").json()
+    assert first["tool_action"]["tool"] == "kundli"
+    assert env["astrology"] == [], "Ask never supplies chart context"
+    assert env["groq"] == [], "the chart boundary makes no provider call"
 
     ask(client, "will my new project work?", conversation_id="switch-2")
     assert len(env["readings"]) == 1, "a personal question opens a reading"
     assert env["groq"][-1] == "PRIVATE READING CONTEXT"
-    assert env["astrology"][-1] == "", "no chart context on a personal reading"
+    assert all("CHART CONTEXT" not in item for item in env["astrology"]), \
+        "no chart context on a personal reading"
 
-    ask(client, "how is my dasha?", conversation_id="switch-2")
-    assert env["groq"][-1] == "", "astrology again carries no Tarot evidence"
-    assert "CHART CONTEXT" in env["astrology"][-1]
+    third = ask(client, "how is my dasha?", conversation_id="switch-2").json()
+    assert third["tool_action"]["tool"] in ("kundli", "dasha")
+    assert all("CHART CONTEXT" not in item for item in env["astrology"]), \
+        "Ask never supplies chart context"
 
 
 def test_personal_reading_to_general_carries_no_hidden_context(env, client):

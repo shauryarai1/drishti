@@ -319,11 +319,13 @@ def test_o_reading_followup_preserves_tarot_isolation(env, client):
     assert env["readings"] == 1, "the same hidden reading is reused"
     assert env["groq"][-1]["private"], "the follow-up still answers from the reading"
 
+    # An explicit chart request is a Kundli boundary, not an in-chat chart
+    # answer: the private reading must not leak and no chart is calculated.
     natal.seed("conv-o", BIRTH)
-    ask(client, "What does Saturn mean in my chart?", "conv-o")
+    body = ask(client, "What does Saturn mean in my chart?", "conv-o")
     assert env["readings"] == 1, "an astrology question must not redraw"
-    assert env["groq"][-1]["private"] == "", "reading context never leaks to chart"
-    assert env["groq"][-1]["astrology"], "the chart context is supplied instead"
+    assert body["tool_action"]["tool"] == "kundli"
+    assert "date of birth" not in body["answer"].lower()
 
 
 # --- P: short follow-ups never force a new draw ------------------------------

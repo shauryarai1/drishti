@@ -90,9 +90,11 @@ _CONCEPT_RE = re.compile(rf"\b(?:{_PLANETS}|{_SIGNS}|nakshatra|rashi|house"
                          r"|planet\w*|dasha|navtara|ascendant|lagna)\b", re.I)
 _PERSONAL_ASTROLOGY = re.compile(
     r"\b(?:my|mine|our)\s+(?:kundli|birth\s*chart|chart|horoscope|planet\w*"
+    r"|sun|moon|mars|mercury|jupiter|venus|saturn|rahu|ketu"
     r"|sun\s+sign|moon\s+sign|ascendant|lagna|rashi|nakshatra|dasha\w*"
     r"|mahadasha|antardasha|pratyantardasha|sookshma|prana|navtara"
-    r"|janam\s*patri|placements?|houses?)\b",
+    r"|janam\s*patri|placements?|houses?)\b"
+    r"|\bmy\s+\d{1,2}(?:st|nd|rd|th)\s+house\b",
     re.I,
 )
 _BIRTH_WORDS = re.compile(r"\b(born|birth|birthday|dob|d\.o\.b|date\s+of\s+birth|nativity)\b", re.I)
@@ -126,7 +128,9 @@ _INTERPRET = re.compile(
 )
 _SUPPLIED = re.compile(
     r"\b(?:says|says\s+that|shows|showed|tells\s+me|according\s+to|reports"
-    r"|indicates|my\s+kundli|my\s+chart|my\s+reading)\b",
+    r"|indicates)\b"
+    r"|\b(?:my|our)\s+(?:sun|moon|mars|mercury|jupiter|venus|saturn|rahu|ketu)"
+    r"\s+(?:is|are)\s+(?:in|at|placed\s+in)\b",
     re.I,
 )
 _FIRST_PERSON = re.compile(r"\bmy\b|\bme\b|\bmine\b|\bmyself\b", re.I)

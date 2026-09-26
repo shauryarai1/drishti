@@ -144,36 +144,32 @@ def test_casual_question_carries_no_astrology_context(env, client):
     assert "PRIVATE READING CONTEXT" not in json.dumps(request["messages"])
 
 
-def test_astrology_question_carries_the_chart_context(env, client):
-    from chat.gemini import ASTROLOGY_INSTRUCTION, READING_INSTRUCTION
-
+def test_chart_question_is_a_boundary_without_astrology_context(env, client):
     seed_chart("groq-1")
-    ask(client, "what does Saturn mean in my chart?")
-    request = env["seen"]["groq"][0]
+    body = ask(client, "what does Saturn mean in my chart?").json()
 
-    assert ASTROLOGY_INSTRUCTION in request["messages"][0]["content"]
-    assert "CHART CONTEXT" in request["messages"][0]["content"]
-    assert READING_INSTRUCTION not in request["messages"][0]["content"]
-    assert "PRIVATE READING CONTEXT" not in json.dumps(request["messages"])
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["seen"]["groq"] == [], "no provider call for a chart request"
 
 
-def test_astrology_follow_up_keeps_context_then_out_of_scope_returns(env, client):
+def test_chart_boundary_then_general_questions_return(env, client):
     import chat.router as router
 
     seed_chart("switch")
-    ask(client, "read my kundli", conversation_id="switch")
-    assert "CHART CONTEXT" in env["seen"]["groq"][-1]["messages"][0]["content"]
+    first = ask(client, "read my kundli", conversation_id="switch").json()
+    assert first["tool_action"]["tool"] == "kundli"
 
-    ask(client, "what about Jupiter?", conversation_id="switch")
-    assert "CHART CONTEXT" in env["seen"]["groq"][-1]["messages"][0]["content"]
+    second = ask(client, "what about Jupiter?", conversation_id="switch").json()
+    assert second["answered"] is True
+    assert "tool_action" not in second
 
     before = len(env["seen"]["groq"])
     body = ask(client, "thanks. Now explain gravity.", conversation_id="switch").json()
     assert body["answered"] is True
     assert body["answer"] != router.SCOPE_MESSAGE, "general questions are answered"
     assert len(env["seen"]["groq"]) > before, "the assistant answered normally"
-    # No calculated chart block rides along with an ordinary question.
-    assert "[KAVACH CHART CONTEXT -" not in env["seen"]["groq"][-1]["messages"][0]["content"]
+    # No calculated chart block ever rides along.
+    assert all("CHART CONTEXT" not in json.dumps(req["messages"]) for req in env["seen"]["groq"])
 
 
 def test_out_of_scope_and_casual_never_carry_hidden_context(env, client):
@@ -300,8 +296,7 @@ def test_system_prompt_and_reasoning_are_never_exposed(env, client):
 
 def test_reasoning_is_never_archived(env, client):
     env["script"]["response"] = FakeResponse(200, groq_payload("Archived answer.", reasoning=REASONING))
-    seed_chart("groq-1")
-    ask(client, "read my kundli")
+    ask(client, "What does Saturn represent?")
 
     row = archive.store.rows[0]
     assert row["product"] == "ask"

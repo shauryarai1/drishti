@@ -156,7 +156,7 @@ def test_api_returns_stub_and_reuses_conversation_id(monkeypatch):
     import main
 
     client = TestClient(main.app)
-    payload = {"question": "Should I become an engineer as per my chart?", "conversation_id": "api-test-1",
+    payload = {"question": "What does Saturn represent?", "conversation_id": "api-test-1",
                "timestamp": "2026-09-20T14:15:00+05:30", "latitude": 28.6, "longitude": 77.2,
                "timezone": "Asia/Kolkata", "location_label": "New Delhi"}
     first = client.post("/api/ask", json=payload).json()

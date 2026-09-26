@@ -161,20 +161,26 @@ def test_usage_rules_forbid_reciting_definitions():
     assert "marginally relevant" not in joined or "never keyword-match" in joined
 
 
-# --- 2. the framework reaches Ask with the calculated chart -------------------
-def test_framework_is_supplied_with_the_calculated_chart(env, client):
+# --- 2. Ask does not calculate or interpret a personal chart ------------------
+def test_explicit_chart_request_is_a_kundli_boundary(env, client):
+    """Ask never builds a chart in chat; an explicit request is a boundary."""
     natal.seed("f1", BIRTH)
     body = ask(client, "Tell me about my Kundli.", "f1").json()
 
     assert body["answered"] is True
-    context = env["seen"]["groq"][0]["astrology"]
-    assert "KAVACH CHART CONTEXT" in context
-    assert planet_framework.FRAMEWORK_NAME in context
-    for planet, core in EXPECTED_CORES.items():
-        assert f"{planet} = {planet_framework.SHORT_MAP[planet]}" in context
-        assert core.replace(" ", " ").split()[0] in str(
-            planet_framework.core_for(planet))
-    assert env["seen"]["kundli"] == 1, "placements came from build_kundli"
+    assert body["tool_action"]["tool"] == "kundli"
+    assert "date of birth" not in body["answer"].lower()
+    assert env["seen"]["kundli"] == 0, "Ask never calculates a chart"
+    assert env["seen"]["groq"] == [], "no provider call for a chart request"
+
+
+def test_framework_block_forbids_deriving_placements():
+    """The owner framework block itself forbids deriving a placement."""
+    block = planet_framework.context_block()
+    assert "never lets you derive a placement" in block
+    assert planet_framework.FRAMEWORK_NAME in block
+    for planet in planet_framework.PLANETS:
+        assert f"{planet} = {planet_framework.SHORT_MAP[planet]}" in block
 
 
 def test_framework_never_arrives_without_a_calculated_chart(env, client):
@@ -185,15 +191,14 @@ def test_framework_never_arrives_without_a_calculated_chart(env, client):
     assert env["seen"]["kundli"] == 0, "no unnecessary personal calculation"
 
 
-def test_framework_block_states_it_never_computes_placements(env, client):
+def test_personal_placement_question_routes_to_kundli(env, client):
+    """A personal placement question is a calculation: Kundli, not the model."""
     natal.seed("f3", BIRTH)
-    ask(client, "How is my Jupiter placed?", "f3")
+    body = ask(client, "How is my Jupiter placed?", "f3").json()
 
-    context = env["seen"]["groq"][0]["astrology"]
-    block = planet_framework.context_block()
-    assert "never lets you derive a placement" in block
-    assert planet_framework.FRAMEWORK_NAME in context
-    assert block in context, "the full framework block is supplied verbatim"
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["seen"]["kundli"] == 0
+    assert env["seen"]["groq"] == []
 
 
 def test_framework_composes_with_other_owner_rules_not_replaces(env, client):
@@ -203,37 +208,14 @@ def test_framework_composes_with_other_owner_rules_not_replaces(env, client):
         assert owner_rule in joined, f"{owner_rule} must be composed, not replaced"
 
 
-def test_chart_facts_are_unchanged_by_the_framework(env, client):
-    """The framework must not alter what the engine calculated."""
-    from kundli.aggregate import build_kundli
-
-    baseline = build_kundli({**BIRTH, "place": BIRTH["place"]})
-
-    natal.seed("f4", BIRTH)
-    ask(client, "Tell me about my Kundli.", "f4")
-    after = natal.get_state("f4")["chart"]
-
-    # Signs and houses are time-independent, so they must match exactly.
-    baseline_signs = {p["planet"]: (p["rashi"], p["house"]) for p in baseline["planets"]}
-    after_signs = {p["planet"]: (p["rashi"], p["house"]) for p in after["planets"]}
-    assert after_signs == baseline_signs, "framework did not move a placement"
-    assert after["summary"]["lagnaRashi"] == baseline["summary"]["lagnaRashi"]
-    assert after["summary"]["moonRashi"] == baseline["summary"]["moonRashi"]
-    assert after["summary"]["nakshatra"] == baseline["summary"]["nakshatra"]
-
-
-def test_focused_problem_gets_a_reasoning_lens_not_all_nine(env, client):
+def test_focused_problem_gets_a_reasoning_lens_not_all_nine():
     """A focused question is nudged toward the grahas that genuinely bear on it."""
-    natal.seed("f5", BIRTH)
-    ask(client, "Why does my career keep stalling in my chart?", "f5")
-
-    context = env["seen"]["groq"][0]["astrology"]
-    hint = planet_framework.lens_hint("Why does my career keep stalling in my chart?")
+    question = "Why does my career keep stalling in my chart?"
+    hint = planet_framework.lens_hint(question)
     assert hint, "a recognisable personal problem maps to a KAVACH lens"
-    assert hint in context
     assert "guidance only" in hint.lower()
     expected = planet_framework.planets_for_lenses(
-        planet_framework.relevant_lenses("Why does my career keep stalling in my chart?"))
+        planet_framework.relevant_lenses(question))
     for planet in expected:
         assert planet in hint, f"{planet} is genuinely relevant here"
     # Not all nine are dumped: the hint names only the lenses that apply.
@@ -325,38 +307,34 @@ def test_general_non_astrology_question_still_answers_normally(env, client):
 
 
 def test_hidden_tarot_isolation_still_holds(env, client):
-    """A chart question must never receive the private reading context."""
+    """A chart request never receives the private reading context."""
     ask(client, "will I be successful in life?", "iso")
     assert env["seen"]["groq"][-1]["private"] == "PRIVATE READING CONTEXT"
 
+    before = len(env["seen"]["groq"])
     natal.seed("iso", BIRTH)
-    ask(client, "Tell me about my Kundli.", "iso")
-    assert env["seen"]["groq"][-1]["private"] == "", \
-        "reading context never leaks into a chart answer"
-    assert planet_framework.FRAMEWORK_NAME in env["seen"]["groq"][-1]["astrology"]
+    body = ask(client, "Tell me about my Kundli.", "iso").json()
+    assert body["tool_action"]["tool"] == "kundli"
+    assert len(env["seen"]["groq"]) == before, "chart boundary needs no provider"
 
 
-def test_natal_gate_still_asks_for_missing_details(env, client):
+def test_chart_request_does_not_collect_birth_details(env, client):
     body = ask(client, "Tell me about my Kundli.", "fresh").json()
 
     assert body["answered"] is True
-    assert "date of birth" in body["answer"].lower()
+    assert body["tool_action"]["tool"] == "kundli"
+    assert "date of birth" not in body["answer"].lower()
     assert env["seen"]["kundli"] == 0, "nothing is invented without details"
 
 
-def test_no_invented_placement_is_survives_scrubbing(env, client):
-    """A fabricated placement claim is still dropped with the framework active."""
-    natal.seed("scrub", BIRTH)
+def test_fabricated_provider_placements_are_failed_closed(env, client):
+    """If a provider asserts a personal placement, it is replaced, not shown."""
     env["script"]["groq_text"] = (
         "Your Sun is in Pisces in the 4th house. Generally stay focused.")
-    body = ask(client, "Tell me about my Kundli.", "scrub").json()
+    body = ask(client, "Explain how astrology works in general", "scrub").json()
 
-    answer = body["answer"]
-    chart = natal.get_state("scrub")["chart"]
-    actual_sun_sign = next(p["rashi"] for p in chart["planets"]
-                           if p["planet"] == "Sun")
-    if actual_sun_sign != "Pisces":
-        assert "Pisces" not in answer, "fabricated Sun placement was scrubbed"
+    assert "Pisces" not in body["answer"]
+    assert body.get("tool_action", {}).get("tool") == "kundli"
 
 
 def test_live_data_is_still_refused_deterministically(env, client):
@@ -367,10 +345,9 @@ def test_live_data_is_still_refused_deterministically(env, client):
     assert env["seen"]["groq"] == [], "a refusal never reaches a provider"
 
 
-def test_follow_up_reuses_the_calculated_chart(env, client):
-    natal.seed("reuse", BIRTH)
+def test_personal_planet_follow_up_stays_a_kundli_boundary(env, client):
     ask(client, "Tell me about my Kundli.", "reuse")
-    ask(client, "what about my Mars?", "reuse")
+    body = ask(client, "what about my Mars?", "reuse").json()
 
-    assert env["seen"]["kundli"] == 1, "the chart is calculated once and reused"
-    assert planet_framework.FRAMEWORK_NAME in env["seen"]["groq"][-1]["astrology"]
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["seen"]["kundli"] == 0

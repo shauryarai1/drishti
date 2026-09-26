@@ -186,14 +186,14 @@ def test_personal_problem_without_chart_intent_gets_normal_help(env, client):
     assert env["readings"] <= 1
 
 
-def test_same_problem_with_chart_intent_uses_the_kundli(env, client):
-    """The identical topic WITH chart intent takes the astrology path."""
+def test_same_problem_with_chart_intent_is_a_chart_boundary(env, client):
+    """The identical topic WITH chart intent is a chart request -> Kundli."""
     natal.seed("study-2", BIRTH)
-    ask(client, "Why do I struggle to concentrate according to my Kundli?",
-        "study-2")
+    body = ask(client, "Why do I struggle to concentrate according to my Kundli?",
+               "study-2").json()
 
-    assert env["kundli"] == 1, "the chart was calculated for a chart question"
-    assert "KAVACH CHART CONTEXT" in env["groq"][-1]["astrology"]
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["kundli"] == 0, "Ask never calculates a chart in chat"
 
 
 # --- 4. astrology question -> astrology explanation ----------------------------
@@ -210,23 +210,22 @@ def test_general_astrology_questions_reach_the_assistant(env, client, question):
     assert env["kundli"] == 0, "general astrology needs no personal calculation"
 
 
-# --- 5. personal Kundli question -> calculated Kundli path ---------------------
+# --- 5. personal chart question -> Kundli boundary, not in-chat chart ----------
 @pytest.mark.parametrize("question", [
     "tell me about my kundli",
     "what is my lagna?",
     "where is my Saturn?",
     "what does my chart say about relationships?",
 ])
-def test_personal_chart_questions_use_the_calculated_kundli(env, client, question):
+def test_personal_chart_questions_are_kundli_boundaries(env, client, question):
     conversation_id = "chart-" + str(abs(hash(question)) % 10000)
     natal.seed(conversation_id, BIRTH)
     body = ask(client, question, conversation_id).json()
 
     assert body["answered"] is True
-    context = env["groq"][-1]["astrology"]
-    assert "KAVACH CHART CONTEXT" in context, "placements came from build_kundli"
-    assert planet_framework.FRAMEWORK_NAME in context
-    assert env["kundli"] == 1
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["kundli"] == 0, "Ask never calculates a chart in chat"
+    assert "date of birth" not in body["answer"].lower()
 
 
 # --- 6. the framework only applies where astrology/chart requires it -----------
@@ -249,11 +248,13 @@ def test_framework_does_not_leak_into_an_astrology_definition_question(env, clie
     assert env["kundli"] == 0
 
 
-def test_framework_arrives_only_with_the_calculated_chart(env, client):
+def test_chart_request_supplies_no_framework_to_the_provider(env, client):
     natal.seed("leak-3", BIRTH)
-    ask(client, "tell me about my kundli", "leak-3")
+    before = len(env["groq"])
+    body = ask(client, "tell me about my kundli", "leak-3").json()
 
-    assert planet_framework.FRAMEWORK_NAME in env["groq"][-1]["astrology"]
+    assert body["tool_action"]["tool"] == "kundli"
+    assert len(env["groq"]) == before, "no provider call for a chart request"
 
 
 # --- 7. identity is an astrology companion -------------------------------------
@@ -267,19 +268,20 @@ def test_identity_is_an_astrology_companion(env, client):
     assert not mentions_provider(answer)
 
 
-# --- 8. welcome message advertises both ---------------------------------------
-def test_welcome_message_covers_general_and_astrology():
-    """The static greeting presents both capabilities and costs no API call."""
+# --- 8. welcome message is a static companion greeting -------------------------
+def test_welcome_message_is_a_static_companion_greeting():
+    """The static greeting is companion-oriented and costs no API call."""
     source = ASK_PAGE.read_text(encoding="utf-8")
-    assert "WELCOME_MESSAGE" in source, "the greeting is a static constant"
+    assert "const WELCOME_MESSAGE" in source, "the greeting is a static constant"
 
     start = source.index("const WELCOME_MESSAGE")
     block = source[start:source.index(";", start)].lower()
 
-    assert "ask anything" in block or "anything" in block
-    assert "explanations" in block or "ideas" in block
-    assert "writing" in block
-    assert "kundli" in block and "astrology" in block
+    assert "ask kavach" in block
+    assert "on your mind" in block or "ask me what" in block
+    assert "kavach" in block
+    # No generic-assistant advertising.
+    assert "school" not in block and "science" not in block and "history" not in block
     # Rendered only for a fresh conversation, and never via the API.
     assert "turns.length === 0" in source
     assert "api_base" not in block
@@ -295,33 +297,36 @@ def test_no_provider_or_model_leakage(env, client, question):
     assert not mentions_provider(body["answer"]), body["answer"]
 
 
-# --- 10. existing natal grounding still works ----------------------------------
-def test_natal_gate_still_collects_missing_details(env, client):
-    """9649ff0: no chart details means a deterministic request, no invention."""
+# --- 10. the chart boundary is safe and asks for no birth details --------------
+def test_chart_boundary_asks_for_no_birth_details(env, client):
     body = ask(client, "tell me about my kundli", "fresh").json()
 
     assert body["answered"] is True
-    assert "date of birth" in body["answer"].lower()
+    assert body["tool_action"]["tool"] == "kundli"
+    assert "date of birth" not in body["answer"].lower()
     assert env["kundli"] == 0, "nothing is invented without details"
-    assert env["groq"] == [], "no provider call for the details request"
+    assert env["groq"] == [], "no provider call for the chart boundary"
 
 
-def test_chart_is_calculated_once_and_reused(env, client):
+def test_personal_planet_follow_up_stays_a_chart_boundary(env, client):
     natal.seed("reuse-1", BIRTH)
     ask(client, "tell me about my kundli", "reuse-1")
-    ask(client, "what about my Mars?", "reuse-1")
+    body = ask(client, "what about my Mars?", "reuse-1").json()
 
-    assert env["kundli"] == 1, "the chart is calculated once and reused"
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["kundli"] == 0, "Ask never calculates a chart in chat"
 
 
 def test_hidden_tarot_isolation_still_holds(env, client):
-    """A chart answer never receives the private reading context."""
+    """A chart request never receives the private reading context."""
     ask(client, "will my project work?", "iso-1")
     assert env["groq"][-1]["private"] == "PRIVATE READING CONTEXT"
 
+    before = len(env["groq"])
     natal.seed("iso-1", BIRTH)
-    ask(client, "tell me about my kundli", "iso-1")
-    assert env["groq"][-1]["private"] == "", "reading never leaks to a chart answer"
+    body = ask(client, "tell me about my kundli", "iso-1").json()
+    assert body["tool_action"]["tool"] == "kundli"
+    assert len(env["groq"]) == before, "chart boundary needs no provider"
 
 
 def test_live_data_requests_are_still_refused(env, client):

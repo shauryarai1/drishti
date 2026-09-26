@@ -42,7 +42,7 @@ REPRESENTATIVE_PROMPTS = {
     "Explain photosynthesis": "casual",
     "Will it rain tomorrow?": "out_of_scope",
     "Will I be successful?": "reading",
-    "What does Saturn mean in my chart?": "astrology",
+    "What does Saturn generally represent?": "astrology",
     "Give me a full detailed reading of my chart": "astrology",
 }
 
@@ -168,7 +168,7 @@ def test_groq_primary_receives_the_style_instruction(captured, monkeypatch):
 
     monkeypatch.setattr(archive, "store", FakeStore())
     seed_chart("style-1")
-    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
+    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn generally represent?",
                                                        "conversation_id": "style-1"}).json()
 
     assert body["answer"] == "Ok."
@@ -186,7 +186,7 @@ def test_gemini_fallback_receives_the_same_style_instruction(captured, monkeypat
                                          "fallback": True})
 
     seed_chart("style-2")
-    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
+    body = TestClient(main.app).post("/api/ask", json={**ASK, "question": "What does Saturn generally represent?",
                                                        "conversation_id": "style-2"}).json()
 
     assert body["answer"] == "Ok."
@@ -260,15 +260,18 @@ def test_everyday_questions_are_no_longer_refused(mock_env):
     assert mock_env["geocoder"] == 0, "general chat must never geocode"
 
 
-def test_astrology_questions_get_context_and_internals_stay_hidden(mock_env, caplog):
+def test_chart_request_is_a_boundary_and_internals_stay_hidden(mock_env, caplog):
+    """An explicit chart request is a Kundli boundary: no provider, no internals."""
     client = TestClient(main.app)
     seed_chart("a-1")
     body = client.post("/api/ask", json={**ASK, "question": "What does Saturn mean in my chart?",
                                          "conversation_id": "a-1"}).text
 
-    assert mock_env["private"] == [""], "astrology must not carry the Tarot reading"
-    assert "CHART CONTEXT" in mock_env["astrology"][-1], "the chart context is supplied"
-    assert set(json.loads(body)) == {"status", "answered", "answer", "conversation_id"}
+    assert mock_env["private"] == [], "the chart request must not carry the Tarot reading"
+    assert mock_env["astrology"] == [], "Ask never supplies chart context"
+    payload = json.loads(body)
+    assert payload["tool_action"]["tool"] == "kundli"
+    assert set(payload) == {"status", "answered", "answer", "tool_action", "conversation_id"}
     for forbidden in ("PRIVATE READING CONTEXT", "CHART CONTEXT", "You are Ask KAVACH",
                       "system", "groq", "gpt-oss"):
         assert forbidden not in body

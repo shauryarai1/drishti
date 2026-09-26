@@ -164,26 +164,27 @@ def test_writing_and_code_requests_are_answered_normally(env, client):
 
 # --- astrology --------------------------------------------------------------
 @pytest.mark.parametrize("question", ASTROLOGY_QUESTIONS)
-def test_astrology_questions_use_the_chart_context(env, client, question):
+def test_personal_chart_questions_are_kundli_boundaries(env, client, question):
     conversation_id = f"astro-{abs(hash(question))}"
     seed_chart(conversation_id)
     body = ask(client, question, conversation_id=conversation_id).json()
 
     assert body["answered"] is True
-    assert body["answer"] == "Groq answer."
-    assert env["groq"][-1] == "", "astrology must not carry the Tarot reading"
-    assert env["astrology"][-1], "astrology must carry the chart context"
+    assert body["tool_action"]["tool"] == "kundli"
+    assert env["groq"] == [], "a chart request never reaches the provider"
+    assert env["astrology"] == [], "Ask never supplies chart context"
     assert env["readings"] == [], "astrology must not draw a Tarot reading"
 
 
-def test_astrology_then_astrology_follow_up_stays_astrology(env, client):
+def test_chart_follow_up_does_not_keep_a_chart_context(env, client):
+    """After a Kundli boundary, a follow-up is conversation, not chart context."""
     seed_chart("astro-switch")
-    ask(client, "read my kundli", conversation_id="astro-switch")
-    assert env["astrology"][-1]
+    first = ask(client, "read my kundli", conversation_id="astro-switch").json()
+    assert first["tool_action"]["tool"] == "kundli"
 
     ask(client, "why?", conversation_id="astro-switch")
-    assert env["astrology"][-1], "a follow-up keeps the chart context"
-    assert env["groq"][-1] == ""
+    assert all("CHART CONTEXT" not in item for item in env["astrology"]), \
+        "no chart context is ever supplied"
 
 
 # --- provider failure -------------------------------------------------------
