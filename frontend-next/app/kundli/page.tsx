@@ -14,6 +14,8 @@ import { ChartAnalysis } from '../../components/kundli/ChartAnalysis';
 import { KundliCharts } from '../../components/kundli/KundliCharts';
 import { DashaFlow } from '../../components/kundli/DashaFlow';
 import { NavtaraPanel } from '../../components/kundli/NavtaraPanel';
+import { PanelBoundary } from '../../components/kundli/PanelBoundary';
+import { ascendantNakshatraView, mergeAdditiveFields } from '../../components/kundli/kundliCompat';
 import { StrengthEvidence } from '../../components/kundli/StrengthEvidence';
 import {
   birthDetailsFor,
@@ -195,11 +197,32 @@ export default function KundliPage() {
           setSnapshotNotice('That saved Kundli could not be found.');
           return;
         }
-        setKundli(reading.result_data as KundliResponse);
-        setPending(reading.input_data as unknown as BirthDetailsType);
+        const snapshot = reading.result_data as KundliResponse;
+        const details = reading.input_data as unknown as BirthDetailsType;
+        const payload = birthPayload(details);
+        // Fill additive fields (Navtara, Ascendant Nakshatra, newer Dasha
+        // levels) for snapshots created before those fields existed. The
+        // historical natal placements are preserved; only missing additive
+        // fields are filled from the authoritative engine.
+        let display = snapshot;
+        try {
+          const fresh = await fetchKundli(payload);
+          if (!active || loadId !== loadIdRef.current) return;
+          display = mergeAdditiveFields(
+            snapshot as unknown as Record<string, unknown>, fresh,
+          ) as unknown as KundliResponse;
+        } catch {
+          // Keep the original snapshot; panels degrade gracefully.
+        }
+        if (!active || loadId !== loadIdRef.current) return;
+        setKundli(display);
+        setPending(details);
         setSnapshotId(reading.id);
         setTab('OVERVIEW');
         setSnapshotNotice('');
+        // Transits are calculated for "now" from birth data, so a saved reading
+        // can still show them. A failure keeps the safe Retry UI.
+        void loadTransits(payload, loadId);
       } catch (exc) {
         if (!active || loadId !== loadIdRef.current) return;
         setSnapshotNotice(exc instanceof Error ? exc.message : 'We could not open that saved Kundli.');
@@ -351,6 +374,7 @@ export default function KundliPage() {
             </div>
 
             {tab === 'OVERVIEW' && (
+              <PanelBoundary label="Overview">
               <section className={`${PANEL} mt-4`}>
                 <div className={LABEL}>Birth</div>
                 <div className="mt-1 text-lg font-semibold text-[#F7F5F0]">{kundli.birth.name || 'Unnamed native'}</div>
@@ -373,15 +397,20 @@ export default function KundliPage() {
                   ))}
                 </div>
               </section>
+              </PanelBoundary>
             )}
 
             {tab === 'OVERVIEW' && (
-              <RetrogradePlanets planets={kundli.planets} className="mt-4" />
+              <PanelBoundary label="Retrograde planets">
+                <RetrogradePlanets planets={kundli.planets} className="mt-4" />
+              </PanelBoundary>
             )}
 
             {tab === 'CHARTS' && (
               <div className="mt-4">
-                <KundliCharts data={kundli} />
+                <PanelBoundary label="Chart">
+                  <KundliCharts data={kundli} />
+                </PanelBoundary>
               </div>
             )}
 
@@ -436,53 +465,77 @@ export default function KundliPage() {
                   />
                 </div>
                 <div className={`${LABEL} mt-5`}>Ascendant Nakshatra</div>
-                <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-4">
-                  {[
-                    ['Lagna', kundli.chart.ascendant.rashi],
-                    ['Nakshatra', kundli.chart.ascendant.nakshatra || kundli.summary.ascendantNakshatra],
-                    ['Pada', kundli.chart.ascendant.pada || kundli.summary.ascendantPada],
-                    ['Lord', kundli.chart.ascendant.nakshatraLord || kundli.summary.ascendantNakshatraLord],
-                  ].map(([label, value]) => (
-                    <div key={String(label)}>
-                      <div className={LABEL}>{label}</div>
-                      <div className="mt-1 text-[15px] text-[#F7F5F0]">{value || '—'}</div>
+                {(() => {
+                  const asc = ascendantNakshatraView(kundli);
+                  if (!asc.available) {
+                    return (
+                      <div className="mt-3 text-[13px] text-[#EEE9DF]/60">
+                        Not available for this saved Kundli. Generate the Kundli again to view it.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-4">
+                      {([
+                        ['Lagna', asc.rashi],
+                        ['Nakshatra', asc.nakshatra],
+                        ['Pada', asc.pada],
+                        ['Lord', asc.lord],
+                      ] as const).map(([label, value]) => (
+                        <div key={String(label)}>
+                          <div className={LABEL}>{label}</div>
+                          <div className="mt-1 text-[15px] text-[#F7F5F0]">{value || '—'}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </section>
             )}
 
             {tab === 'BNN' && (
               <div className="mt-4">
-                <BnnConnections data={kundli} />
+                <PanelBoundary label="BNN connections">
+                  <BnnConnections data={kundli} />
+                </PanelBoundary>
               </div>
             )}
 
             {tab === 'STRENGTH' && (
               <div className="mt-4">
-                <StrengthEvidence data={kundli} />
+                <PanelBoundary label="Strength">
+                  <StrengthEvidence data={kundli} />
+                </PanelBoundary>
               </div>
             )}
 
             {tab === 'ANALYSIS' && (
               <div className="mt-4">
-                <ChartAnalysis data={kundli} />
+                <PanelBoundary label="Analysis">
+                  <ChartAnalysis data={kundli} />
+                </PanelBoundary>
               </div>
             )}
 
             {tab === 'DASHA' && (
               <div className="mt-4">
-                <DashaFlow dasha={kundli.dasha} />
-                <div className={`${PANEL} mt-4 text-[12.5px] text-[#EEE9DF]/50`}>
-                  Birth balance: {kundli.dasha.balanceAtBirth.lord} &middot; {kundli.dasha.balanceAtBirth.years.toFixed(2)} years remaining
-                  at birth (progress {(kundli.dasha.progressAtBirth * 100).toFixed(1)}% through {kundli.dasha.birthNakshatra})
-                </div>
+                <PanelBoundary label="Dasha">
+                  <DashaFlow dasha={kundli.dasha} />
+                </PanelBoundary>
+                {kundli.dasha?.balanceAtBirth && (
+                  <div className={`${PANEL} mt-4 text-[12.5px] text-[#EEE9DF]/50`}>
+                    Birth balance: {kundli.dasha.balanceAtBirth.lord} &middot; {kundli.dasha.balanceAtBirth.years.toFixed(2)} years remaining
+                    at birth (progress {(kundli.dasha.progressAtBirth * 100).toFixed(1)}% through {kundli.dasha.birthNakshatra})
+                  </div>
+                )}
               </div>
             )}
 
             {tab === 'NAVTARA' && (
               <div className="mt-4">
-                <NavtaraPanel data={kundli.navtara} />
+                <PanelBoundary label="Navtara">
+                  <NavtaraPanel data={kundli.navtara} />
+                </PanelBoundary>
               </div>
             )}
 
@@ -502,7 +555,7 @@ export default function KundliPage() {
                       Retry
                     </button>
                   </div>
-                ) : transits ? (
+                ) : transits?.transits?.length ? (
                   <>
                     <div className="mt-2 rounded border border-[#A62A34]/30 bg-[#0E0708]/50 px-3 py-2">
                       <span className={LABEL}>As of</span>{' '}
@@ -525,7 +578,16 @@ export default function KundliPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="mt-3 text-[13px] text-[#EEE9DF]/50">Transits were not calculated.</div>
+                  <div className="mt-3 rounded border border-[#A62A34]/40 bg-[#2B0C11]/60 p-3 text-[13px] text-[#EEE9DF]/80">
+                    <div>Transit data couldn&apos;t be loaded. The natal Kundli above is unaffected.</div>
+                    <button
+                      type="button"
+                      onClick={retryTransits}
+                      className="mt-3 rounded border border-[#D6BE85]/50 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#D6BE85] hover:border-[#D6BE85]"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 )}
               </section>
             )}

@@ -16,6 +16,7 @@ KUNDLI = FRONTEND / "components" / "Kundli.tsx"
 CHARTS = FRONTEND / "components" / "kundli" / "KundliCharts.tsx"
 KUNDLI_PAGE = FRONTEND / "app" / "kundli" / "page.tsx"
 KUNDLI_LIB = FRONTEND / "lib" / "kundli.ts"
+GEOMETRY = FRONTEND / "components" / "kundli" / "chartGeometry.ts"
 
 FIXTURE = {
     "date": "2010-01-21", "time": "08:19", "place": "Delhi",
@@ -45,7 +46,7 @@ def test_frontend_renders_ascendant_nakshatra_without_recalculating():
     lib = read(KUNDLI_LIB)
 
     assert "Ascendant Nakshatra" in page
-    assert "kundli.chart.ascendant.nakshatra" in page
+    assert "ascendantNakshatraView(kundli)" in page
     assert "ascendantNakshatra" in lib
     assert "nakshatra_of" not in page.lower()
 
@@ -83,12 +84,16 @@ def test_chart_presentation_is_mobile_readable_white_and_red():
 
 
 def test_planet_slots_are_deterministic_and_compact():
+    geometry = read(GEOMETRY)
     chart = read(CHART)
-    assert "HOUSE_SAFE_SLOTS" in chart
-    assert "1:" in chart and "12:" in chart
-    assert "[-30, -15], [30, -15]" in chart
-    assert "[-28, -25], [28, -25]" in chart
-    assert "safe.length" in chart
+
+    assert "HOUSE_GEOMETRY" in geometry
+    assert "LABEL_BOX" in geometry and "RASHI_BOX" in geometry
+    assert "planetSlots" in geometry
+    assert "planetSlots(" in chart
+    # Slots are declared per house and consumed from the shared module.
+    for house in range(1, 13):
+        assert f"  {house}:" in geometry
 
 
 def test_transit_request_has_bounded_retry_and_timeout():

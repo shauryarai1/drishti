@@ -54,7 +54,8 @@ def test_retrograde_section_exists_and_is_rendered_in_the_kundli_result():
     page = _read(KUNDLI_PAGE)
     assert "RetrogradePlanets" in page, "the result must render the section"
     # Placed with the factual chart information (OVERVIEW), not in analysis.
-    assert "tab === 'OVERVIEW' && (\n              <RetrogradePlanets" in page
+    assert "tab === 'OVERVIEW' && (\n              <PanelBoundary label=\"Retrograde planets\">" in page
+    assert "<RetrogradePlanets planets={kundli.planets}" in page
 
 
 # --- 2/3/4. selection comes from the authoritative motion field --------------

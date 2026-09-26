@@ -1,5 +1,6 @@
 import React from 'react';
 import { NorthHouseData as HouseData, NorthPlanetPosition as PlanetPosition } from '../lib/types';
+import { HOUSE_GEOMETRY, planetSlots, polygonPoints } from './kundli/chartGeometry';
 
 interface NorthIndianChartProps {
   houses: HouseData[];
@@ -7,41 +8,6 @@ interface NorthIndianChartProps {
   selectedHouse?: number | null;
   onSelectHouse?: (houseNumber: number) => void;
   highlightPlanet?: string | null;
-}
-
-interface HousePolygon {
-  houseNum: number;
-  points: string;
-  rashiPos: { x: number; y: number };
-  contentPos: { x: number; y: number };
-  badgePos: { x: number; y: number };
-  labelPos: { x: number; y: number };
-}
-
-type Slot = [number, number];
-
-// Local offsets from each house's content anchor. These are deliberately
-// different for the narrow triangular houses and the wider diamond houses so
-// conjunctions stay inside their own geometry and away from sign numbers.
-const HOUSE_SAFE_SLOTS: Record<number, Slot[]> = {
-  1: [[0, 0], [-30, -15], [30, -15], [-30, 18], [30, 18], [0, 40]],
-  2: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
-  3: [[0, 0], [0, -24], [0, 24], [-18, -11], [-18, 14], [0, 42]],
-  4: [[0, 0], [-30, 0], [30, 0], [-28, 25], [28, 25], [0, 48]],
-  5: [[0, 0], [0, -24], [0, 24], [-18, -11], [-18, 14], [0, 42]],
-  6: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
-  7: [[0, 0], [-30, 15], [30, 15], [-30, -18], [30, -18], [0, -40]],
-  8: [[0, 0], [-22, 0], [22, 0], [-18, -22], [18, -22], [0, -42]],
-  9: [[0, 0], [0, -24], [0, 24], [18, -11], [18, 14], [0, -42]],
-  10: [[0, 0], [-30, 0], [30, 0], [-28, -25], [28, -25], [0, -48]],
-  11: [[0, 0], [0, -24], [0, 24], [18, -11], [18, 14], [0, -42]],
-  12: [[0, 0], [-22, 0], [22, 0], [-18, 22], [18, 22], [0, 42]],
-};
-
-function planetSlots(houseNumber: number, count: number): Slot[] {
-  const safe = HOUSE_SAFE_SLOTS[houseNumber] ?? HOUSE_SAFE_SLOTS[1];
-  if (count <= safe.length) return safe.slice(0, count);
-  return [...safe, ...Array.from({ length: count - safe.length }, (_unused, index) => [0, 58 + index * 17] as Slot)];
 }
 
 // Planetary Vedic symbols and English abbreviations
@@ -67,109 +33,8 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
   onSelectHouse,
   highlightPlanet,
 }) => {
-  // Exact geometric coordinates for North Indian D1 Chart (500x500 SVG)
-  const housePolygons: HousePolygon[] = [
-    {
-      houseNum: 1, // Top center diamond (Tanu Bhava / Lagna)
-      points: '250,0 125,125 250,250 375,125',
-      rashiPos: { x: 250, y: 62 },
-      contentPos: { x: 250, y: 140 },
-      badgePos: { x: 250, y: 16 },
-      labelPos: { x: 250, y: 92 },
-    },
-    {
-      houseNum: 2, // Top-left upper triangle (Dhana Bhava)
-      points: '0,0 250,0 125,125',
-      rashiPos: { x: 135, y: 40 },
-      contentPos: { x: 105, y: 72 },
-      badgePos: { x: 55, y: 25 },
-      labelPos: { x: 165, y: 25 },
-    },
-    {
-      houseNum: 3, // Left upper triangle (Bhratri Bhava)
-      points: '0,0 125,125 0,250',
-      rashiPos: { x: 40, y: 135 },
-      contentPos: { x: 55, y: 105 },
-      badgePos: { x: 25, y: 55 },
-      labelPos: { x: 25, y: 165 },
-    },
-    {
-      houseNum: 4, // Left center diamond (Sukha Bhava)
-      points: '0,250 125,125 250,250 125,375',
-      rashiPos: { x: 62, y: 250 },
-      contentPos: { x: 140, y: 250 },
-      badgePos: { x: 18, y: 250 },
-      labelPos: { x: 92, y: 250 },
-    },
-    {
-      houseNum: 5, // Left lower triangle (Putra Bhava)
-      points: '0,250 125,375 0,500',
-      rashiPos: { x: 40, y: 365 },
-      contentPos: { x: 55, y: 395 },
-      badgePos: { x: 25, y: 445 },
-      labelPos: { x: 25, y: 335 },
-    },
-    {
-      houseNum: 6, // Bottom-left triangle (Ari Bhava)
-      points: '0,500 125,375 250,500',
-      rashiPos: { x: 135, y: 460 },
-      contentPos: { x: 105, y: 428 },
-      badgePos: { x: 55, y: 475 },
-      labelPos: { x: 165, y: 475 },
-    },
-    {
-      houseNum: 7, // Bottom center diamond (Yuvati Bhava)
-      points: '250,250 125,375 250,500 375,375',
-      rashiPos: { x: 250, y: 438 },
-      contentPos: { x: 250, y: 360 },
-      badgePos: { x: 250, y: 482 },
-      labelPos: { x: 250, y: 408 },
-    },
-    {
-      houseNum: 8, // Bottom-right triangle (Randhra Bhava)
-      points: '250,500 375,375 500,500',
-      rashiPos: { x: 365, y: 460 },
-      contentPos: { x: 395, y: 428 },
-      badgePos: { x: 445, y: 475 },
-      labelPos: { x: 335, y: 475 },
-    },
-    {
-      houseNum: 9, // Right lower triangle (Dharma Bhava)
-      points: '375,375 500,250 500,500',
-      rashiPos: { x: 460, y: 365 },
-      contentPos: { x: 445, y: 395 },
-      badgePos: { x: 475, y: 445 },
-      labelPos: { x: 475, y: 335 },
-    },
-    {
-      houseNum: 10, // Right center diamond (Karma Bhava)
-      points: '250,250 375,125 500,250 375,375',
-      rashiPos: { x: 438, y: 250 },
-      contentPos: { x: 360, y: 250 },
-      badgePos: { x: 482, y: 250 },
-      labelPos: { x: 408, y: 250 },
-    },
-    {
-      houseNum: 11, // Right upper triangle (Labha Bhava)
-      points: '375,125 500,0 500,250',
-      rashiPos: { x: 460, y: 135 },
-      contentPos: { x: 445, y: 105 },
-      badgePos: { x: 475, y: 55 },
-      labelPos: { x: 475, y: 165 },
-    },
-    {
-      houseNum: 12, // Top-right upper triangle (Vyaya Bhava)
-      points: '250,0 500,0 375,125',
-      rashiPos: { x: 365, y: 40 },
-      contentPos: { x: 395, y: 72 },
-      badgePos: { x: 445, y: 25 },
-      labelPos: { x: 335, y: 25 },
-    },
-  ];
-
   return (
-    <div className="w-full flex flex-col items-center select-none">
-      {/* Chart Interactive Controls */}
+    <div className="flex w-full flex-col items-center select-none">
       <div className="relative w-full max-w-[680px] aspect-[0.862] bg-white p-0 sm:aspect-square">
         <svg
           id="north-indian-kundli-svg"
@@ -181,24 +46,25 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
           <rect width="500" height="500" fill="#ffffff" />
 
           {/* 12 House Polygons */}
-          {housePolygons.map((poly) => {
-            const house = houses[poly.houseNum - 1];
-            const isSelected = selectedHouse === poly.houseNum;
-            const isKendra = [1, 4, 7, 10].includes(poly.houseNum);
-            const isTrikona = [5, 9].includes(poly.houseNum);
-            const isDusthana = [6, 8, 12].includes(poly.houseNum);
+          {Object.keys(HOUSE_GEOMETRY).map((key) => {
+            const houseNum = Number(key);
+            const geometry = HOUSE_GEOMETRY[houseNum];
+            const house = houses[houseNum - 1];
+            const isSelected = selectedHouse === houseNum;
+            const isKendra = [1, 4, 7, 10].includes(houseNum);
+            const isTrikona = [5, 9].includes(houseNum);
+            const isDusthana = [6, 8, 12].includes(houseNum);
 
             const fillUrl = isSelected ? '#fff1f1' : (isKendra || isTrikona || isDusthana ? '#fffafa' : '#ffffff');
 
             return (
               <g
-                key={`house-${poly.houseNum}`}
+                key={`house-${houseNum}`}
                 className={onSelectHouse ? 'cursor-pointer transition-all duration-150' : 'transition-all duration-150'}
-                onClick={() => onSelectHouse?.(poly.houseNum)}
+                onClick={() => onSelectHouse?.(houseNum)}
               >
-                {/* House Compartment Polygon */}
                 <polygon
-                  points={poly.points}
+                  points={polygonPoints(houseNum)}
                   fill={fillUrl}
                   stroke="none"
                   strokeWidth="0"
@@ -207,24 +73,22 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
 
                 {/* Small printed Rashi number, without a medallion. */}
                 <text className="kundli-rashi-label pointer-events-none"
-                    x={poly.rashiPos.x}
-                    y={poly.rashiPos.y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isSelected ? '#ffffff' : '#B4232F'}
-                    fontSize="12"
-                    fontWeight="800"
-                    fontFamily="sans-serif"
+                  x={geometry.rashi[0]}
+                  y={geometry.rashi[1]}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill={isSelected ? '#ffffff' : '#B4232F'}
+                  fontSize="12"
+                  fontWeight="800"
+                  fontFamily="sans-serif"
                 >{house?.signNumber}</text>
 
-                {/* Planets occupying this house */}
-                <g
-                  transform={`translate(${poly.contentPos.x}, ${poly.contentPos.y})`}
-                  className="kundli-planet-label pointer-events-none"
-                >
-                  {house?.planets.map((planet, pIdx) => {
-                    const slots = planetSlots(poly.houseNum, house.planets.length);
-                    const [dx, dy] = slots[pIdx] ?? [0, 38 + (pIdx - 4) * 18];
+                {/* Planets occupying this house. Each label is a single compact
+                    line (abbreviation + tiny degree + status marker) and sits on
+                    a verified slot so conjunctions never overlap. */}
+                <g className="kundli-planet-label pointer-events-none">
+                  {(house?.planets ?? []).map((planet, pIdx) => {
+                    const [x, y] = planetSlots(houseNum, house.planets.length)[pIdx] ?? geometry.slots[0];
 
                     const meta = PLANET_SYMBOLS[planet.englishName] || {
                       abbr: planet.name.slice(0, 2),
@@ -236,56 +100,37 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
                     const isExalted = planet.dignity === 'Exalted';
                     const isDebilitated = planet.dignity === 'Debilitated';
                     const isCombust = planet.isCombust;
+                    const highlighted = highlightPlanet === planet.englishName;
 
                     return (
-                      <g key={planet.key} transform={`translate(${dx}, ${dy})`}>
-                        {/* Planet name and symbol sit directly on the ivory chart surface. */}
+                      <g key={planet.key} transform={`translate(${x}, ${y})`}>
                         <text className="kundli-planet-text"
                           x="0"
-                          y="-5"
+                          y="0"
                           textAnchor="middle"
                           dominantBaseline="central"
-                          fill="#151719"
+                          fill={highlighted ? '#7B1D26' : '#151719'}
                           fontSize="14"
                           fontWeight="700"
                           fontFamily="sans-serif"
                         >
                           {meta.abbr}
+                          <tspan className="kundli-degree-text" fill="#B4232F" fontSize="9.5" fontWeight="700" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
+                            {' '}{Math.floor(planet.degreeInSign).toString().padStart(2, '0')}°
+                          </tspan>
                           {isRetro && (
-                            <tspan fill="#ef4444" fontSize="9" fontWeight="900">
-                              {' '}R
-                            </tspan>
+                            <tspan fill="#ef4444" fontSize="9" fontWeight="900">{' R'}</tspan>
                           )}
                           {isExalted && (
-                            <tspan fill="#4ade80" fontSize="9" fontWeight="900">
-                              {' '}↑
-                            </tspan>
+                            <tspan fill="#16a34a" fontSize="9" fontWeight="900">{' ↑'}</tspan>
                           )}
                           {isDebilitated && (
-                            <tspan fill="#f87171" fontSize="9" fontWeight="900">
-                              {' '}↓
-                            </tspan>
+                            <tspan fill="#dc2626" fontSize="9" fontWeight="900">{' ↓'}</tspan>
                           )}
                           {isCombust && (
-                            <tspan fill="#f97316" fontSize="9" fontWeight="900">
-                              {' '}c
-                            </tspan>
+                            <tspan fill="#ea580c" fontSize="9" fontWeight="900">{' c'}</tspan>
                           )}
                         </text>
-
-                        <text className="kundli-degree-text"
-                          x="0"
-                          y="11"
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fill="#B4232F"
-                          fontSize="10.5"
-                          fontWeight="700"
-                          fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                        >
-                          {Math.floor(planet.degreeInSign).toString().padStart(2, '0')}°
-                        </text>
-
                       </g>
                     );
                   })}
@@ -294,23 +139,18 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
             );
           })}
 
-          {/* Golden Geometric Line Overlay - CRISP, LUMINOUS & ACCURATE */}
+          {/* Thin red geometric overlay. */}
           <g stroke="#C94B43" strokeWidth="1.8" fill="none" className="pointer-events-none">
-            {/* Outer Border */}
             <rect x="2" y="2" width="496" height="496" strokeWidth="2.5" stroke="#B4232F" />
-
-            {/* Corner to Corner Diagonals */}
             <line x1="0" y1="0" x2="500" y2="500" strokeWidth="2.2" />
             <line x1="0" y1="500" x2="500" y2="0" strokeWidth="2.2" />
-
-            {/* Diamond Connecting Midpoints */}
             <line x1="250" y1="0" x2="0" y2="250" strokeWidth="2.2" />
             <line x1="0" y1="250" x2="250" y2="500" strokeWidth="2.2" />
             <line x1="250" y1="500" x2="500" y2="250" strokeWidth="2.2" />
             <line x1="500" y1="250" x2="250" y2="0" strokeWidth="2.2" />
           </g>
 
-          {/* Auspicious Center Bindu (Yantra Central Point) */}
+          {/* Center bindu. */}
           <g transform="translate(250, 250)" className="pointer-events-none">
             <circle r="18" fill="#ffffff" stroke="#C94B43" strokeWidth="1.5" />
             <circle r="10" fill="#fff1f1" stroke="#B4232F" strokeWidth="1" />
@@ -319,7 +159,6 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
           </g>
         </svg>
       </div>
-
     </div>
   );
 };

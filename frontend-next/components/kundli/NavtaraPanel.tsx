@@ -1,14 +1,28 @@
 import React from 'react';
-import type { KundliNavtara } from '../../lib/kundli';
+import { hasNavtara, navtaraJanma, navtaraRows } from './kundliCompat';
 
 const LABEL = 'font-mono text-[9.5px] uppercase tracking-[0.18em] text-[#B39250]';
 
-export function NavtaraPanel({ data }: { data: KundliNavtara }) {
+export function NavtaraPanel({ data }: { data: unknown }) {
+  if (!hasNavtara(data)) {
+    return (
+      <section className="rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70 p-4 sm:p-5">
+        <div className={LABEL}>Navtara</div>
+        <div className="mt-3 text-[13px] text-[#EEE9DF]/60">
+          Navtara is unavailable for this saved Kundli. Generate the Kundli again to view it.
+        </div>
+      </section>
+    );
+  }
+
+  const rows = navtaraRows(data);
+  const janma = navtaraJanma(data);
+
   return (
     <section className="rounded-lg border border-[#A62A34]/25 bg-[#160A0C]/70 p-4 sm:p-5">
       <div className={LABEL}>Navtara</div>
       <div className="mt-2 text-[13px] text-[#EEE9DF]/65">
-        Janma Nakshatra: <span className="font-semibold text-[#F7F5F0]">{data.janmaNakshatra}</span>
+        Janma Nakshatra: <span className="font-semibold text-[#F7F5F0]">{janma || '—'}</span>
       </div>
 
       <div className="mt-4 hidden grid-cols-[48px_1.25fr_1fr_1.15fr_2fr] gap-3 border-b border-[#A62A34]/25 pb-2 sm:grid">
@@ -17,7 +31,7 @@ export function NavtaraPanel({ data }: { data: KundliNavtara }) {
         ))}
       </div>
       <div className="mt-2 space-y-2">
-        {data.positions.map((item) => (
+        {rows.map((item) => (
           <div
             key={item.position}
             className={`grid grid-cols-[36px_1fr_auto] gap-x-3 gap-y-1 rounded border p-3 sm:grid-cols-[48px_1.25fr_1fr_1.15fr_2fr] sm:items-center sm:gap-3 ${
