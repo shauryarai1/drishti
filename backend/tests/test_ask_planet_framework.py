@@ -258,26 +258,23 @@ def test_identity_questions_answer_from_the_product(env, client, question):
         f"provider leaked in: {body['answer']}"
 
 
-def test_identity_does_not_claim_astrology_is_the_only_job(env, client):
-    """Identity must present a general assistant that ALSO does astrology."""
+def test_identity_is_an_astrology_companion(env, client):
+    """Identity presents KAVACH's astrological companion, not a generic assistant."""
     body = ask(client, "Who are you?", "id-only").json()
     answer = body["answer"].lower()
 
-    assert "ai assistant" in answer, "described as a general AI assistant"
-    # General capability is named, not just astrology.
-    assert any(word in answer for word in ("chat", "questions", "tasks", "everyday")), \
-        "it advertises normal assistant capability"
-    assert "astrology" in answer or "kundli" in answer, "astrology is still offered"
+    assert "ask kavach" in answer
+    assert "astrolog" in answer or "kundli" in answer
+    assert "general-purpose assistant" not in answer
 
 
-def test_purpose_question_covers_both_general_and_astrology(env, client):
-    """'What can you do?' must explain BOTH capabilities."""
+def test_purpose_question_describes_astrology_companion(env, client):
+    """'What can you do?' describes astrology capabilities, not generic ones."""
     body = ask(client, "what can you do", "id-both").json()
     answer = body["answer"].lower()
 
-    assert any(word in answer for word in ("writing", "explanations", "ideas",
-                                           "everyday", "questions"))
-    assert "astrology" in answer or "kundli" in answer
+    assert "astrolog" in answer or "kundli" in answer
+    assert "general-purpose assistant" not in answer
 
 
 def test_identity_questions_never_spend_provider_quota(env, client):
@@ -311,7 +308,7 @@ def test_purpose_question_describes_the_product(env, client, question):
 
     assert "KAVACH" in body["answer"]
     assert not mentions_provider(body["answer"])
-    assert "ai assistant" in body["answer"].lower()
+    assert "astrolog" in body["answer"].lower() or "kundli" in body["answer"].lower()
 
 
 # --- 4. preserved behaviour ---------------------------------------------------

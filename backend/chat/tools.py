@@ -45,6 +45,20 @@ FOLLOWUP_COPY = {
     "navtara": "I can explain Navtara concepts, but I won't guess your personal cycle. Open Kundli to calculate your Navtara properly, then ask me about the result.",
 }
 
+# Astrology-companion capability replies used when a follow-up asks what Ask can
+# help with while a dedicated-tool context is active. Each retains its tool
+# action; none of them advertises generic (non-astrology) abilities.
+CAPABILITY_FOLLOWUP = {
+    "kundli": "I can help you understand your astrology - what planets, houses, Nakshatras, Dashas, Navtara and different placements mean, or interpret details you already have from your KAVACH chart. For your actual planetary placements, open Kundli first so I use KAVACH's calculated chart instead of guessing them.",
+    "dasha": "I can explain how Dasha works - Mahadasha, Antardasha and the deeper levels - and what each period signifies. To see which Dasha you are actually running, open KAVACH Kundli and its Dasha section, which calculates it from your birth chart.",
+    "navtara": "I can explain the Navtara cycle and what each Tara such as Janma, Sampat or Vipat means. To see your own 27 Navtara positions, open KAVACH Kundli and its Navtara section.",
+    "daily": "I can explain how daily guidance works and what it is based on. For a calculated reading for today, KAVACH Daily is the right place.",
+    "matchmaking": "I can explain what compatibility factors such as Tara, Gana and Nadi mean. For a calculated match between two people, KAVACH Matchmaking is the right tool.",
+    "yes_no": "I can talk through a decision with you and explain what a yes-or-no reading considers. For a focused reading, KAVACH Yes / No is the dedicated tool.",
+    "panchang": "I can explain Tithi, Nakshatra, Yoga and Karana. For today's calculated Panchang, KAVACH Panchang is the right place.",
+    "life_summary": "I can explain what an overall life reading covers. For your own calculated life reading, KAVACH Life Summary is the right tool.",
+}
+
 # Used whenever Ask is asked to derive astrology for a person or birth date.
 # The language model is never allowed to do that calculation.
 DATE_GUARD_COPY = (
@@ -124,6 +138,21 @@ def guard_for_tool(tool: str) -> Dict[str, Any]:
     if tool in ("dasha", "navtara"):
         return {"answer": TOOL_COPY[tool], "tool_action": _action(tool)}
     return {"answer": DATE_GUARD_COPY, "tool_action": _action("kundli")}
+
+
+def is_supplied_fact(text: str) -> bool:
+    """True when the user states a placement and asks to interpret it.
+
+    A user- or KAVACH-supplied fact may be explained; Ask must not recalculate
+    it. This is narrower than is_interpretation_allowed: it requires explicit
+    supplied-fact wording ("my chart says <planet> is in <sign/house>").
+    """
+    lowered = (text or "").lower()
+    return bool(
+        _INTERPRET.search(lowered)
+        and (_CONCEPT_RE.search(lowered) or _ASTRO_TERMS.search(lowered))
+        and _SUPPLIED.search(lowered)
+    )
 
 
 def is_interpretation_allowed(text: str) -> bool:
@@ -225,26 +254,40 @@ def tool_action_for(question: str) -> Optional[Dict[str, Any]]:
         return {"answer": KUNDLI_ANSWER, "tool_action": _action("kundli")}
 
     if _personal(text, r"\bwhat (?:mahadasha|antardasha|pratyantardasha|sookshma|prana) am i (?:running|in)\b") \
-            or _personal(text, r"\bshow my (?:mahadasha|antardasha|pratyantardasha|sookshma|prana)\b"):
+            or _personal(text, r"\b(?:show|tell me) my (?:current )?(?:mahadasha|antardasha|pratyantardasha|sookshma|prana)\b") \
+            or _personal(text, r"\bwhich (?:mahadasha|antardasha|dasha) am i\b") \
+            or _personal(text, r"\bwhen does my .*\bdasha\b.*\bstart"):
         return {"answer": TOOL_COPY["dasha"], "tool_action": _action("dasha")}
 
-    if _personal(text, r"\bwhat is my navtara\b|\bshow my .*\b(?:janma|sampat|vipat)\b"):
+    if _personal(text, r"\bwhat is my navtara\b") \
+            or _personal(text, r"\bshow my .*\b(?:janma|sampat|vipat)\b") \
+            or _personal(text, r"\bwhich (?:is my|nakshatra is my|is my)\b.*\b(?:janma|sampat|vipat|kshema|pratyari|sadhaka|vadha|mitra|ati-?mitra) tara\b") \
+            or _personal(text, r"\bmy (?:27 )?navtara\b"):
         return {"answer": TOOL_COPY["navtara"], "tool_action": _action("navtara")}
 
     if _personal(text, r"\b(?:how is|what is|what's) today(?:'s)? prediction for [a-z]+\b") \
-            or _personal(text, r"\bhow is today for my moon sign\b"):
+            or _personal(text, r"\bhow is today for my moon sign\b") \
+            or _personal(text, r"\bhow is today (?:looking )?for me\b") \
+            or _personal(text, r"\bwhat should i be mindful of today\b") \
+            or _personal(text, r"\b(?:give me|what is|what's) today(?:'s)? (?:prediction|reading)\b"):
         return {"answer": TOOL_COPY["daily"], "tool_action": _action("daily")}
 
-    if _personal(text, r"\b(?:compatible astrologically|match our charts|marriage compatibility|compatibility of (?:us|our))\b"):
+    if _personal(text, r"\b(?:compatible astrologically|match our charts|marriage compatibility|compatibility of (?:us|our))\b") \
+            or _personal(text, r"\bcheck (?:our|the|me and .*?) (?:marriage )?compatibility\b") \
+            or _personal(text, r"\bare (?:me and|we) .*compatible\b") \
+            or _personal(text, r"\bcompatibility between\b"):
         return {"answer": TOOL_COPY["matchmaking"], "tool_action": _action("matchmaking")}
 
-    if _personal(text, r"\b(?:give me|do) (?:a )?yes(?:[ /-]?or)?[ /-]?no (?:reading|answer)\b"):
+    if _personal(text, r"\b(?:give me|do|need) (?:a )?yes(?:[ /-]?or)?[ /-]?no (?:reading|answer)\b") \
+            or _personal(text, r"\byes or no answer\b"):
         return {"answer": TOOL_COPY["yes_no"], "tool_action": _action("yes_no")}
 
-    if _personal(text, r"\b(?:panchang today|today's panchang|tithi.*nakshatra.*yoga|nakshatra.*tithi.*yoga)\b"):
+    if _personal(text, r"\b(?:panchang today|today's panchang|today's tithi|today's nakshatra|tithi.*nakshatra.*yoga|nakshatra.*tithi.*yoga)\b") \
+            or _personal(text, r"\btell me (?:today's|the current) (?:nakshatra|tithi|panchang)\b"):
         return {"answer": TOOL_COPY["panchang"], "tool_action": _action("panchang")}
 
-    if _personal(text, r"\b(?:give me|show me) my overall life reading\b"):
+    if _personal(text, r"\b(?:give me|show me) my overall life reading\b") \
+            or _personal(text, r"\b(?:overview of my life|my life summary|show my life summary|life reading)\b"):
         return {"answer": TOOL_COPY["life_summary"], "tool_action": _action("life_summary")}
 
     return None
@@ -276,8 +319,11 @@ def followup_tool_action_for(question: str, tool: str) -> Optional[Dict[str, Any
         return {"clear": True}
 
     ambiguous = re.search(
-        r"^(?:so\s+)?(?:what can (?:you|u) tell me|tell me more|anything else|why|how|then|explain)\b"
-        r"|\bwhat about\b|\bwhat does that mean\b|\bwhat does .* mean for me\b",
+        r"^(?:so\s+|then\s+)?(?:what can (?:you|u) (?:tell|say|share|explain|help)(?:\s+me)?(?:\s+about)?"
+        r"|what else can (?:you|u) (?:tell|say|share|explain)"
+        r"|tell me more|anything else|what else|why|how|then|explain)\b"
+        r"|\bwhat about\b|\bwhat does that mean\b|\bwhat does .* mean for me\b"
+        r"|\b(?:then )?what can i ask\b|\bwhat do you know\b",
         text,
     )
     if not ambiguous and re.search(
@@ -289,7 +335,7 @@ def followup_tool_action_for(question: str, tool: str) -> Optional[Dict[str, Any
         return None
 
     return {
-        "answer": FOLLOWUP_COPY.get(tool, FOLLOWUP_COPY["kundli"]),
+        "answer": CAPABILITY_FOLLOWUP.get(tool, FOLLOWUP_COPY.get(tool, FOLLOWUP_COPY["kundli"])),
         "tool_action": _action(tool),
     }
 

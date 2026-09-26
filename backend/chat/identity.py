@@ -16,30 +16,31 @@ import re
 
 PRODUCT_NAME = "Ask KAVACH"
 
-# Identity is stated as a general AI assistant that ALSO carries KAVACH's
-# astrology capability - never as an astrology-only bot.
+# Identity is stated as KAVACH's conversational ASTROLOGICAL companion - not a
+# generic assistant that happens to know astrology.
 IDENTITY_REPLY = (
-    "I'm Ask KAVACH, your AI assistant inside KAVACH. I can chat with you "
-    "normally, help with questions and everyday tasks, and when you want "
-    "astrology guidance, I can also work with your calculated Kundli."
+    "I'm Ask KAVACH, your astrological companion inside KAVACH. I can help you "
+    "understand your Kundli and explain astrology - planets, houses, Rashis, "
+    "Nakshatras, Dashas, Navtara and other concepts - using KAVACH's "
+    "interpretation system."
 )
 
 MODEL_REPLY = (
-    "I'm Ask KAVACH, the AI assistant inside KAVACH. The models behind me are "
-    "an implementation detail - what matters is that you get a helpful answer, "
-    "with KAVACH's astrology available whenever you want it."
+    "I'm Ask KAVACH, the astrology companion inside KAVACH. The models behind me "
+    "are an implementation detail - what matters is that you get clear astrology "
+    "guidance through KAVACH's framework."
 )
 
 CREATOR_REPLY = (
-    "I'm part of KAVACH, built to be your AI assistant inside KAVACH - alongside "
-    "KAVACH's astrology and Kundli capabilities."
+    "I'm part of KAVACH, built as your astrological companion inside KAVACH."
 )
 
 PURPOSE_REPLY = (
-    "I'm Ask KAVACH - your AI assistant inside KAVACH. I can help with everyday "
-    "questions, explanations, ideas, writing, decisions and reasoning, and when "
-    "you want astrology guidance I can also read your calculated Kundli and "
-    "explain what it shows."
+    "I'm Ask KAVACH, your astrological companion inside KAVACH. I can explain "
+    "planets, houses, Rashis, Nakshatras, conjunctions, aspects, retrograde, "
+    "Dashas, Navtara, Panchang and other astrology concepts, and help you "
+    "interpret placements you already have from your KAVACH chart. For your own "
+    "calculated results, I'll point you to the right KAVACH tool."
 )
 
 # The provider names must never appear in a public Ask reply.
@@ -77,7 +78,9 @@ _CREATOR_WORDS = ("who made", "who built", "who created", "who developed",
                   "made you", "built you", "created you", "developed you",
                   "your creator", "your maker", "who is behind")
 _PURPOSE_WORDS = ("your purpose", "what do you do", "what can you do",
-                  "why do you exist", "what are you for")
+                  "why do you exist", "what are you for", "what can you help",
+                  "how can you help", "what can i ask", "what are you able to do",
+                  "what can you explain")
 
 
 def is_identity_question(question: str) -> bool:
@@ -94,9 +97,15 @@ def is_identity_question(question: str) -> bool:
     # "What are you?" / "Who are you?" asks for identity; "how" does not.
     if re.search(r"\b(who|what)\s+(are|is|r|s)\s+you\b", text):
         return True
-    # A bare capability question ("what can you do", "what do you offer"),
+    # A bare capability question ("what can you do", "what can you help with"),
     # never "what can you tell me about <topic>".
-    if re.search(r"\bwhat\s+(?:can|do|does)\s+you\s+(?:do|offer|provide|help\s+with)\b", text):
+    if re.search(
+        r"\bwhat\s+(?:can|do|does)\s+you\s+(?:do|offer|provide|help(?:\s+me)?\s+with)\b"
+        r"|\bhow\s+can\s+you\s+help\b"
+        r"|\bwhat\s+are\s+you\s+able\s+to\s+do\b"
+        r"|\bwhat\s+can\s+i\s+ask\b",
+        text,
+    ):
         return True
     return bool(_SUBJECT_PATTERN.search(text) and _TOPIC_PATTERN.search(text))
 

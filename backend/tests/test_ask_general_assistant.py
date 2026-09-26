@@ -256,18 +256,14 @@ def test_framework_arrives_only_with_the_calculated_chart(env, client):
     assert planet_framework.FRAMEWORK_NAME in env["groq"][-1]["astrology"]
 
 
-# --- 7. identity is not astrology-only -----------------------------------------
-def test_identity_advertises_general_assistance_and_astrology(env, client):
+# --- 7. identity is an astrology companion -------------------------------------
+def test_identity_is_an_astrology_companion(env, client):
     body = ask(client, "Who are you?", "who-1").json()
     answer = body["answer"]
 
     assert "Ask KAVACH" in answer
-    assert "ai assistant" in answer.lower()
-    astrology_words = ("astrology", "kundli")
-    assert any(word in answer.lower() for word in astrology_words)
-    general_words = ("chat", "questions", "tasks", "everyday")
-    assert any(word in answer.lower() for word in general_words), \
-        "identity must not make astrology sound like the only job"
+    assert "astrolog" in answer.lower() or "kundli" in answer.lower()
+    assert "general-purpose" not in answer.lower()
     assert not mentions_provider(answer)
 
 

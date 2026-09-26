@@ -110,17 +110,17 @@ def test_trace_data_is_only_reachable_behind_the_dev_gate(monkeypatch, ask_env, 
     assert client.post("/api/dev/kavach-trace", json={"conversation_id": conversation}).status_code == 404
 
 
-def test_frontend_never_ships_a_visible_production_inspector():
+def test_frontend_never_ships_a_visible_inspector_by_default():
     source = ASK_PAGE.read_text(encoding="utf-8")
-    # Compile-time development gate: inlined as false in a production build.
-    assert "process.env.NODE_ENV !== 'production'" in source
-    # Fail-closed default: the control is not visible until a development probe succeeds.
-    assert "useState(DEV_TOOLS_ENABLED)" in source
+    # Explicit opt-in only: an ordinary (even non-production) build shows nothing.
+    assert "NEXT_PUBLIC_KAVACH_DEV_TOOLS === '1'" in source
+    assert "process.env.NODE_ENV !== 'production'" not in source
     assert "const [devEnabled, setDevEnabled] = useState(true)" not in source
-    # Both the trigger and the panel are behind the compile-time flag.
-    assert source.count("DEV_TOOLS_ENABLED && devEnabled") >= 2
-    # The trace endpoint is not probed at all outside development.
-    assert "if (!DEV_TOOLS_ENABLED) return;" in source
+    # Both the trigger and the panel are behind the opt-in flag.
+    assert source.count("DEV_TOOLS_ENABLED &&") >= 2
+    # No raw network/exception diagnostic is ever surfaced to the user.
+    assert "Failed to fetch" not in source
+    assert "setTraceError(exc instanceof Error ? exc.message" not in source
 
 
 # --- 2. rate limiting -------------------------------------------------------

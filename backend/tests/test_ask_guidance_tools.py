@@ -347,3 +347,88 @@ def test_topic_change_after_kundli_redirect_is_not_blocked(env, client):
     assert "tool_action" not in body
     assert "tool_action" not in followup
     assert len(env["groq"]) == 2
+
+
+# --- astrology companion UX (not a generic assistant) --------------------------
+GENERIC_PITCH = ("schoolwork", "science", "history", "story", "homework",
+                 "brainstorm", "tutor")
+
+
+def test_astrology_followup_after_kundli_stays_in_astrology(env, client):
+    ask(client, "tell me about my kundli 21/01/2010", "companion")
+    before = len(env["groq"])
+    body = ask(client, "so what can u tell then", "companion")
+
+    assert body["tool_action"]["tool"] == "kundli"
+    assert len(env["groq"]) == before, "no provider call for a contextual follow-up"
+    answer = body["answer"].lower()
+    assert "astrolog" in answer or "kundli" in answer
+    assert not any(term in answer for term in GENERIC_PITCH), answer
+    assert _no_placements(body["answer"])
+
+
+def test_capability_question_describes_astrology_companion(env, client):
+    for index, question in enumerate(("What can you help me with?", "what can you do")):
+        before = len(env["groq"])
+        body = ask(client, question, f"cap-{index}")
+        answer = body["answer"].lower()
+        assert "kavach" in answer
+        assert "astrolog" in answer or "kundli" in answer
+        assert not any(term in answer for term in GENERIC_PITCH), answer
+        assert len(env["groq"]) == before, "capability question is answered deterministically"
+
+
+@pytest.mark.parametrize("question,tool", [
+    ("Where is Saturn in my chart?", "kundli"),
+    ("Which Mahadasha am I running?", "dasha"),
+    ("Tell me my current mahadasha", "dasha"),
+    ("What is my Navtara?", "navtara"),
+    ("Show my 27 Navtara positions", "navtara"),
+    ("How is today looking for me?", "daily"),
+    ("Check compatibility between me and her", "matchmaking"),
+    ("Are me and this person compatible?", "matchmaking"),
+    ("What is today's Tithi?", "panchang"),
+    ("Tell me today's Nakshatra", "panchang"),
+    ("Give me an overview of my life", "life_summary"),
+    ("I need a yes or no answer", "yes_no"),
+    ("21/01/2010 tell me my Moon sign", "kundli"),
+])
+def test_personal_calculation_routes_to_the_right_tool(env, client, question, tool):
+    before = len(env["groq"])
+    body = ask(client, question, f"route-{tool}-{abs(hash(question)) % 1000}")
+
+    assert body["tool_action"]["tool"] == tool, question
+    assert len(env["groq"]) == before, "deterministic tool routes never call the provider"
+    assert env["kundli"] == 0
+
+
+@pytest.mark.parametrize("question", [
+    "What is Mahadasha?",
+    "What does Navtara mean?",
+    "What does Tithi mean?",
+    "What does Saturn generally represent?",
+    "What is Graha Maitri?",
+])
+def test_concept_questions_stay_conversational(env, client, question):
+    before = len(env["groq"])
+    body = ask(client, question, f"concept-{abs(hash(question)) % 1000}")
+
+    assert "tool_action" not in body, question
+    assert len(env["groq"]) == before + 1, question
+
+
+def test_user_supplied_placement_is_interpreted_not_recalculated(env, client):
+    before = len(env["groq"])
+    body = ask(client, "My Kundli says Moon is in Chitra. Explain it.", "supplied-moon")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+
+
+def test_newest_clear_intent_replaces_stale_tool_context(env, client):
+    first = ask(client, "Which dasha am I running?", "switch-intent")
+    assert first["tool_action"]["tool"] == "dasha"
+
+    second = ask(client, "actually check our compatibility", "switch-intent")
+    assert second["tool_action"]["tool"] == "matchmaking"
+    assert env["groq"] == []

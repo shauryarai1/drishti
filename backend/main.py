@@ -472,24 +472,23 @@ async def ask_endpoint(payload: ChatRequest):
     # a deterministic allowlisted action and never collects birth data or
     # invokes the Kundli engine inside chat.
     from chat.tools import (followup_tool_action_for, guard_for_tool,
-                            is_interpretation_allowed, personal_astrology_tool,
+                            is_supplied_fact, personal_astrology_tool,
                             tool_action_for)
 
     last_tool = get_tool_intent(conversation_id)
-    # A concept question, or a fact the user already supplied and asked to
-    # interpret, is allowed to stay in normal conversation. Everything else that
-    # asks Ask to derive personal astrology is routed to a dedicated tool.
-    interpretation_allowed = is_interpretation_allowed(question)
-    tool_action = None if interpretation_allowed else tool_action_for(question)
+    # A placement the user (or KAVACH) already supplied may be interpreted in
+    # conversation; only explicit supplied-fact wording defers tool routing.
+    # Concept questions still reach normal conversation, while personal or
+    # current calculations route to the most appropriate dedicated tool.
+    supplied_fact = is_supplied_fact(question)
+    tool_action = None if supplied_fact else tool_action_for(question)
     # Structural pre-provider gate: a request that requires deriving astrology
     # for a person or birth date is answered by a dedicated KAVACH tool and is
     # never sent to the model. This is independent of the sticky tool intent.
-    if not tool_action and not interpretation_allowed:
+    if not tool_action:
         required = personal_astrology_tool(question, last_tool)
         if required:
             tool_action = guard_for_tool(required)
-    if interpretation_allowed:
-        clear_tool_intent(conversation_id)
     if not tool_action and last_tool:
         followup = followup_tool_action_for(question, last_tool)
         if followup and followup.get("clear"):

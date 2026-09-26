@@ -33,11 +33,11 @@ const STORAGE_KEY = 'kavach_ask_location';
 // persisted as a conversation turn.
 const WELCOME_MESSAGE = "Hi, I’m Ask KAVACH.\n\nAsk me what’s on your mind — a situation, decision, relationship,\nconcern, or simply something you want clarity on. I’ll help you explore\nit, and when one of KAVACH’s dedicated tools can give you a better\nanswer, I’ll take you there.";
 
-// Development-only inspector tooling. In a production build Next.js inlines
-// `process.env.NODE_ENV` as "production", so the control is never rendered.
-// The backend independently refuses inspector/trace data to ordinary
-// production requests.
-const DEV_TOOLS_ENABLED = process.env.NODE_ENV !== 'production';
+// Developer-only inspector tooling. Off unless explicitly opted in at build
+// time, so ordinary users never see internal inspection controls or raw
+// diagnostics. The backend independently refuses inspector/trace data to
+// ordinary requests.
+const DEV_TOOLS_ENABLED = process.env.NEXT_PUBLIC_KAVACH_DEV_TOOLS === '1';
 
 interface ToolAction { tool: string; label: string; href: string }
 interface Turn { id: number; question: string; answer: string; answered: boolean; assistantIndex: number; toolAction?: ToolAction }
@@ -180,7 +180,7 @@ export default function AskPage() {
   const [conversationId, setConversationId] = useState('');
   // Fail-closed by default: the inspector control stays hidden unless the
   // development probe below succeeds, and that probe never runs in production.
-  const [devEnabled, setDevEnabled] = useState(DEV_TOOLS_ENABLED);
+
   const [inspecting, setInspecting] = useState<number | null>(null);
   const [trace, setTrace] = useState<TraceEvent | null>(null);
   const [traceError, setTraceError] = useState('');
@@ -189,11 +189,6 @@ export default function AskPage() {
 
   useEffect(() => {
     setConversationId((current) => current || newConversationId());
-  }, []);
-
-  useEffect(() => {
-    if (!DEV_TOOLS_ENABLED) return;
-    setDevEnabled(true);
   }, []);
 
   useEffect(() => {
@@ -229,10 +224,11 @@ export default function AskPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: conversationId, index: turn.assistantIndex }),
       });
-      if (!response.ok) throw new Error('No internal trace available for this answer.');
+      if (!response.ok) throw new Error('unavailable');
       setTrace(await response.json());
-    } catch (exc) {
-      setTraceError(exc instanceof Error ? exc.message : 'Trace unavailable');
+    } catch {
+      // Never surface a raw network/exception message to the user.
+      setTraceError('No internal trace is available for this answer.');
     }
   };
 
@@ -405,7 +401,7 @@ export default function AskPage() {
                       {turn.toolAction.label} →
                     </a>
                   )}
-                  {DEV_TOOLS_ENABLED && devEnabled && (
+                  {DEV_TOOLS_ENABLED && (
                     <button
                       onClick={() => openInspector(turn)}
                       className="mt-1 text-[11px] text-[#B39250]/80 hover:text-[#D6BE85]"
@@ -413,7 +409,7 @@ export default function AskPage() {
                       🔧 Inspect Reading
                     </button>
                   )}
-                  {DEV_TOOLS_ENABLED && devEnabled && inspecting === turn.id && (
+                  {DEV_TOOLS_ENABLED && inspecting === turn.id && (
                     trace
                       ? <DevInspector event={trace} onClose={() => setInspecting(null)} />
                       : <div className="mt-2 text-[11px] text-[#E5B567]">{traceError || 'Loading trace…'}</div>
