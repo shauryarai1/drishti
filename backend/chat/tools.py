@@ -23,10 +23,12 @@ TOOL_REGISTRY: Dict[str, Dict[str, str]] = {
     "life_summary": {"label": "Open Life Summary", "href": "/life-summary"},
 }
 
+# Ask does not do birth-chart work. A Kundli action is offered only when the
+# user explicitly asks for chart/Kundli calculation; the reply states the
+# boundary instead of interpreting the chart.
 KUNDLI_ANSWER = (
-    "For a complete chart analysis, KAVACH Kundli is the better tool. It "
-    "shows your planetary placements, houses, Nakshatras, Dashas and other "
-    "chart details."
+    "I don't calculate or interpret birth charts here. KAVACH Kundli is the "
+    "separate chart experience."
 )
 
 TOOL_COPY = {
@@ -62,9 +64,8 @@ CAPABILITY_FOLLOWUP = {
 # Used whenever Ask is asked to derive astrology for a person or birth date.
 # The language model is never allowed to do that calculation.
 DATE_GUARD_COPY = (
-    "I can explain astrology concepts and anything from your chart, but I won't "
-    "guess planetary placements from a date alone. KAVACH Kundli calculates those "
-    "details properly."
+    "I don't calculate or interpret birth charts from a date here. KAVACH Kundli "
+    "is the separate chart experience."
 )
 
 # --- structural pre-provider detection ---------------------------------------
@@ -199,7 +200,10 @@ def personal_astrology_tool(question: str, context_tool: Optional[str] = None) -
         astro = bool(_ASTRO_TERMS.search(text) or _CONCEPT_RE.search(text))
         personal = bool(_PERSONAL_INTENT.search(text))
         context_astro = context_tool in _ASTRO_CONTEXT_TOOLS and not exempt
-        if astro or (personal and not exempt) or context_astro:
+        # A concrete birth date is birth data: it must never reach the provider
+        # as material for deriving a chart, whatever else the message asks.
+        birth_date = bool(_BIRTH_WORDS.search(text) and _DATE.search(text))
+        if astro or (personal and not exempt) or context_astro or (birth_date and not exempt):
             return "kundli"
         # A bare date with a generic "tell me about" is treated as astrology in
         # this product unless it is clearly an ordinary date question.
@@ -247,15 +251,17 @@ def tool_action_for(question: str) -> Optional[Dict[str, Any]]:
 
     # Educational questions stay in Ask. Personal chart placement/reading
     # wording is the boundary that recommends Kundli.
-    if _personal(text, r"\b(?:my|make my|read my|tell me about my)\s+(?:kundli|birth chart|chart)\b") \
+    if _personal(text, r"\b(?:my|make my|read my|tell me about my|calculate my|show my)\s+(?:kundli|birth chart|chart)\b") \
             or _personal(text, r"\b(?:where is|what is|show me)\s+(?:my\s+)?(?:saturn|jupiter|mars|mercury|venus|sun|moon|rahu|ketu|ascendant|lagna)\s+(?:in my chart|in my kundli|doing)\b") \
             or _personal(text, r"\bwhat (?:is|are) my (?:\d+(?:st|nd|rd|th)\s+house|planets?|nakshatra|rashi|lagna|ascendant)\b") \
-            or _personal(text, r"\bwhat planets? are in my (?:\d+(?:st|nd|rd|th)\s+house|chart|kundli)\b"):
+            or _personal(text, r"\bwhat planets? (?:are in my (?:\d+(?:st|nd|rd|th)\s+house|chart|kundli)|do i have)\b"):
         return {"answer": KUNDLI_ANSWER, "tool_action": _action("kundli")}
 
     if _personal(text, r"\bwhat (?:mahadasha|antardasha|pratyantardasha|sookshma|prana) am i (?:running|in)\b") \
-            or _personal(text, r"\b(?:show|tell me) my (?:current )?(?:mahadasha|antardasha|pratyantardasha|sookshma|prana)\b") \
+            or _personal(text, r"\b(?:show|tell me|calculate) my (?:current )?(?:mahadasha|antardasha|pratyantardasha|sookshma|prana)\b") \
             or _personal(text, r"\bwhich (?:mahadasha|antardasha|dasha) am i\b") \
+            or _personal(text, r"\b(?:show|tell me|calculate) my (?:current )?dasha(?: timeline)?\b") \
+            or _personal(text, r"\bdasha timeline\b") \
             or _personal(text, r"\bwhen does my .*\bdasha\b.*\bstart"):
         return {"answer": TOOL_COPY["dasha"], "tool_action": _action("dasha")}
 
@@ -265,21 +271,22 @@ def tool_action_for(question: str) -> Optional[Dict[str, Any]]:
             or _personal(text, r"\bmy (?:27 )?navtara\b"):
         return {"answer": TOOL_COPY["navtara"], "tool_action": _action("navtara")}
 
-    if _personal(text, r"\b(?:how is|what is|what's) today(?:'s)? prediction for [a-z]+\b") \
-            or _personal(text, r"\bhow is today for my moon sign\b") \
-            or _personal(text, r"\bhow is today (?:looking )?for me\b") \
-            or _personal(text, r"\bwhat should i be mindful of today\b") \
-            or _personal(text, r"\b(?:give me|what is|what's) today(?:'s)? (?:prediction|reading)\b"):
+    # Daily is a calculation/structured experience: only an explicit request
+    # routes there. Everyday concerns like "how will my day go?" stay in Ask.
+    if _personal(text, r"\b(?:calculate|open|show)\b.*\btoday(?:'s)?\b.*\b(?:detailed )?(?:daily )?(?:prediction|reading)\b") \
+            or _personal(text, r"\b(?:calculate|open|show) (?:my )?(?:today(?:'s)? )?daily (?:prediction|reading)\b") \
+            or _personal(text, r"\bgive me today(?:'s)? detailed (?:daily )?prediction\b"):
         return {"answer": TOOL_COPY["daily"], "tool_action": _action("daily")}
 
-    if _personal(text, r"\b(?:compatible astrologically|match our charts|marriage compatibility|compatibility of (?:us|our))\b") \
-            or _personal(text, r"\bcheck (?:our|the|me and .*?) (?:marriage )?compatibility\b") \
+    if _personal(text, r"\b(?:compatible astrologically|match our charts|match our kundli|marriage compatibility|compatibility of (?:us|our))\b") \
+            or _personal(text, r"\b(?:check|calculate) (?:our|the|my|me and .*?) (?:marriage )?compatibility\b") \
+            or _personal(text, r"\bcalculate (?:our |the )?compatibility\b") \
             or _personal(text, r"\bare (?:me and|we) .*compatible\b") \
             or _personal(text, r"\bcompatibility between\b"):
         return {"answer": TOOL_COPY["matchmaking"], "tool_action": _action("matchmaking")}
 
-    if _personal(text, r"\b(?:give me|do|need) (?:a )?yes(?:[ /-]?or)?[ /-]?no (?:reading|answer)\b") \
-            or _personal(text, r"\byes or no answer\b"):
+    if _personal(text, r"\b(?:give me|do|need|show me) (?:a )?(?:strict )?yes(?:[ /-]?or)?[ /-]?no (?:reading|answer|result)\b") \
+            or _personal(text, r"\byes or no (?:answer|result)\b"):
         return {"answer": TOOL_COPY["yes_no"], "tool_action": _action("yes_no")}
 
     if _personal(text, r"\b(?:panchang today|today's panchang|today's tithi|today's nakshatra|tithi.*nakshatra.*yoga|nakshatra.*tithi.*yoga)\b") \
@@ -318,14 +325,18 @@ def followup_tool_action_for(question: str, tool: str) -> Optional[Dict[str, Any
     if topic_change and not re.search(r"\b(?:chart|kundli|dasha|navtara|planet|saturn|jupiter)\b", text):
         return {"clear": True}
 
+    # Only genuine meta/continuation questions retain the tool context. A new
+    # concern such as "how will my day go?" must not match (that stays in Ask).
     ambiguous = re.search(
         r"^(?:so\s+|then\s+)?(?:what can (?:you|u) (?:tell|say|share|explain|help)(?:\s+me)?(?:\s+about)?"
         r"|what else can (?:you|u) (?:tell|say|share|explain)"
-        r"|tell me more|anything else|what else|why|how|then|explain)\b"
+        r"|tell me more|anything else)\b"
         r"|\bwhat about\b|\bwhat does that mean\b|\bwhat does .* mean for me\b"
         r"|\b(?:then )?what can i ask\b|\bwhat do you know\b",
         text,
     )
+    if not ambiguous and re.fullmatch(r"(?:why|how|then|explain|hmm|ok(?:ay)?)\??", text.strip()):
+        ambiguous = True
     if not ambiguous and re.search(
         r"^and\s+(?:saturn|jupiter|mars|mercury|venus|sun|moon|rahu|ketu)\b",
         text,

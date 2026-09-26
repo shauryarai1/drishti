@@ -106,7 +106,7 @@ def test_personal_guidance_reuses_private_tarot_without_exposing_method(env, cli
     ("Where is Saturn in my chart?", "kundli", "/kundli"),
     ("What Mahadasha am I running?", "dasha", "/kundli"),
     ("What is my Navtara?", "navtara", "/kundli"),
-    ("What's today's prediction for Aries?", "daily", "/daily"),
+    ("Calculate today's detailed prediction", "daily", "/daily"),
     ("Are we compatible astrologically?", "matchmaking", "/compatibility"),
     ("Give me a yes/no reading", "yes_no", "/yes-no"),
     ("Panchang today", "panchang", "/panchang"),
@@ -148,14 +148,20 @@ def test_kundli_request_never_calls_build_kundli_inside_ask(env, client):
     assert env["groq"] == []
 
 
-def test_kundli_tool_context_survives_ambiguous_followup(env, client):
-    first = ask(client, "21/01/2010 tell me about my kundli", "sticky-kundli")
-    second = ask(client, "so what can u tell me?", "sticky-kundli")
-
+def test_kundli_boundary_does_not_poison_later_conversation(env, client):
+    """A Kundli boundary must not force later messages back to Kundli."""
+    first = ask(client, "21/01/2010 tell me about my kundli", "after-kundli")
     assert first["tool_action"]["tool"] == "kundli"
-    assert second["tool_action"]["tool"] == "kundli"
+    assert "separate chart experience" in first["answer"].lower()
+
+    second = ask(client, "so what can u tell me?", "after-kundli")
+    # The follow-up is ordinary conversation, not a repeated Kundli redirect.
+    assert "tool_action" not in second
     assert "date of birth" not in second["answer"].lower()
-    assert env["groq"] == [], "ambiguous personal-chart follow-up is blocked before the model"
+
+    # A brand-new personal concern is answered conversationally, never Kundli.
+    third = ask(client, "okay then how will my day go?", "after-kundli")
+    assert third.get("tool_action", {}).get("tool") not in ("kundli", "daily")
 
 
 @pytest.mark.parametrize("followup", [
@@ -166,8 +172,7 @@ def test_kundli_followups_never_generate_personal_placements(env, client, follow
     ask(client, "Tell me about my Kundli", f"sticky-{followup[:3]}")
     body = ask(client, followup, f"sticky-{followup[:3]}")
 
-    assert body["tool_action"]["tool"] == "kundli"
-    assert env["groq"] == []
+    assert body.get("tool_action", {}).get("tool") != "kundli"
     assert all(sign not in body["answer"] for sign in (" in Aries", " in Aquarius", " in Capricorn"))
 
 
@@ -329,14 +334,27 @@ def test_ordinary_date_questions_stay_normal(env, client):
         assert len(env["groq"]) == before + 1, question
 
 
-def test_contextual_kundli_followups_make_zero_provider_calls(env, client):
-    ask(client, "Tell me about my Kundli", "zero-provider")
+@pytest.mark.parametrize("question", [
+    "How will my day go?",
+    "How will today be for me?",
+    "What should I focus on today?",
+    "I'm nervous about tomorrow.",
+    "Will things get better?",
+    "I'm confused about a relationship.",
+    "Should I talk to this person?",
+    "I'm worried about an interview.",
+    "I feel stuck. What should I do?",
+    "How might this situation unfold?",
+])
+def test_personal_concerns_are_answered_conversationally(env, client, question):
+    """Personal concerns get private guidance, never a forced tool redirect."""
     before = len(env["groq"])
-    for index, followup in enumerate(("tell me more", "what about Saturn?", "and Jupiter?")):
-        body = ask(client, followup, "zero-provider")
-        assert body["tool_action"]["tool"] == "kundli"
-        assert len(env["groq"]) == before, f"{followup} reached the provider"
-        assert _no_placements(body["answer"])
+    body = ask(client, question, f"concern-{abs(hash(question)) % 10000}")
+
+    assert body.get("tool_action", {}).get("tool") not in (
+        "kundli", "daily", "matchmaking", "yes_no"), question
+    assert len(env["groq"]) == before + 1, question
+    assert _no_placements(body["answer"])
 
 
 def test_topic_change_after_kundli_redirect_is_not_blocked(env, client):
@@ -354,17 +372,26 @@ GENERIC_PITCH = ("schoolwork", "science", "history", "story", "homework",
                  "brainstorm", "tutor")
 
 
-def test_astrology_followup_after_kundli_stays_in_astrology(env, client):
-    ask(client, "tell me about my kundli 21/01/2010", "companion")
-    before = len(env["groq"])
-    body = ask(client, "so what can u tell then", "companion")
+def test_new_concern_after_kundli_is_conversational(env, client):
+    """After a Kundli boundary, a new concern is answered conversationally."""
+    first = ask(client, "tell me about my kundli 21/01/2010", "companion")
+    assert first["tool_action"]["tool"] == "kundli"
 
-    assert body["tool_action"]["tool"] == "kundli"
-    assert len(env["groq"]) == before, "no provider call for a contextual follow-up"
-    answer = body["answer"].lower()
-    assert "astrolog" in answer or "kundli" in answer
-    assert not any(term in answer for term in GENERIC_PITCH), answer
+    body = ask(client, "okay then how will my day go?", "companion")
+    assert body.get("tool_action", {}).get("tool") not in ("kundli", "daily")
+    assert "date of birth" not in body["answer"].lower()
     assert _no_placements(body["answer"])
+
+
+def test_astrology_context_capability_followup_is_tool_specific(env, client):
+    """A meta follow-up retains the active dedicated-tool context (not Kundli)."""
+    ask(client, "Which dasha am I running?", "companion-dasha")
+    body = ask(client, "what can you tell me then", "companion-dasha")
+
+    assert body["tool_action"]["tool"] == "dasha"
+    answer = body["answer"].lower()
+    assert "dasha" in answer
+    assert not any(term in answer for term in GENERIC_PITCH), answer
 
 
 def test_capability_question_describes_astrology_companion(env, client):
@@ -384,13 +411,18 @@ def test_capability_question_describes_astrology_companion(env, client):
     ("Tell me my current mahadasha", "dasha"),
     ("What is my Navtara?", "navtara"),
     ("Show my 27 Navtara positions", "navtara"),
-    ("How is today looking for me?", "daily"),
+    ("Calculate today's detailed prediction", "daily"),
     ("Check compatibility between me and her", "matchmaking"),
+    ("Calculate compatibility between us", "matchmaking"),
     ("Are me and this person compatible?", "matchmaking"),
     ("What is today's Tithi?", "panchang"),
     ("Tell me today's Nakshatra", "panchang"),
     ("Give me an overview of my life", "life_summary"),
+    ("Show my life summary", "life_summary"),
     ("I need a yes or no answer", "yes_no"),
+    ("Give me a strict Yes/No result", "yes_no"),
+    ("Calculate my Navtara", "navtara"),
+    ("Show my current Dasha timeline", "dasha"),
     ("21/01/2010 tell me my Moon sign", "kundli"),
 ])
 def test_personal_calculation_routes_to_the_right_tool(env, client, question, tool):

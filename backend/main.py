@@ -476,20 +476,23 @@ async def ask_endpoint(payload: ChatRequest):
                             tool_action_for)
 
     last_tool = get_tool_intent(conversation_id)
+    # Personal concerns (career, relationships, decisions, "how will my day
+    # go?") are answered conversationally, never auto-routed to a tool.
+    personal_route = route in (PERSONAL_READING, READING_FOLLOWUP)
     # A placement the user (or KAVACH) already supplied may be interpreted in
     # conversation; only explicit supplied-fact wording defers tool routing.
-    # Concept questions still reach normal conversation, while personal or
-    # current calculations route to the most appropriate dedicated tool.
     supplied_fact = is_supplied_fact(question)
+    # Only explicit structured/calculation requests match here; ordinary
+    # concerns never do, so this is safe even on a personal-route message.
     tool_action = None if supplied_fact else tool_action_for(question)
-    # Structural pre-provider gate: a request that requires deriving astrology
-    # for a person or birth date is answered by a dedicated KAVACH tool and is
-    # never sent to the model. This is independent of the sticky tool intent.
+    # Structural pre-provider gate (always runs, even for personal concerns):
+    # a request that requires deriving astrology for a person or birth date is
+    # answered by the Kundli boundary and is never sent to the model.
     if not tool_action:
         required = personal_astrology_tool(question, last_tool)
         if required:
             tool_action = guard_for_tool(required)
-    if not tool_action and last_tool:
+    if not tool_action and last_tool and not personal_route and not supplied_fact:
         followup = followup_tool_action_for(question, last_tool)
         if followup and followup.get("clear"):
             clear_tool_intent(conversation_id)
@@ -498,9 +501,15 @@ async def ask_endpoint(payload: ChatRequest):
     if not tool_action and last_tool:
         clear_tool_intent(conversation_id)
     if tool_action:
+        tool = tool_action["tool_action"]["tool"]
         append(conversation_id, "user", question)
         append(conversation_id, "assistant", tool_action["answer"])
-        set_tool_intent(conversation_id, tool_action["tool_action"]["tool"])
+        # Kundli is a boundary, not a conversation mode: never let it poison
+        # later messages. Other tool contexts are retained for meta follow-ups.
+        if tool == "kundli":
+            clear_tool_intent(conversation_id)
+        else:
+            set_tool_intent(conversation_id, tool)
         set_mode(conversation_id, route)
         record_submission(
             "ask",
