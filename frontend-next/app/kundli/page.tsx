@@ -534,7 +534,7 @@ export default function KundliPage() {
             {tab === 'NAVTARA' && (
               <div className="mt-4">
                 <PanelBoundary label="Navtara">
-                  <NavtaraPanel data={kundli.navtara} />
+                  <NavtaraPanel data={kundli.navtara} kundli={kundli} />
                 </PanelBoundary>
               </div>
             )}

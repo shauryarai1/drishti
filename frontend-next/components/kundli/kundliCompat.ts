@@ -43,6 +43,41 @@ export function navtaraJanma(data: unknown): string {
   return value && typeof value.janmaNakshatra === 'string' ? value.janmaNakshatra : '';
 }
 
+// Canonical, spelling-agnostic Nakshatra key. Mirrors the backend normaliser
+// (letters only, lower-cased) so the join is not fragile display-string matching.
+function nakshatraKey(name: string): string {
+  return (name || '').toLowerCase().replace(/[^a-z]/g, '');
+}
+
+/**
+ * Join the authoritative natal planets to their calculated Nakshatra.
+ *
+ * Source is the Kundli response's own `planets[].nakshatra` (already computed by
+ * the existing engine). No Nakshatra is recalculated here. Returns a map of
+ * canonical Nakshatra key -> planet names, in the order the planets appear.
+ */
+export function planetsByNakshatra(kundli: unknown): Record<string, string[]> {
+  const page = (kundli ?? {}) as { planets?: unknown };
+  const planets = Array.isArray(page.planets) ? page.planets : [];
+  const map: Record<string, string[]> = {};
+  for (const item of planets) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const planet = typeof row.planet === 'string' ? row.planet : '';
+    const nakshatra = typeof row.nakshatra === 'string' ? row.nakshatra : '';
+    if (!planet || !nakshatra) continue;
+    const key = nakshatraKey(nakshatra);
+    if (!key) continue;
+    (map[key] ??= []).push(planet);
+  }
+  return map;
+}
+
+/** Planets occupying one Navtara row's Nakshatra (empty when none/unknown). */
+export function planetsForNakshatra(nakshatra: string, map: Record<string, string[]>): string[] {
+  return map[nakshatraKey(nakshatra)] ?? [];
+}
+
 export interface AscendantNakshatraView {
   rashi: string;
   nakshatra: string;

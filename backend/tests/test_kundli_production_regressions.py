@@ -125,7 +125,7 @@ def test_navtara_panel_is_legacy_safe():
 
     page = PAGE.read_text(encoding="utf-8")
     assert "<PanelBoundary label=\"Navtara\">" in page
-    assert "<NavtaraPanel data={kundli.navtara} />" in page
+    assert "<NavtaraPanel data={kundli.navtara} kundli={kundli} />" in page
     assert "PanelBoundary" in page  # other optional panels are protected too
 
 
