@@ -10,7 +10,7 @@ const SAFE_PATHS = [
   '/history',
   '/admin',
   '/kundli',
-  '/daily',
+  '/weekly-prediction',
   '/your-week',
   '/life-summary',
   '/reading',

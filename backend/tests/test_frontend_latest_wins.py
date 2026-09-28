@@ -13,9 +13,8 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 APP = REPO / "frontend-next" / "app"
 
 GUARDED = {
-    "daily": APP / "daily" / "page.tsx",
     "life-summary": APP / "life-summary" / "page.tsx",
-    "your-week": APP / "your-week" / "page.tsx",
+    "weekly-prediction": APP / "weekly-prediction" / "page.tsx",
     "kundli": APP / "kundli" / "page.tsx",
 }
 
@@ -33,13 +32,6 @@ def test_every_result_page_has_a_latest_wins_guard():
         assert "!== " in source and ".current) return;" in source, name
 
 
-def test_daily_guard_keeps_the_request_id():
-    source = _read(GUARDED["daily"])
-    assert "requestIdRef" in source
-    assert "if (requestId !== requestIdRef.current) return;" in source
-    assert "if (requestId === requestIdRef.current) setBusy(false);" in source
-
-
 def test_life_summary_guard_covers_data_error_and_busy():
     source = _read(GUARDED["life-summary"])
     assert "requestIdRef" in source
@@ -47,8 +39,8 @@ def test_life_summary_guard_covers_data_error_and_busy():
     assert "if (requestId === requestIdRef.current) setBusy(false);" in source
 
 
-def test_your_week_guard_covers_the_reveal_fetch():
-    source = _read(GUARDED["your-week"])
+def test_weekly_prediction_guard_covers_the_reveal_fetch():
+    source = _read(GUARDED["weekly-prediction"])
     assert "requestIdRef" in source
     # The user-triggered reveal uses the latest-request-wins guard.
     assert source.count("requestIdRef.current + 1") == 1
@@ -68,7 +60,7 @@ def test_payloads_and_methodology_untouched_by_the_guard():
     """The guard must not change what is requested."""
     life = _read(GUARDED["life-summary"])
     assert "`${API_BASE}/life-summary`" in life
-    week = _read(GUARDED["your-week"])
+    week = _read(GUARDED["weekly-prediction"])
     assert "fetchWeekly(" in week and "birth:" in week and "forecast:" in week
     kundli = _read(GUARDED["kundli"])
     assert "fetchKundli(payload)" in kundli and "fetchKundliTransits(payload)" in kundli

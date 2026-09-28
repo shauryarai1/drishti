@@ -246,7 +246,7 @@ export default function YourWeekPage() {
             </span>
             <span className={LABEL}>KAVACH <span className="text-[#A62A34]">&bull;</span> Personal Guidance</span>
           </div>
-          <h1 className="mt-3 text-2xl font-semibold tracking-[0.06em] text-[#F7F5F0] sm:text-4xl">YOUR WEEK</h1>
+          <h1 className="mt-3 text-2xl font-semibold tracking-[0.06em] text-[#F7F5F0] sm:text-4xl">WEEKLY PREDICTION</h1>
           <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-[#EEE9DF]/55">
             See the rhythm of your next seven days &mdash; when to move forward, when to take things slowly,
             and when support may be easier to find.
@@ -315,7 +315,7 @@ export default function YourWeekPage() {
           <>
             <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className={LABEL}>Your Week</div>
+                <div className={LABEL}>Weekly Prediction</div>
                 <div className="mt-1 text-xl font-semibold tracking-[0.08em] text-[#F7F5F0]">{range}</div>
               </div>
               <button

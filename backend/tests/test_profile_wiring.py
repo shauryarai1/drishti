@@ -16,7 +16,7 @@ LIB = REPO / "frontend-next" / "lib"
 
 # Astrology tools are PUBLIC: usable without an account. Accounts remain an
 # optional convenience for saving readings and profiles.
-PUBLIC_TOOLS = ("kundli", "reading", "results", "life-summary", "your-week",
+PUBLIC_TOOLS = ("kundli", "reading", "results", "life-summary", "weekly-prediction",
                 "compatibility", "ask", "yes-no", "panchang")
 # Account management surfaces stay protected. They self-guard in the page (no
 # route-level gate), so a signed-out visitor is asked to sign in, not blocked
@@ -39,18 +39,11 @@ def _layout(route: str) -> str:
 def test_astrology_tools_have_no_login_or_profile_gate():
     for route in PUBLIC_TOOLS:
         layout = APP / route / "layout.tsx"
-        # daily has no layout; the rest have a pass-through layout.
         if layout.exists():
             source = _read(layout)
             assert "GuardedLayout" not in source, route
             assert "RequireProfile" not in source, route
             assert "return children" in source, route
-
-
-def test_daily_has_no_login_gate():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "RequireProfile" not in page
-    assert "<RequireProfile>" not in page
 
 
 def test_account_only_routes_still_enforce_authentication():
@@ -139,37 +132,6 @@ def test_primary_edit_cannot_change_primary_status():
     assert "clean(input)" in update
 
 
-# --- Daily wiring ------------------------------------------------------------
-def test_daily_is_transit_only_and_has_no_person_selector():
-    page = _read(APP / "daily" / "page.tsx")
-    # Transit-only: no natal derivation, no profile list, no person selector.
-    assert "deriveNatal" not in page
-    assert "listProfiles" not in page
-    assert "PersonSelector" not in page
-    assert "natalRef" not in page
-    assert "RequireProfile" not in page  # Daily is public: no login/profile gate
-
-
-def test_daily_never_sends_natal_values():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "natal_moon" not in page
-    assert "natal_nakshatra" not in page
-    # It still sends the selected city and the local calendar date.
-    assert "date: localDate" in page
-
-
-def test_natal_values_come_from_the_existing_authoritative_engine():
-    natal = _read(LIB / "natal.ts")
-    # The authoritative /kundli chart is used, because /interpretation hides
-    # planets and nakshatras (that mismatch was the personal-Daily failure).
-    assert "fetchKundli" in natal, "reuse the existing authoritative chart path"
-    assert "api.getInterpretation" not in natal, "the interpretation payload has no nakshatra"
-    assert "row.planet === 'Moon'" in natal
-    assert "moon?.rashi" in natal and "moon?.nakshatra" in natal
-    for banned in ("swisseph", "swe.", "RASHI_NAKSHATRA", "rashiToNakshatra"):
-        assert banned not in natal, banned
-
-
 def test_require_profile_signed_out_resolves_to_the_sign_in_notice():
     guard = _read(COMPONENTS / "RequireProfile.tsx")
     # The session-loading branch must depend on the AUTH status only. Treating a
@@ -186,74 +148,6 @@ def test_auth_session_resolution_is_bounded():
     assert "setTimeout" in auth
     assert "current === 'loading' ? 'signedOut' : current" in auth
     assert "clearTimeout(settle)" in auth
-
-
-def test_daily_keeps_city_latest_wins_and_renders_the_transit_nakshatra():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "requestIdRef" in page
-    assert "if (requestId !== requestIdRef.current) return;" in page
-    # The integrated transit-Nakshatra prediction is rendered per sign.
-    assert "card.pattern" in page
-    assert "data.nakshatra?.name" in page
-
-
-def test_daily_keeps_midnight_rollover():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "localCalendarDate" in page and "dayRef" in page
-
-
-# --- Daily personalisation acceptance (11A-11I) ------------------------------
-def test_daily_never_falls_back_to_a_saved_reading():
-    page = _read(APP / "daily" / "page.tsx")
-    # No fallback to a saved Kundli / reading / cached person anywhere.
-    for banned in ("getSavedKundli", "latestKundli", "savedReading", "getHistory", "listReadings"):
-        assert banned not in page, banned
-    # And no natal/personal retry state remains in the current Daily flow.
-    assert "profileError" not in page
-    assert "personal reading" not in page
-
-
-def test_daily_is_public_and_creates_no_anonymous_profile():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "RequireProfile" not in page
-    assert "createPrimaryProfile" not in page
-    assert "createOtherPerson" not in page
-    assert "sessionStorage" not in page
-
-
-def test_daily_never_creates_an_anonymous_profile():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "RequireProfile" not in page
-    # No session-only birth profile: Daily never writes or creates a profile.
-    assert "createPrimaryProfile" not in page
-    assert "createOtherPerson" not in page
-    assert "sessionStorage" not in page
-    assert "birth_profiles" not in page
-
-
-def test_daily_location_stays_separate_from_birth_place():
-    page = _read(APP / "daily" / "page.tsx")
-    # The birth place is never sent as the Daily location.
-    assert "birth_place_name" not in page
-    assert "localCalendarDate" in page
-    # Nothing asks the user to type a Rashi / Nakshatra / Lagna.
-    lowered = page.lower()
-    assert "rashi</label>" not in lowered
-
-
-def test_personal_natal_code_is_preserved_but_unused_by_daily():
-    # The natal/Navtara code is kept for possible future use...
-    natal = LIB / "natal.ts"
-    assert natal.exists()
-    assert "deriveNatal" in _read(natal)
-    # ...but the current Daily page does not import or call it.
-    assert "lib/natal" not in _read(APP / "daily" / "page.tsx")
-
-
-def test_daily_has_no_person_switch_logic():
-    page = _read(APP / "daily" / "page.tsx")
-    assert "selectPerson" not in page
-    assert "selectedId" not in page
 
 
 # --- account profile management ---------------------------------------------

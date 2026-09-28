@@ -26,7 +26,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'Manrope', 'sans-serif'],
+        display: ['var(--font-display)', 'Sora', 'sans-serif'],
         serif: ['var(--font-serif)', 'Cinzel', 'serif'],
       },
     },

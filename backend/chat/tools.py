@@ -16,7 +16,6 @@ TOOL_REGISTRY: Dict[str, Dict[str, str]] = {
     "kundli": {"label": "Open Kundli", "href": "/kundli"},
     "dasha": {"label": "Open Kundli - Dasha", "href": "/kundli"},
     "navtara": {"label": "Open Kundli - Navtara", "href": "/kundli"},
-    "daily": {"label": "Open Daily", "href": "/daily"},
     "matchmaking": {"label": "Open Matchmaking", "href": "/compatibility"},
     "yes_no": {"label": "Open Yes / No", "href": "/yes-no"},
     "panchang": {"label": "Open Panchang", "href": "/panchang"},
@@ -34,7 +33,6 @@ KUNDLI_ANSWER = (
 TOOL_COPY = {
     "dasha": "Your current Dasha needs the dedicated Kundli calculation. KAVACH Kundli has the full Vimshottari Dasha section.",
     "navtara": "Your personal Navtara needs the dedicated Kundli calculation. KAVACH Kundli has the full Navtara section.",
-    "daily": "A dedicated KAVACH Daily reading is the right place for a calculated prediction for today.",
     "matchmaking": "KAVACH Matchmaking is the better tool for a calculated compatibility analysis.",
     "yes_no": "KAVACH Yes / No is the dedicated tool for a focused yes-or-no reading.",
     "panchang": "KAVACH Panchang is the right tool for today's Tithi, Nakshatra, Yoga and Karana.",
@@ -54,7 +52,6 @@ CAPABILITY_FOLLOWUP = {
     "kundli": "I can help you understand your astrology - what planets, houses, Nakshatras, Dashas, Navtara and different placements mean, or interpret details you already have from your KAVACH chart. For your actual planetary placements, open Kundli first so I use KAVACH's calculated chart instead of guessing them.",
     "dasha": "I can explain how Dasha works - Mahadasha, Antardasha and the deeper levels - and what each period signifies. To see which Dasha you are actually running, open KAVACH Kundli and its Dasha section, which calculates it from your birth chart.",
     "navtara": "I can explain the Navtara cycle and what each Tara such as Janma, Sampat or Vipat means. To see your own 27 Navtara positions, open KAVACH Kundli and its Navtara section.",
-    "daily": "I can explain how daily guidance works and what it is based on. For a calculated reading for today, KAVACH Daily is the right place.",
     "matchmaking": "I can explain what compatibility factors such as Tara, Gana and Nadi mean. For a calculated match between two people, KAVACH Matchmaking is the right tool.",
     "yes_no": "I can talk through a decision with you and explain what a yes-or-no reading considers. For a focused reading, KAVACH Yes / No is the dedicated tool.",
     "panchang": "I can explain Tithi, Nakshatra, Yoga and Karana. For today's calculated Panchang, KAVACH Panchang is the right place.",
@@ -134,8 +131,20 @@ _SUPPLIED = re.compile(
     re.I,
 )
 _FIRST_PERSON = re.compile(r"\bmy\b|\bme\b|\bmine\b|\bmyself\b", re.I)
-_ASTRO_CONTEXT_TOOLS = ("kundli", "dasha", "navtara", "daily", "matchmaking",
+_ASTRO_CONTEXT_TOOLS = ("kundli", "dasha", "navtara", "matchmaking",
                         "panchang", "life_summary", "yes_no")
+
+# Self-description: the user asking about their own self ("tell me about
+# myself", "describe me", "who am I") is a personal reading answered from the
+# hidden Tarot. Even when the message also carries a birth date, it is NOT a
+# request to derive a chart - so it must not be blocked by the Kundli boundary.
+_SELF_DESCRIPTION = re.compile(
+    r"\b(?:tell\s+me\s+about\s+(?:me|myself|my\s+life|my\s+future|my\s+personality)"
+    r"|about\s+me|about\s+myself|about\s+my\s+life|about\s+my\s+future"
+    r"|about\s+my\s+personality|my\s+personality|describe\s+me|describe\s+myself"
+    r"|who\s+am\s+i(?:really)?)\b",
+    re.I,
+)
 
 
 def guard_for_tool(tool: str) -> Dict[str, Any]:
@@ -187,6 +196,12 @@ def personal_astrology_tool(question: str, context_tool: Optional[str] = None) -
     if not text:
         return None
     if is_interpretation_allowed(text):
+        return None
+    # A self-description reading ("tell me about myself", "describe me",
+    # "who am I") is answered from the hidden Tarot, never from a chart. Any
+    # birth date the user adds alongside is incidental context, not a request
+    # to derive placements - so it must not redirect to the Kundli boundary.
+    if _SELF_DESCRIPTION.search(text):
         return None
 
     if re.search(r"\b(?:my|mine|our)\b.*\b(?:mahadasha|antardasha|pratyantardasha|sookshma|prana)\b"
@@ -274,13 +289,6 @@ def tool_action_for(question: str) -> Optional[Dict[str, Any]]:
             or _personal(text, r"\bwhich (?:is my|nakshatra is my|is my)\b.*\b(?:janma|sampat|vipat|kshema|pratyari|sadhaka|vadha|mitra|ati-?mitra) tara\b") \
             or _personal(text, r"\bmy (?:27 )?navtara\b"):
         return {"answer": TOOL_COPY["navtara"], "tool_action": _action("navtara")}
-
-    # Daily is a calculation/structured experience: only an explicit request
-    # routes there. Everyday concerns like "how will my day go?" stay in Ask.
-    if _personal(text, r"\b(?:calculate|open|show)\b.*\btoday(?:'s)?\b.*\b(?:detailed )?(?:daily )?(?:prediction|reading)\b") \
-            or _personal(text, r"\b(?:calculate|open|show) (?:my )?(?:today(?:'s)? )?daily (?:prediction|reading)\b") \
-            or _personal(text, r"\bgive me today(?:'s)? detailed (?:daily )?prediction\b"):
-        return {"answer": TOOL_COPY["daily"], "tool_action": _action("daily")}
 
     if _personal(text, r"\b(?:compatible astrologically|match our charts|match our kundli|marriage compatibility|compatibility of (?:us|our))\b") \
             or _personal(text, r"\b(?:check|calculate) (?:our|the|my|me and .*?) (?:marriage )?compatibility\b") \

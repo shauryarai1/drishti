@@ -194,7 +194,7 @@ def test_navtara_is_not_wired_into_any_public_route():
     root = pathlib.Path(__file__).resolve().parents[1]
     main_source = (root / "main.py").read_text(encoding="utf-8").lower()
     assert "navtara" not in main_source
-    assert "daily" in main_source  # /daily remains the public daily feature
+    assert "weekly" in main_source  # /weekly remains the public weekly feature
 
 
 def test_no_planet_rules_were_invented():

@@ -106,7 +106,6 @@ def test_personal_guidance_reuses_private_tarot_without_exposing_method(env, cli
     ("Where is Saturn in my chart?", "kundli", "/kundli"),
     ("What Mahadasha am I running?", "dasha", "/kundli"),
     ("What is my Navtara?", "navtara", "/kundli"),
-    ("Calculate today's detailed prediction", "daily", "/daily"),
     ("Are we compatible astrologically?", "matchmaking", "/compatibility"),
     ("Give me a yes/no reading", "yes_no", "/yes-no"),
     ("Panchang today", "panchang", "/panchang"),
@@ -161,7 +160,7 @@ def test_kundli_boundary_does_not_poison_later_conversation(env, client):
 
     # A brand-new personal concern is answered conversationally, never Kundli.
     third = ask(client, "okay then how will my day go?", "after-kundli")
-    assert third.get("tool_action", {}).get("tool") not in ("kundli", "daily")
+    assert third.get("tool_action", {}).get("tool") != "kundli"
 
 
 @pytest.mark.parametrize("followup", [
@@ -352,7 +351,7 @@ def test_personal_concerns_are_answered_conversationally(env, client, question):
     body = ask(client, question, f"concern-{abs(hash(question)) % 10000}")
 
     assert body.get("tool_action", {}).get("tool") not in (
-        "kundli", "daily", "matchmaking", "yes_no"), question
+        "kundli", "matchmaking", "yes_no"), question
     assert len(env["groq"]) == before + 1, question
     assert _no_placements(body["answer"])
 
@@ -378,7 +377,7 @@ def test_new_concern_after_kundli_is_conversational(env, client):
     assert first["tool_action"]["tool"] == "kundli"
 
     body = ask(client, "okay then how will my day go?", "companion")
-    assert body.get("tool_action", {}).get("tool") not in ("kundli", "daily")
+    assert body.get("tool_action", {}).get("tool") != "kundli"
     assert "date of birth" not in body["answer"].lower()
     assert _no_placements(body["answer"])
 
@@ -411,7 +410,6 @@ def test_capability_question_describes_astrology_companion(env, client):
     ("Tell me my current mahadasha", "dasha"),
     ("What is my Navtara?", "navtara"),
     ("Show my 27 Navtara positions", "navtara"),
-    ("Calculate today's detailed prediction", "daily"),
     ("Check compatibility between me and her", "matchmaking"),
     ("Calculate compatibility between us", "matchmaking"),
     ("Are me and this person compatible?", "matchmaking"),
@@ -432,6 +430,49 @@ def test_personal_calculation_routes_to_the_right_tool(env, client, question, to
     assert body["tool_action"]["tool"] == tool, question
     assert len(env["groq"]) == before, "deterministic tool routes never call the provider"
     assert env["kundli"] == 0
+
+
+def test_removed_daily_product_has_no_ask_tool_action(env, client):
+    """The removed Daily route must not be offered as an Ask destination."""
+    before = len(env["groq"])
+    body = ask(client, "Calculate today's detailed prediction", "removed-daily")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+
+
+@pytest.mark.parametrize("question", [
+    "tell me about me",
+    "tell me about myself",
+    "describe me",
+    "who am i",
+    "tell me about my life",
+    "tell me about me, i was born 21/01/2010 at 8am in Delhi",
+    "describe me, i was born 15 May 1990",
+])
+def test_self_description_is_answered_from_tarot_not_blocked(env, client, question):
+    """Self-description is a reading, even with a supplied birth date."""
+    before = len(env["groq"])
+    body = ask(client, question, f"self-{abs(hash(question)) % 1000}")
+
+    assert "tool_action" not in body, question
+    assert len(env["groq"]) == before + 1, question
+    assert env["reading"] >= 1, "self-description must draw the hidden reading"
+    assert _no_placements(body["answer"])
+
+
+def test_real_chart_requests_remain_blocked_with_birth_data(env, client):
+    """A genuine chart/planet derivation request is still redirected to Kundli."""
+    for question in (
+        "What sign was the Moon in on 21 Jan 2010?",
+        "21 January 2010, 08:19 AM, Delhi — tell me my planets",
+        "What can you tell me about someone born 21 Jan 2010?",
+    ):
+        before = len(env["groq"])
+        body = ask(client, question, f"chart-{abs(hash(question)) % 1000}")
+        assert body["tool_action"]["tool"] == "kundli", question
+        assert len(env["groq"]) == before, question
+        assert _no_placements(body["answer"])
 
 
 @pytest.mark.parametrize("question", [

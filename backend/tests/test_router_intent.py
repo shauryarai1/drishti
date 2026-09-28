@@ -50,6 +50,22 @@ PERSONAL_READING_QUESTIONS = [
     "what should I be cautious about?",
 ]
 
+# Self-description: the user asking about their own self is a personal reading,
+# never a request for birth details.
+SELF_DESCRIPTION_QUESTIONS = [
+    "tell me about me",
+    "tell me about myself",
+    "describe me",
+    "describe myself",
+    "who am i",
+    "who am i really",
+    "tell me about my personality",
+    "tell me about my life",
+    "tell me about my future",
+    "tell me about me, i was born 21/01/2010 at 8am in Delhi",
+    "describe me, i was born 15 May 1990",
+]
+
 OUT_OF_SCOPE_QUESTIONS = [
     "will it rain tomorrow?",
     "will India win the match?",
@@ -69,6 +85,12 @@ def test_astrology_questions(question):
 
 @pytest.mark.parametrize("question", PERSONAL_READING_QUESTIONS)
 def test_personal_reading_questions(question):
+    assert route_message(question, has_active_reading=False) == PERSONAL_READING, question
+
+
+@pytest.mark.parametrize("question", SELF_DESCRIPTION_QUESTIONS)
+def test_self_description_questions_route_to_a_reading(question):
+    """Asking about their own self is a reading, never a birth-details request."""
     assert route_message(question, has_active_reading=False) == PERSONAL_READING, question
 
 

@@ -7,15 +7,7 @@ No astrology methodology is tested here - only WHEN a new day is selected.
 
 from __future__ import annotations
 
-import pathlib
-
-import pytest
-
 from daily.engine import build_daily_prediction, get_daily_moon_rashi
-
-REPO = pathlib.Path(__file__).resolve().parents[2]
-PAGE = REPO / "frontend-next" / "app" / "daily" / "page.tsx"
-LIB = REPO / "frontend-next" / "lib" / "daily.ts"
 
 DELHI = {"latitude": 28.6139, "longitude": 77.209, "timezone": "Asia/Kolkata", "place": "Delhi"}
 
@@ -88,32 +80,3 @@ def test_missing_date_still_falls_back_to_the_local_today():
     result = get_daily_moon_rashi(dict(DELHI))
     assert result["date"]
     assert result["date"] == result["sunrise"][:10]
-
-
-def test_frontend_sends_the_local_calendar_date():
-    lib = LIB.read_text(encoding="utf-8")
-    page = PAGE.read_text(encoding="utf-8")
-    assert "date?: string" in lib, "the request must be able to carry the local date"
-    assert "date: localDate" in page, "the page must send the local calendar date"
-    assert "localCalendarDate" in page
-    # The zone is used to compute it, never the server's date.
-    assert "timeZone" in page
-
-
-def test_frontend_refreshes_across_midnight():
-    page = PAGE.read_text(encoding="utf-8")
-    # A tab left open must roll over without a manual reload.
-    assert "setInterval(" in page
-    assert "visibilitychange" in page
-    assert "dayRef" in page
-    assert "if (dayRef.current && current !== dayRef.current)" in page
-
-
-def test_frontend_daily_is_latest_wins_and_uncached():
-    """A slow response for a previous city must never overwrite the current one."""
-    page = PAGE.read_text(encoding="utf-8")
-    lib = LIB.read_text(encoding="utf-8")
-    assert "requestIdRef" in page
-    assert "if (requestId !== requestIdRef.current) return;" in page
-    # The reading must never be served from a cache.
-    assert "cache: 'no-store'" in lib

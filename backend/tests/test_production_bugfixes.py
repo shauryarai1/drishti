@@ -10,7 +10,6 @@ Deterministic: provider HTTP is mocked, "now" is frozen, no live quota used.
 from __future__ import annotations
 
 import json
-import pathlib
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -310,22 +309,6 @@ def test_daily_respects_the_selected_timezone_for_the_local_date():
         index = panchang["sun_moon_rashi"]["moon"]["index"]
         assert result["rashi"] == RASHIS[index], tz_name
         assert result["sunrise"] == panchang["sun_moon"]["sunrise"], tz_name
-
-
-def test_daily_frontend_sends_the_selected_city_timezone():
-    root = pathlib.Path(__file__).resolve().parents[2]
-    source = (root / "frontend-next" / "lib" / "daily.ts").read_text(encoding="utf-8")
-    page = (root / "frontend-next" / "app" / "daily" / "page.tsx").read_text(encoding="utf-8")
-
-    # Every city carries its own IANA timezone...
-    assert source.count("{ label: '") == source.count("timezone: '"), "every city needs a timezone"
-    assert source.count("timezone: '") >= 10
-    assert "timezone: 'Europe/London'" in source
-    assert "timezone: 'America/New_York'" in source
-    assert "timezone: 'Australia/Sydney'" in source
-    # ...and the page sends the selected city's zone, not a fixed one.
-    assert "timezone: found.timezone" in page
-    assert "timezone: 'Asia/Kolkata',\n        }));" not in page
 
 
 # ============================ BUG 1: Ask KAVACH ==============================

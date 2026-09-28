@@ -40,7 +40,7 @@ export default function ProfileSetupPage() {
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [next, setNext] = useState('/daily');
+  const [next, setNext] = useState('/weekly-prediction');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

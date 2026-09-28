@@ -44,6 +44,15 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      {
+        source: '/your-week',
+        destination: '/weekly-prediction',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

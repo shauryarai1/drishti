@@ -28,7 +28,7 @@ export const DRISHTI_COLORS = {
 
 export const DRISHTI_FONTS = {
   sans: 'var(--font-sans, "Plus Jakarta Sans", -apple-system, sans-serif)',
-  display: 'var(--font-display, "Manrope", sans-serif)',
+  display: 'var(--font-display, "Sora", sans-serif)',
   serif: 'var(--font-serif, "Cinzel", Georgia, serif)',
 } as const;
 

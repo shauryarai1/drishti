@@ -174,7 +174,7 @@ def test_reusable_services_cta_exists_and_result_pages_are_untouched():
 
     # The CTA is deliberately NOT placed on any result page yet.
     for page in ("app/ask/page.tsx", "app/results/page.tsx", "app/life-summary/page.tsx",
-                 "app/daily/page.tsx", "app/your-week/page.tsx", "app/yes-no/page.tsx"):
+                 "app/weekly-prediction/page.tsx", "app/yes-no/page.tsx"):
         assert "ServicesCTA" not in _read(FRONTEND / page), page
 
 

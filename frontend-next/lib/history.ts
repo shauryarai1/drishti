@@ -16,7 +16,7 @@ export const SCHEMA_VERSION = 1;
 export const READING_TYPE_LABELS: Record<ReadingType, string> = {
   kundli: 'Kundli',
   daily: 'Daily Prediction',
-  weekly: 'Your Week',
+  weekly: 'Weekly Prediction',
   life_summary: 'Life Summary',
   dasha: 'Dasha Reading',
   ask: 'Ask KAVACH',

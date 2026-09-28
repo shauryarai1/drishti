@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL } from '../lib/site';
 
-const PUBLIC_ROUTES = ['', '/your-week', '/life-summary', '/daily', '/kundli', '/panchang', '/ask', '/privacy', '/terms'];
+const PUBLIC_ROUTES = ['', '/weekly-prediction', '/life-summary', '/kundli', '/panchang', '/ask', '/privacy', '/terms'];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();

@@ -15,8 +15,7 @@ interface HeaderProps {
 const NAV_LINKS = [
   { label: 'Home', href: '/' },
   { label: 'Kundli Generator', href: '/kundli' },
-  { label: 'Daily Prediction', href: '/daily' },
-  { label: 'Your Week', href: '/your-week' },
+  { label: 'Weekly Prediction', href: '/weekly-prediction' },
   { label: 'Life Summary', href: '/life-summary' },
   { label: 'Ask Kavach', href: '/ask' },
   { label: 'YES / NO', href: '/yes-no' },
@@ -29,7 +28,7 @@ const FADE_BASE =
   'pointer-events-none absolute inset-y-0 z-10 w-[clamp(14px,1.8vw,30px)] transition-opacity duration-200';
 
 const ARROW_CLASS =
-  'hidden h-7 w-7 shrink-0 items-center justify-center text-[#EEE9DF]/40 transition-colors duration-200 hover:text-[#F7F5F0] md:flex cursor-pointer';
+  'hidden h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#EEE9DF]/45 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105 hover:text-[#F7F5F0] focus-visible:scale-105 focus-visible:text-[#F7F5F0] focus-visible:outline-none md:flex';
 
 export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
   const pathname = usePathname();
@@ -106,13 +105,13 @@ export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
         isLight ? 'border-[#171717]/10 bg-[#F7F5F0]/85' : 'border-[#A62A34]/15 bg-[#090909]/80'
       }`}
     >
-      <div className="mx-auto w-full max-w-[1560px] px-[clamp(24px,4vw,72px)]">
-        <div className="flex flex-wrap items-center gap-y-2.5 py-3.5 md:flex-nowrap md:py-4">
+      <div className="mx-auto w-full max-w-[1560px] px-[clamp(28px,4vw,76px)]">
+        <div className="flex flex-wrap items-center gap-y-3 py-4 md:flex-nowrap md:py-5">
           {/* Brand — fixed left */}
-          <a href="/" className="group order-1 flex shrink-0 select-none items-center gap-2.5">
-            <div className="h-2.5 w-2.5 rotate-45 border border-[#B39250] transition-colors duration-300 group-hover:bg-[#A62A34]" />
+          <a href="/" className="group order-1 flex shrink-0 select-none items-center gap-3">
+            <div className="h-2.5 w-2.5 rotate-45 border border-[#B39250] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:rotate-[135deg] group-hover:bg-[#A62A34]" />
             <span
-              className={`text-base font-bold tracking-[0.25em] transition-colors duration-200 sm:text-lg ${
+              className={`font-display text-base font-semibold tracking-[0.24em] transition-colors duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:text-lg ${
                 isLight ? 'text-[#171717]' : 'text-[#F7F5F0]'
               }`}
             >
@@ -135,7 +134,7 @@ export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
           </div>
 
           {/* Navigable rail — own row on mobile, center zone on desktop */}
-          <div className="order-3 w-full min-w-0 md:order-2 md:ml-[clamp(28px,3vw,52px)] md:mr-[clamp(24px,2.6vw,44px)] md:w-auto md:flex-1">
+          <div className="order-3 w-full min-w-0 md:order-2 md:ml-[clamp(32px,3.2vw,56px)] md:mr-[clamp(28px,2.8vw,48px)] md:w-auto md:flex-1">
             <div className="flex items-center">
               {canScrollLeft && (
                 <button
@@ -152,8 +151,8 @@ export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
                 <nav
                   ref={railRef}
                   aria-label="Primary"
-                  className="flex items-center overflow-x-auto py-1 [overscroll-behavior-x:contain] [scroll-behavior:smooth] [scrollbar-width:none] motion-reduce:[scroll-behavior:auto] [&::-webkit-scrollbar]:hidden"
-                  style={{ gap: 'clamp(22px, 2.4vw, 40px)' }}
+                  className="flex items-center overflow-x-auto py-2 antialiased [overscroll-behavior-x:contain] [scroll-behavior:smooth] [scrollbar-width:none] motion-reduce:[scroll-behavior:auto] [&::-webkit-scrollbar]:hidden"
+                  style={{ gap: 'clamp(28px,2.8vw,48px)' }}
                 >
                   {NAV_LINKS.map((link) => {
                     const active = isActive(link.href);
@@ -162,7 +161,7 @@ export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
                         key={link.href}
                         href={link.href}
                         aria-current={active ? 'page' : undefined}
-                        className={`relative shrink-0 whitespace-nowrap pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-200 md:text-[11px] ${
+                        className={`group relative shrink-0 whitespace-nowrap px-0.5 pb-2.5 pt-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.16em] transition-[color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px focus-visible:-translate-y-px focus-visible:outline-none md:text-xs ${
                           isLight
                             ? active
                               ? 'text-[#171717]'
@@ -175,8 +174,8 @@ export function Header({ onStartReading, variant = 'immersive' }: HeaderProps) {
                         {link.label}
                         <span
                           aria-hidden
-                          className={`absolute inset-x-0 bottom-0 h-px bg-[#A62A34] transition-opacity duration-200 ${
-                            active ? 'opacity-100' : 'opacity-0'
+                          className={`absolute inset-x-0 bottom-0 h-[2px] origin-left rounded-full bg-[#A62A34] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-visible:scale-x-100 ${
+                            active ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-70'
                           }`}
                         />
                       </a>

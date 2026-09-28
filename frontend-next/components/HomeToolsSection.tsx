@@ -37,12 +37,6 @@ const PRIMARY_TOOLS: Tool[] = [
     cta: 'GET AN ANSWER',
   },
   {
-    href: '/daily',
-    title: 'Daily Prediction',
-    description: 'See what may deserve your attention today.',
-    cta: 'VIEW TODAY',
-  },
-  {
     href: '/compatibility',
     title: 'Matchmaking',
     description: 'Compare two charts through traditional Kuta matching and deeper relationship analysis.',
@@ -54,7 +48,7 @@ const PRIMARY_TOOLS: Tool[] = [
 const SECONDARY_TOOLS = [
   { href: '/kundli', label: 'Kundli Generator' },
   { href: '/panchang', label: 'Panchang' },
-  { href: '/your-week', label: 'Your Week' },
+  { href: '/weekly-prediction', label: 'Weekly Prediction' },
 ];
 
 export function HomeToolsSection() {

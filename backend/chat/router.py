@@ -94,6 +94,11 @@ PERSONAL_TOPIC_MARKERS = (
     "my future", "my life", "my situation", "my decision", "my project",
     "my exam", "my interview", "my health", "my family", "my child", "my path",
     "my growth", "about me", "for me", "guide me", "help me decide",
+    # Self-description: the user asking about their own self is a personal
+    # reading, never a request for birth details.
+    "about myself", "tell me about myself", "describe me", "describe myself",
+    "who am i", "who am i really", "about my personality", "my personality",
+    "tell me about my life", "about my life", "tell me about my future",
     "i feel stuck", "i'm stuck", "im stuck", "i feel lost", "i am confused",
     "i'm confused", "im confused", "what do you think about me",
     "i'm sad", "i am sad", "i feel sad", "i'm worried", "i am worried",

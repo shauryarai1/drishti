@@ -261,7 +261,7 @@ export default function AskPage() {
       });
       const body = await res.json();
       const allowedTools: Record<string, string> = {
-        kundli: '/kundli', dasha: '/kundli', navtara: '/kundli', daily: '/daily',
+        kundli: '/kundli', dasha: '/kundli', navtara: '/kundli',
         matchmaking: '/compatibility', yes_no: '/yes-no', panchang: '/panchang',
         life_summary: '/life-summary',
       };
