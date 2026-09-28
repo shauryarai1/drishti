@@ -475,6 +475,62 @@ def test_real_chart_requests_remain_blocked_with_birth_data(env, client):
         assert _no_placements(body["answer"])
 
 
+# --- worried-person / real-world uncertainty: private guidance, not refusal ----
+def test_worried_loved_one_is_answered_with_private_guidance(env, client):
+    """A worried family member gets interpretive guidance, not a refusal."""
+    q = ("My didi is worried for her husband, his phn is off, can u chk where he is "
+         "and when he will come back")
+    before = len(env["groq"])
+    body = ask(client, q, "worried-didi")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1, "the concern must reach the provider"
+    assert env["reading"] >= 1, "worried-person concern must draw the hidden reading"
+    assert _no_placements(body["answer"])
+
+
+def test_deictic_followup_retains_the_prior_concern(env, client):
+    """'Check it astrologically' must keep the husband/phone context, not generic."""
+    first = ask(client,
+                "My didi is worried for her husband, his phn is off, can u chk where he is",
+                "deictic-flow")
+    assert env["reading"] == 1
+
+    before = len(env["groq"])
+    second = ask(client, "Check it astrologically", "deictic-flow")
+    assert "tool_action" not in second
+    assert len(env["groq"]) == before + 1
+    assert env["reading"] >= 1, "follow-up reuses/extends the hidden reading"
+    # The provider must receive the private guidance context, not empty astrology.
+    assert env["groq"][-1]["private"], "the reading context must reach the model"
+    assert _no_placements(second["answer"])
+
+
+def test_explicit_tarot_request_is_private_guidance_not_education(env, client):
+    q = "Why his phn is off, check tarot cards & tell us his mood"
+    before = len(env["groq"])
+    body = ask(client, q, "tarot-worried")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+    assert env["reading"] >= 1, "an explicit cards request must draw a reading"
+    assert env["groq"][-1]["private"], "the reading context must reach the model"
+    assert _no_placements(body["answer"])
+
+
+def test_location_only_question_keeps_guidance_when_context_exists(env, client):
+    """A bare location question with an active concern continues guidance."""
+    ask(client,
+        "My husband's phone is off, I'm worried. When will he come back?",
+        "loc-flow")
+    before = len(env["groq"])
+    body = ask(client, "Where exactly is he right now?", "loc-flow")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+    assert env["reading"] >= 1
+
+
 @pytest.mark.parametrize("question", [
     "What is Mahadasha?",
     "What does Navtara mean?",

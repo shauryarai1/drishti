@@ -31,6 +31,8 @@ assistant using the recent conversation.
 
 from __future__ import annotations
 
+import re
+
 CASUAL = "CASUAL"
 ASTROLOGY = "ASTROLOGY"
 PERSONAL_READING = "PERSONAL_READING"
@@ -174,6 +176,39 @@ CHIT_CHAT = ("hi", "hello", "hey", "thanks", "thank", "thx", "bye", "ok", "okay"
              "cool", "nice", "great", "got", "hmm", "good", "night", "morning")
 GREETINGS = ("how are you", "how's it going", "how are things", "what's up", "whats up")
 
+# Real-world uncertainty about someone the user cares about (a loved one).
+# These are personal concerns suitable for interpretive guidance even though
+# they are not about the user's own life. A person noun plus an absence /
+# worry / communication signal marks a suitable third-party concern.
+LOVED_ONE_NOUNS = (
+    "husband", "wife", "didi", "bhai", "brother", "sister", "mother", "father",
+    "mom", "dad", "son", "daughter", "partner", "boyfriend", "girlfriend",
+    "uncle", "aunt", "cousin", "friend", "fiance", "family", "grandma",
+    "grandpa", "child",
+)
+ABSENCE_SIGNALS = (
+    "worried", "worries", "worry", "concern", "concerned", "phone", "phn",
+    "not answering", "not responding", "no response", "unreachable", "missing",
+    "where is he", "where is she", "when will he", "when will she",
+    "come back", "come home", "hasn't come", "hasn't returned", "return",
+    "mood", "safe", "track", "locate", "location", "find",
+)
+
+# Explicitly asking KAVACH to use cards / a Tarot reading for the concern.
+TAROT_SIGNALS = (
+    "tarot", "draw cards", "draw the cards", "card reading", "do a reading",
+    "do a tarot reading", "check the cards", "check the tarot", "read the cards",
+)
+
+# Applying astrology or cards to the concern already on the table
+# ("check it astrologically", "check it", "draw cards for it").
+_DEICTIC_APPLY = re.compile(
+    r"\b(?:check|look\s+(?:at|into)|do|run|see|draw|read)\s+"
+    r"(?:it|that|this|the\s+cards?|the\s+tarot|a\s+reading|the\s+reading|"
+    r"it\s+astrologically|that\s+astrologically)\b",
+    re.I,
+)
+
 
 def _tokens(text: str) -> list:
     import re as _re
@@ -215,6 +250,30 @@ def is_out_of_scope(message: str) -> bool:
     return any(signal in text for signal in OUT_OF_SCOPE_SIGNALS)
 
 
+def is_loved_one_uncertainty(message: str) -> bool:
+    """True for a real-world uncertainty about a person the user cares about.
+
+    These are personal concerns (a worried family member, someone's phone off,
+    where someone is) suitable for the private interpretive guidance path, even
+    though they are not about the user's own life.
+    """
+    text = (message or "").lower()
+    has_person = any(noun in text for noun in LOVED_ONE_NOUNS)
+    has_signal = any(signal in text for signal in ABSENCE_SIGNALS)
+    return has_person and has_signal
+
+
+def is_tarot_request(message: str) -> bool:
+    """True when the user explicitly asks KAVACH to use cards / a reading."""
+    text = (message or "").lower()
+    return any(signal in text for signal in TAROT_SIGNALS)
+
+
+def is_deictic_apply(message: str) -> bool:
+    """True when the user applies astrology/cards to the concern on the table."""
+    return bool(_DEICTIC_APPLY.search(message or ""))
+
+
 def route_message(message: str, has_active_reading: bool = False,
                   active_reading: dict | None = None,
                   last_mode: str | None = None) -> str:
@@ -226,6 +285,8 @@ def route_message(message: str, has_active_reading: bool = False,
     tokens = _tokens(text)
     astrology = has_astrology_signal(text)
     personal = is_personal_uncertainty(text) or is_personal_topic(text)
+    loved_one = is_loved_one_uncertainty(text)
+    tarot_request = is_tarot_request(text)
     out_of_scope = is_out_of_scope(text)
     standalone = any(signal in text for signal in STANDALONE_FACTUAL) and len(tokens) > 1
     has_marker = any(marker in text for marker in FOLLOW_UP_MARKERS)
@@ -237,6 +298,16 @@ def route_message(message: str, has_active_reading: bool = False,
     # 1. Lightweight conversation.
     if chit_chat:
         return CASUAL
+
+    # 1b. Applying astrology/cards to a concern already on the table
+    #     ("check it astrologically", "draw cards for it") continues that
+    #     reading rather than starting generic astrology education.
+    if is_deictic_apply(text):
+        if has_active_reading:
+            return READING_FOLLOWUP
+        # No active reading yet, but the ask is to apply cards/astrology: treat
+        # it as a concern to interpret rather than a generic astrology lesson.
+        return PERSONAL_READING
 
     # 2. Explicit astrology always wins: it selects the chart context.
     if astrology:
@@ -263,7 +334,9 @@ def route_message(message: str, has_active_reading: bool = False,
                 return READING_FOLLOWUP
 
     # 6. The user's own uncertainty, decision or life topic -> hidden reading.
-    if personal:
+    #    A real-world worry about a loved one or an explicit cards request is
+    #    also a suitable interpretive concern -> hidden reading.
+    if personal or loved_one or tarot_request:
         return PERSONAL_READING
 
     # 7. Answer by default: ordinary questions, follow-ups, corrections and

@@ -18,6 +18,7 @@ import pytest
 from chat.router import (ASTROLOGY, CASUAL, OUT_OF_SCOPE, PERSONAL_READING,
                          READING_FOLLOWUP, SCOPE_MESSAGE, has_astrology_signal,
                          is_out_of_scope, is_personal_topic, is_personal_uncertainty,
+                         is_loved_one_uncertainty, is_tarot_request,
                          route_message)
 
 CASUAL_MESSAGES = ["hi", "hello", "hey", "thanks", "okay", "how are you?", "thanks!"]
@@ -202,3 +203,37 @@ def test_conversational_fragments_are_answered_not_refused():
     for fragment in ("why?", "okay", "yes", "tell me more", "23.11.2009",
                      "I don't understand", "what about career?", "continue"):
         assert route_message(fragment, has_active_reading=False) == CASUAL, fragment
+
+
+# --- worried-person / real-world uncertainty routing --------------------------
+def test_loved_one_uncertainty_is_a_personal_reading():
+    q = ("My didi is worried for her husband, his phn is off, can u chk where he is "
+         "and when he will come back")
+    assert is_loved_one_uncertainty(q) is True
+    assert route_message(q, has_active_reading=False) == PERSONAL_READING
+
+
+def test_explicit_tarot_request_is_a_personal_reading():
+    q = "Why his phn is off, check tarot cards & tell us his mood"
+    assert is_tarot_request(q) is True
+    assert route_message(q, has_active_reading=False) == PERSONAL_READING
+
+
+def test_deictic_apply_continues_an_active_reading():
+    active = {"draw_id": "d"}
+    assert route_message("Check it astrologically", True, active) == READING_FOLLOWUP
+    assert route_message("Check it", True, active) == READING_FOLLOWUP
+    assert route_message("Draw cards for it", True, active) == READING_FOLLOWUP
+
+
+def test_deictic_apply_without_active_reading_is_a_reading():
+    assert route_message("Check it astrologically", False) == PERSONAL_READING
+
+
+def test_generic_astrology_stays_astrology():
+    assert route_message("What does Saturn represent?", False) == ASTROLOGY
+    assert route_message("What does Saturn represent?", True, {"draw_id": "d"}) == ASTROLOGY
+
+
+def test_personal_chart_request_does_not_turn_into_a_reading():
+    assert route_message("Where is my Saturn?", False) == ASTROLOGY
