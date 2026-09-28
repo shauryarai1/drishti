@@ -209,6 +209,30 @@ _DEICTIC_APPLY = re.compile(
     re.I,
 )
 
+# Third-party relationship / behavioural dynamics about another person ("he",
+# "his", "she"...) combined with a behaviour, communication, mood or absence
+# signal. These are situational concerns suitable for a private reading even
+# without naming a loved one or a first-person pronoun.
+THIRD_PERSON_REFS = ("he", "him", "his", "she", "her", "they", "them", "their")
+DYNAMIC_SIGNALS = (
+    "stopped talking", "stop talking", "not talking", "talking to me",
+    "ignoring", "ignored", "went quiet", "gone quiet", "distant", "cold",
+    "mood", "behaviour", "behavior", "feel", "feeling", "react", "treating",
+    "treats", "phone", "message", "text", "call", "answering", "response",
+    "respond", "relationship", "break up", "broke up", "ghosting", "pulled away",
+    "pulling away", "changed towards", "suddenly", "unreachable", "missing",
+    "come back", "come home", "return", "safe", "worried", "worries",
+)
+
+# Situational / contextual guidance phrasing that is about "this / the
+# situation" rather than a named person or a first-person concern.
+SITUATIONAL_SIGNALS = (
+    "what's going on", "what is going on", "what's happening", "what is happening",
+    "this situation", "the situation", "tell me about this", "how is this going",
+    "how will this go", "why is this happening", "what does this mean",
+    "check this", "what's the situation", "what is the situation",
+)
+
 
 def _tokens(text: str) -> list:
     import re as _re
@@ -274,6 +298,26 @@ def is_deictic_apply(message: str) -> bool:
     return bool(_DEICTIC_APPLY.search(message or ""))
 
 
+def is_relational_dynamic(message: str) -> bool:
+    """True for a situational concern about another person's behaviour/dynamics.
+
+    Covers "why has he suddenly stopped talking to me?", "why is his phone
+    off?", "tell me his mood": a third-party reference plus a behaviour,
+    communication, mood or absence signal. These are interpretive concerns
+    suitable for a private reading.
+    """
+    text = (message or "").lower()
+    has_ref = any(ref in text for ref in THIRD_PERSON_REFS)
+    has_dynamic = any(signal in text for signal in DYNAMIC_SIGNALS)
+    return has_ref and has_dynamic
+
+
+def is_situational_concern(message: str) -> bool:
+    """True for a question about "this / the situation" rather than a named thing."""
+    text = (message or "").lower()
+    return any(signal in text for signal in SITUATIONAL_SIGNALS)
+
+
 def route_message(message: str, has_active_reading: bool = False,
                   active_reading: dict | None = None,
                   last_mode: str | None = None) -> str:
@@ -287,6 +331,8 @@ def route_message(message: str, has_active_reading: bool = False,
     personal = is_personal_uncertainty(text) or is_personal_topic(text)
     loved_one = is_loved_one_uncertainty(text)
     tarot_request = is_tarot_request(text)
+    relational = is_relational_dynamic(text)
+    situational = is_situational_concern(text)
     out_of_scope = is_out_of_scope(text)
     standalone = any(signal in text for signal in STANDALONE_FACTUAL) and len(tokens) > 1
     has_marker = any(marker in text for marker in FOLLOW_UP_MARKERS)
@@ -334,9 +380,10 @@ def route_message(message: str, has_active_reading: bool = False,
                 return READING_FOLLOWUP
 
     # 6. The user's own uncertainty, decision or life topic -> hidden reading.
-    #    A real-world worry about a loved one or an explicit cards request is
-    #    also a suitable interpretive concern -> hidden reading.
-    if personal or loved_one or tarot_request:
+    #    A real-world worry about a loved one, an explicit cards request, a
+    #    relational dynamic about another person, or a "this situation" concern
+    #    are all suitable interpretive concerns -> hidden reading.
+    if personal or loved_one or tarot_request or relational or situational:
         return PERSONAL_READING
 
     # 7. Answer by default: ordinary questions, follow-ups, corrections and

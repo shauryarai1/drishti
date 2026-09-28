@@ -237,3 +237,41 @@ def test_generic_astrology_stays_astrology():
 
 def test_personal_chart_request_does_not_turn_into_a_reading():
     assert route_message("Where is my Saturn?", False) == ASTROLOGY
+
+
+# --- default private-draw bias -------------------------------------------------
+GUIDANCE_QUESTIONS = [
+    "Should I message her?",
+    "Why has he suddenly stopped talking to me?",
+    "How will my interview go?",
+    "What should I focus on today?",
+    "Why is his phone off?",
+    "Tell me his mood",
+    "What does this situation mean for me?",
+    "What's going on?",
+    "Tell me about this situation",
+    "Will this relationship work?",
+    "What should I do about my career?",
+    "Should I text her?",
+    "How will my day go?",
+]
+
+
+@pytest.mark.parametrize("question", GUIDANCE_QUESTIONS)
+def test_guidance_questions_default_to_a_private_draw(question):
+    """Personal/situational/guidance questions bias toward the hidden reading."""
+    assert route_message(question, has_active_reading=False) == PERSONAL_READING, question
+
+
+def test_deictic_and_mood_followups_retain_context():
+    active = {"draw_id": "d"}
+    assert route_message("And his mood?", True, active) == READING_FOLLOWUP
+    assert route_message("What about tomorrow?", True, active) == READING_FOLLOWUP
+    assert route_message("What should I do?", True, active) == READING_FOLLOWUP
+
+
+def test_factual_educational_questions_never_draw():
+    for question in ("What does Saturn represent?", "What is a Nakshatra?",
+                     "Who rules Aries?", "What is the capital of Japan?",
+                     "Explain photosynthesis."):
+        assert route_message(question, has_active_reading=False) in (ASTROLOGY, CASUAL), question

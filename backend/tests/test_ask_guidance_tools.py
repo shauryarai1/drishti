@@ -531,6 +531,58 @@ def test_location_only_question_keeps_guidance_when_context_exists(env, client):
     assert env["reading"] >= 1
 
 
+# --- default private-draw bias (end to end) -----------------------------------
+@pytest.mark.parametrize("question", [
+    "Should I text her?",
+    "Why has he suddenly stopped talking to me?",
+    "How will my interview go?",
+    "What should I focus on today?",
+    "Why is his phone off?",
+    "Tell me his mood",
+    "What's going on?",
+    "Will this relationship work?",
+    "What should I do about my career?",
+])
+def test_guidance_questions_draw_privately_end_to_end(env, client, question):
+    before = len(env["groq"])
+    body = ask(client, question, f"guidance-{abs(hash(question)) % 1000}")
+
+    assert "tool_action" not in body, question
+    assert len(env["groq"]) == before + 1, question
+    assert env["reading"] >= 1, f"{question} must draw the hidden reading"
+    assert env["groq"][-1]["private"], f"{question} must reach the model with guidance"
+    assert _no_placements(body["answer"])
+
+
+def test_how_will_my_day_go_draws_not_daily_redirect(env, client):
+    """'How will my day go?' is a reading, never a Daily tool redirect."""
+    before = len(env["groq"])
+    body = ask(client, "How will my day go?", "day-go")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+    assert env["reading"] >= 1
+
+
+def test_calculate_compatibility_still_routes_to_matchmaking(env, client):
+    """A structured tool request is not swallowed by the draw bias."""
+    before = len(env["groq"])
+    body = ask(client, "Calculate compatibility", "calc-comp")
+
+    assert body["tool_action"]["tool"] == "matchmaking"
+    assert len(env["groq"]) == before, "tool route never calls the provider"
+    assert env["reading"] == 0
+
+
+def test_educational_astrology_still_has_no_draw(env, client):
+    before = len(env["groq"])
+    body = ask(client, "What does Saturn represent?", "edu-saturn")
+
+    assert "tool_action" not in body
+    assert len(env["groq"]) == before + 1
+    assert env["reading"] == 0, "educational astrology must not draw"
+
+
 @pytest.mark.parametrize("question", [
     "What is Mahadasha?",
     "What does Navtara mean?",
